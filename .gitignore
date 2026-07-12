@@ -5,6 +5,7 @@ __pycache__/
 
 # local files
 .dev
+easymcf.code-workspace
 
 # local env variables
 .env

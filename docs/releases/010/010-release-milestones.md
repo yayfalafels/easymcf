@@ -4,8 +4,8 @@
 
 | id | release | seq | status   |   feature                                |
 | -- | ------- | --- | -------  | ---------------------------------------- |
-| 01 | 010     | 01  | open     | requirements                             |
-| 02 | 010     | 02  | pending  | test strategy                            |
+| 01 | 010     | 01  | done     | requirements                             |
+| 02 | 010     | 02  | open     | test strategy                            |
 | 03 | 010     | 03  | pending  | test cases                               |
 | 04 | 010     | 04  | pending  | data model                               |
 | 05 | 010     | 05  | pending  | architecture                             |

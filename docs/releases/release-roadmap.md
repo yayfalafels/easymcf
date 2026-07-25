@@ -26,6 +26,7 @@ __features__
 | 06 | search by keywords   | yes                | yes             | yes              | yes                     |
 | 07 | crm pipeline         | yes                | yes             | yes              | yes                     |
 | 08 | automated apply      | yes                | yes             | yes              | yes                     |
+| 09 | match algorithm      | primitive + salry  | primitive title | semantic desc    | semantic desc                    |
 
 __learning from mcfpipe__
 

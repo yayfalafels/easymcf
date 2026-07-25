@@ -13,6 +13,9 @@ easymcf.code-workspace
 # credentials
 .secrets
 
+# personal Claude Code overrides (project-scoped .claude/settings.json is committed)
+.claude/settings.local.json
+
 # C extensions
 *.so
 

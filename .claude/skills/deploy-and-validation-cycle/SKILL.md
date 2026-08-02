@@ -7,6 +7,8 @@ description: The local run-and-verify loop for easymcf — how to exercise a cha
 
 `010` has no cloud deploy step (REQ-PLAT-04) — "deploy" here means running the local backend/frontend/database and exercising the change, matching this project's general practice of verifying behavior rather than only relying on type checks or unit tests (see the top-level `verify` skill for the general version of this practice).
 
+Run backend/scraping/apply/DB commands through the `~/env` operational venv (never a throwaway one-off env) — see [local-infra-navigation](../local-infra-navigation/SKILL.md#python-virtual-environments--hard-rule).
+
 ## Status: scaffold, not yet backed by a running system
 
 The concrete commands below don't exist yet — they land with milestone 07 (local dev/test env) and 08 (seed data), alongside [local-infra-navigation](../local-infra-navigation/SKILL.md), which this skill depends on. **Update this file once those commands exist** with the actual start/reset/run sequence.

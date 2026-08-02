@@ -29,3 +29,4 @@ You implement easymcf's backend/data platform (REQ-PLAT-01..04 in [010-01-requir
 - No API Gateway/Lambda-style indirection — a plain local process.
 - Validate before persisting: required-field enforcement, type validation, date-format validation, and a 404 with a descriptive message for a missing record or unknown table — per `mcfpipe`'s documented validation test cases (see [easymcf-backend-api](../skills/easymcf-backend-api/SKILL.md)).
 - Verify changes by actually running the affected endpoint (curl/httpie or equivalent) against local/seed data before reporting done — see [deploy-and-validation-cycle](../skills/deploy-and-validation-cycle/SKILL.md).
+- Run the app/DB/CRUD code through the `~/env` operational venv, never a throwaway one-off env — see [local-infra-navigation](../skills/local-infra-navigation/SKILL.md#python-virtual-environments--hard-rule).

@@ -4,11 +4,11 @@
 
 | id | release | seq | status   |   feature                                |
 | -- | ------- | --- | -------  | ---------------------------------------- |
-| 01 | 010     | 01  | open     | requirements                             |
-| 02 | 010     | 02  | pending  | test strategy                            |
-| 03 | 010     | 03  | pending  | test cases                               |
-| 04 | 010     | 04  | pending  | data model                               |
-| 05 | 010     | 05  | pending  | architecture                             |
+| 01 | 010     | 01  | closed   | requirements                             |
+| 05 | 010     | 02  | pending  | architecture                             |
+| 02 | 010     | 03  | open     | test strategy                            |
+| 03 | 010     | 04  | pending  | test cases                               |
+| 04 | 010     | 05  | pending  | data model                               |
 | 06 | 010     | 06  | pending  | design                                   |
 | 07 | 010     | 07  | pending  | local dev and test env                   |
 | 08 | 010     | 08  | pending  | setup database seed data                 |

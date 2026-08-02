@@ -13,6 +13,9 @@ easymcf.code-workspace
 # credentials
 .secrets
 
+# real personal job-search history (source data for scripts/gen_test_data.py) — never commit
+test-data/
+
 # personal Claude Code overrides (project-scoped .claude/settings.json is committed)
 .claude/settings.local.json
 

@@ -26,6 +26,7 @@ Scoped in [docs/releases/010/010-claude-agent.md](docs/releases/010/010-claude-a
 - Never issue requests against the live `mycareersfuture.gov.sg` site, or read/commit a real session cookie export, `.env`, or `.secrets`, in an automated/unattended context — only when the user explicitly asks to run something live in that turn. Development and tests run against seed/fixture data (REQ-DEV-03).
 - Don't `git push` or take other high-blast-radius git actions without the user's explicit confirmation in that turn, even though `.claude/settings.json` pre-approves routine local Bash/file-write operations.
 - Cloud deployment, multi-user support, and CI/CD are out of scope for `010` — don't introduce AWS/cloud SDKs, credentials, or infrastructure as part of this release's work.
+- Only two Python virtual environments exist for this project — `~/.dev/dev-env` (one-time/throwaway dev tasks) and `~/env` (anything in the app's operational lifecycle: running the app, DB init/seed, CRUD, maintenance/data-patching, scraping and apply automation). **Never create an ad hoc/disposable venv for any operation, ever** — always run Python work through one of these two. See [local-infra-navigation](.claude/skills/local-infra-navigation/SKILL.md) for which env a given task belongs in and how to sync dependencies.
 
 ## Verifying changes
 

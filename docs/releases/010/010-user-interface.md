@@ -4,15 +4,20 @@
 
 Page inventory and UX behavior for the AngularJS frontend (REQ-FE-01/02), derived from [010-workflows.md](010-workflows.md) — every page below exists to drive one or more of that document's workflows, and every field/action on a page maps to an entity in [010-data-model.md](010-data-model.md). This is a conceptual/wireframe-level spec (structure, states, interactions), not a visual design — no layout grid, color, or component-library decisions.
 
-010 is a single local user on their own desktop machine (requirements "end user" section) — no responsive/mobile requirement, no multi-user affordances (no login screen beyond the MCF session flow below), no offline mode.
+010 is a single local user on their own desktop machine — no responsive/mobile requirement, no multi-user affordances. There is no login screen beyond the MCF session flow below, nor any offline mode.
 
 ## Information architecture
 
 The nav is organized around **domain entities** — the things the user owns and comes back to check on — not around the workflow numbers used to spec them. A user thinks "let me check my leads" or "what did today's search turn up," never "let me go do workflow 5." Four of the five nav destinations are exactly the nouns in the glossary: **Tracks**, **Posts**, **Leads**, **Applications**. Match score, stage, apply status — the mechanics workflows.md is precise about — show up as state *within* these entity views, not as separate destinations.
 
-The fifth destination, **Automation**, is deliberately not an entity the user curates. It's the operational machinery underneath the other four: run history (did the last search/apply actually work?) and MCF session status (is the credential the apply run depends on still valid?). Neither is something the user "manages" day to day the way they manage a lead or a track — they're checked occasionally, usually when something looks wrong elsewhere. Bundling them into one admin-adjacent nav item keeps the primary nav to the four things the user actually works with, rather than diluting it with two ops/diagnostic screens that would otherwise sit as peers to "Leads."
+The fifth destination, **Automation**, is deliberately not an entity the user curates. It's the operational machinery underneath the other four: 
 
-One consequence worth naming: this makes the page count line up with the nav count. Every nav destination is exactly one page; the two contextual views (Manual Post Entry, Lead Detail) are reached *from* a page rather than sitting in the nav themselves. The previous structure had two extra top-level pages (Run History, MCF Session) that weren't nav peers of the other five in any real sense — folding them into Automation removes that mismatch.
+1. run history, which addresses the questions such as did the last search/apply actually work?
+2. MCF session status, which addresses questions such as whether the credential the apply run depends on still valid?. 
+
+Neither is something the user "manages" day to day the way they manage a lead or a track — they're checked occasionally, usually when something looks wrong elsewhere. Bundling them into one admin-adjacent nav item keeps the primary nav to the four things the user actually works with, rather than diluting it with two ops/diagnostic screens that would otherwise sit as peers to "Leads."
+
+This makes the page count line up with the nav count. Every nav destination is exactly one page; the two contextual views (Manual Post Entry, Lead Detail) are reached *from* a page rather than sitting in the nav themselves. 
 
 ## Navigation structure
 
@@ -110,7 +115,7 @@ Sub-navigation: tabs across the top of the page — **Pipeline**, **Applied**, *
 
 The split follows how the two halves of a lead's life actually get used: `PROSPECT`/`TOAPPLY` are high-volume and triage-y (scanning many leads at once, queuing a batch for apply), which a board suits; `APPLIED` through `OFFER` are lower-volume and detail-y (one specific callback, one specific interview slot, one specific offer to weigh), where a focused list surfacing the stage's one relevant date beats a generic card.
 
-**Pipeline tab (board)** — `PROSPECT` and `TOAPPLY`:
+**Pipeline tab board** — `PROSPECT` and `TOAPPLY`:
 
 - Board layout, one column per stage; each card shows title, company, track, deadline (highlighted if approaching/passed), and days since last activity.
 - A card's days-since-last-activity indicator shifts into a warning state as it approaches the 28-day auto-expiry threshold (REQ-CRM-05), so the user isn't surprised when a stale lead moves itself to Closed. Last activity is the latest entry in the lead's activity log (REQ-CRM-08), not a bare timestamp, and this indicator applies across every tab on this page, not just the board.

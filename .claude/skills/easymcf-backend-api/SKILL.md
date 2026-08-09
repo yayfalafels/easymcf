@@ -23,6 +23,8 @@ POST   /{table}/delete
 
 Validate each request against the entity's schema. `mcfpipe/docs/validation.md`'s documented test cases are a useful checklist even though its implementation (DynamoDB-backed) doesn't carry forward: required-field enforcement (400 + field name), type validation, strict date-format validation, and 404 with a descriptive message for a missing record or unknown table name.
 
+This generic shape is the *default* for an entity, not a blanket mandate — [010-api.md](../../../docs/releases/010/010-api.md) classifies every entity into pure-generic, generic-shaped-but-hook-backed (same URL/verb, but a per-table hook enforces an invariant or writes a side effect — e.g. `lead`, where every write must also append a `lead_event` row and any `stage` change must be a legal transition), or a named endpoint (promote, queue, dequeue, run-trigger, session-upload) for an action that spans tables or triggers a background process. Read that document before wiring a route for `lead`, `application`, `post`, `run_log`, or `session` — none of those five is ever pure-generic.
+
 ## Runtime shape (REQ-PLAT-01)
 
 Plain local Python process (Flask reference), not behind API Gateway/Lambda or any request-routing indirection — this is a `flask run`-equivalent process the user starts locally. See the [Flask quickstart](https://flask.palletsprojects.com/en/stable/quickstart/) for routing/request-handling basics if unfamiliar with the framework.

@@ -2,13 +2,13 @@
 
 ## Purpose
 
-This document defines *how* release `010` is tested and validated — the strategy milestone 04 (test cases) instantiates into concrete cases per requirement, and every functional milestone (09–11) builds against. It answers three questions: which component is tested where, what tooling gives an agent fast pass/fail feedback without a human in the loop, and what strategic decisions govern which test cases get written for a given requirement. It does not restate the tier mechanics [010-architecture.md](010-architecture.md) already fixed (`ARCH-TEST-01..08`) — it builds the component-silo layer on top of them and gives the reasoning a future test-case author needs.
+This document defines *how* release `010` is tested and validated — the strategy milestone 03 (test cases) instantiates into concrete cases per requirement, and every functional milestone (09–11) builds against. It answers three questions: which component is tested where, what tooling gives an agent fast pass/fail feedback without a human in the loop, and what strategic decisions govern which test cases get written for a given requirement. It does not restate the tier mechanics [010-architecture.md](010-architecture.md) already fixed (`ARCH-TEST-01..08`) — it builds the component-silo layer on top of them and gives the reasoning a future test-case author needs.
 
 Decisions carry a `STRAT-*` id (grouped `SILO`/`CASE`/`LOOP`), mirroring the `REQ-*`/`ARCH-*` convention in [010-01-requirements.md](010-01-requirements.md) and [010-architecture.md](010-architecture.md).
 
 ## References
 
-- [010-01-requirements.md](010-01-requirements.md) — REQ-DEV-03..05 define the three test protocols (backend-only, mock e2e, live) this strategy operationalizes; every `REQ-*` in the functional sections is what test cases (milestone 04) trace back to.
+- [010-01-requirements.md](010-01-requirements.md) — REQ-DEV-03..05 define the three test protocols (backend-only, mock e2e, live) this strategy operationalizes; every `REQ-*` in the functional sections is what test cases (milestone 03) trace back to.
 - [010-architecture.md](010-architecture.md) — `ARCH-TEST-01..08` already fix the tiering (backend / mock e2e / live), pytest as the single test runner, state isolation (temp SQLite per session), the fixture corpus layout, and the agent build→test→debug command table. This document does not re-decide any of that.
 - [010-data-model.md](010-data-model.md) — entities (`role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `lead`, `lead_event`, `application`, `run_log`, `session`) the data-model silo below operates on.
 - [010-prototype.md](010-prototype.md) — the named `jobsearch` defect (`updateOpenExpired()`'s unconditional status overwrite) this strategy requires a regression test against.
@@ -36,7 +36,7 @@ This lets a schema or data-model change be validated **before** any service, API
 
 ### Backend API silo
 
-**STRAT-SILO-03** Endpoint test cases are **data, not code**: `tests/backend/cases/*.json`, one file per table or feature area, each entry carrying `name`, `req_id` (traceability back to `010-01-requirements.md`), `method`, `path`, `params`, `body`, `headers`, and an `expect` block (`status`, and either `body_contains` or a JSON-path value check). A single harness, `tests/backend/test_api_cases.py`, parametrizes pytest over every case in the directory — adding a test case is editing JSON, not writing a new Python function, which keeps the case count that milestone 04 produces from becoming a maintenance burden.
+**STRAT-SILO-03** Endpoint test cases are **data, not code**: `tests/backend/cases/*.json`, one file per table or feature area, each entry carrying `name`, `req_id` (traceability back to `010-01-requirements.md`), `method`, `path`, `params`, `body`, `headers`, and an `expect` block (`status`, and either `body_contains` or a JSON-path value check). A single harness, `tests/backend/test_api_cases.py`, parametrizes pytest over every case in the directory — adding a test case is editing JSON, not writing a new Python function, which keeps the case count that milestone 03 produces from becoming a maintenance burden.
 
 The harness executes cases against Flask's **test client** (`ARCH-TEST-03`'s decision — no spawned process, no port, tracebacks from the failing line), which is what the automated tier-1 loop runs. The same case format is also replayable by `scripts/api_tester.py`, a thin swap of the test client for the `requests` library against an already-running `python -m easymcf` instance — useful when a developer or agent has the dev server up and wants to poke a single endpoint interactively (this is the `requests`-based tool the CRM/apply/platform skills' "hit the affected endpoint directly" guidance in `deploy-and-validation-cycle` refers to) — but this interactive mode is a convenience, not part of the automated closed loop; `pytest -m backend` via the test client is.
 
@@ -85,6 +85,6 @@ This extends `ARCH-TEST-07`'s table with which silo to reach for **first**, befo
 ## Out of scope
 
 - Restating `ARCH-TEST-01..08`'s tier mechanics, isolation strategy, pytest configuration, or fixture corpus layout — read [010-architecture.md](010-architecture.md) directly; this document only adds the silo layer and the case-selection reasoning on top.
-- The concrete enumeration of test cases per requirement — that is milestone 04 (test cases), which this document is the direct input to.
+- The concrete enumeration of test cases per requirement — that is milestone 03 (test cases), which this document is the direct input to.
 - A JS unit-test tier (Karma/Jasmine) — `ARCH-TEST-05` already rejects this for `010`; the frontend silo proposed above (`STRAT-SILO-07`) is Playwright-based specifically so no node/npm/build toolchain is introduced (`ARCH-RUN-06`).
 - Performance/load testing — `010` is a single local user; not a meaningful category of risk for this release.

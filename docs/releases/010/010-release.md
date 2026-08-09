@@ -4,12 +4,11 @@
 
 Easy MCF is a platform to streamline the job search and application process for job seekers in Singapore using [MyCareerFutures](http://mycareersfuture.gov.sg/) website
 
-An early prototype version `jobsearch` is available for reference in the repo `jobsearch/` with webscraping methods developed in 
-python for automating the search and application process using `selenium` for python package.  
+An early prototype version `jobsearch` is available for reference in the repo `jobsearch/` with webscraping methods developed in python for automating the search and application process using `selenium` for python package.
 
 ## Features
 
-The current release will run locally with a segregated frontend - backend model with front-end running python fast api with a backend local sqlite db, and frontend on angular js.  
+The current release will run locally with a segregated frontend - backend model with a back end running python (Flask), a local sqlite db, and a frontend on angular js.
 
 | id | feature              | poc local       | 
 | -- | -------------------- | --------------- |

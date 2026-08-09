@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Page inventory and UX behavior for the AngularJS frontend (REQ-FE-01/02), derived from [010-workflows.md](010-workflows.md) — every page below exists to drive one or more of that document's workflows, and every field/action on a page maps to an entity in [010-data-model.md](010-data-model.md). This is a conceptual/wireframe-level spec (structure, states, interactions), not a visual design — no layout grid, color, or component-library decisions.
+Page inventory and UX behavior for the AngularJS frontend (REQ-FE-01/02), derived from [010-workflows.md](010-workflows.md) — every page below exists to drive one or more of that document's workflows, and every field/action on a page maps to an entity in [010-data-model.md](010-data-model.md). This is a conceptual/wireframe-level spec (structure, states, interactions), not a visual design — no layout grid, color, or component-library decisions. [010-frontend-app.md](010-frontend-app.md) elaborates this page inventory into the actual AngularJS module/routing/controller structure and the API calls each page makes — read that alongside this document once building, not instead of it.
 
 010 is a single local user on their own desktop machine — no responsive/mobile requirement, no multi-user affordances. There is no login screen beyond the MCF session flow below, nor any offline mode.
 

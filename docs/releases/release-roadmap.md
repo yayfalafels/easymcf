@@ -28,6 +28,8 @@ __features__
 | 08 | automated apply      | yes                | yes             | yes              | yes                     |
 | 09 | match algorithm      | primitive + salry  | primitive title | semantic desc    | semantic desc                    |
 
+`fe runtime: angular js` (row 02) carries an accepted, weighed risk in `010`: AngularJS 1.x has been end-of-life since 2021-12-31 with no security patches, mitigated for `010` only by [010-architecture.md](010/010-architecture.md)'s loopback-only binding (`ARCH-NET-01`) on a single-user, offline, un-authenticated POC. That mitigation does not carry forward automatically — `020` (MVP cloud) puts the same frontend behind a network-exposed, presumably multi-reachable deployment, so `020`'s design pass must explicitly re-affirm AngularJS (or replace it) rather than silently inheriting `010`'s row value.
+
 __learning from mcfpipe__
 
 `easymcf` has similar aims as the reference `mcfpipe` to improve on the prototype `jobsearch`, with similarities and differences by features:

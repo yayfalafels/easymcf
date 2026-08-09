@@ -21,6 +21,53 @@ Scoped in [docs/releases/010/010-claude-agent.md](docs/releases/010/010-claude-a
 
 **Subagents** (`.claude/agents/`) — delegate to these for role-scoped work: `product-manager` (requirements/milestones/scope/QA), `architect` (data model/architecture/design), `backend-api-developer` (Flask/SQLite), `frontend-ui-developer` (AngularJS), `automation-engineer` (scraping/apply browser automation), `testing-validation` (test strategy, test runs, requirement validation).
 
+## Documentation style
+
+_paragraph sections_
+
+Every `.md` file in this repo (`docs/releases/**`, skills, this file) writes each paragraph as a single unwrapped line in the raw source — no manual mid-paragraph line breaks at some fixed column width **for paragraph sections**. Let the editor soft-wrap for display.
+
+The hard line-length limit **only ever applies to genuinely tabular content** (e.g. a summary table's row width), **never to narrative prose**. This keeps diffs to the sentence that actually changed instead of reflowing a whole paragraph, and it's the existing convention in every doc under `docs/releases/` — match it rather than introducing a new one.
+
+_markdown table rules_
+
+1. limit row length in table rows to < 115 char
+2. pad to fixed width columns
+3. use numeric id column to the far left
+4. avoid useless columns with same value in all rows
+
+correctly formatted
+
+```md
+
+| id | seq | status   |   feature       |
+| -- | --- | -------  | --------------- |
+| 01 | 01  | closed   | requirements    |
+| 05 | 02  | open     | architecture    |
+| 02 | 03  | open     | test strategy   |
+| 03 | 04  | open     | test cases      |
+
+release: `010`
+
+feature specifications
+
+02. test strategy should describe how the test program can be broken down into isolated functional components which can be tested in isolated environments independently. these test environment should aim to accomodate automated feedback loops to enable build test evaluate and corrective feedback loops managed autonomously by an ai agent.
+
+```
+
+out-of-compliance
+
+```md
+
+| release | seq | status | feature | specification |
+| -- | --- | -- | -- | -- |
+| 010 | 01  | closed | requirements  | | 
+| 010 | 02  | open | architecture | | 
+| 010 | 03  | open | test strategy | test strategy should describe how the test program can be broken down into isolated functional components which can be tested in isolated environments independently. these test environment should aim to accomodate automated feedback loops to enable build test evaluate and corrective feedback loops managed autonomously by an ai agent |
+| 010 | 04  | open | test cases |
+
+```
+
 ## Boundaries
 
 - Never issue requests against the live `mycareersfuture.gov.sg` site, or read/commit a real session cookie export, `.env`, or `.secrets`, in an automated/unattended context — only when the user explicitly asks to run something live in that turn. Development and tests run against seed/fixture data (REQ-DEV-03).

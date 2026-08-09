@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines where test/seed data for `010` comes from, what it's missing, and how it is transformed from the `jobsearch` prototype's reference schema into the `010` target [data model](010-data-model.md). This document is the direct input to milestone 08 (setup database seed data) and to milestone 04 (test cases) wherever a test case needs a real-shaped fixture rather than a hand-built one — analogous to how [010-workflows.md](010-workflows.md) is the input to [010-data-model.md](010-data-model.md). It does not restate [010-architecture.md](010-architecture.md)'s seed-loading mechanics (`ARCH-STO-04..06`: seed is plain SQL text, loaded by `resetdb.py --seed`, dates are relative-to-load-time) — it supplies the *content* those mechanics load, and the transformation logic that produces it.
+Defines where test/seed data for `010` comes from, what it's missing, and how it is transformed from the `jobsearch` prototype's reference schema into the `010` target [data model](010-data-model.md). This document is the direct input to milestone 08 (setup database seed data) and to milestone 03 (test cases) wherever a test case needs a real-shaped fixture rather than a hand-built one — analogous to how [010-workflows.md](010-workflows.md) is the input to [010-data-model.md](010-data-model.md). It does not restate [010-architecture.md](010-architecture.md)'s seed-loading mechanics (`ARCH-STO-04..06`: seed is plain SQL text, loaded by `resetdb.py --seed`, dates are relative-to-load-time) — it supplies the *content* those mechanics load, and the transformation logic that produces it.
 
 Decisions carry a `TESTDATA-*` id (grouped `SRC`/`GAP`/`MAP`/`GEN`), mirroring the `REQ-*`/`ARCH-*`/`STRAT-*` convention.
 

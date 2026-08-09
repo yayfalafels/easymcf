@@ -12,6 +12,9 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirrorin
 - [release-roadmap.md](../release-roadmap.md) — the feature table fixing python/AngularJS/SQLite/local, and the `mcfpipe` lesson that bounds how much infrastructure `010` is allowed to build.
 - [010-prototype.md](010-prototype.md) — `jobsearch`'s runtime dependencies and local-env pain points (Selenium + matching chromedriver, Playwright Chromium, `cookies_mcf.json`, hardcoded Windows paths, `recommission.py`).
 - [010-data-model.md](010-data-model.md) — the tables the storage section below is concrete about.
+- [010-test-strategy.md](010-test-strategy.md) — written after this document's first version; `ARCH-TEST-09` confirms its `STRAT-SILO-07` proposal (the `tests/frontend/` silo) back into this document's repo layout and tier table.
+- [010-api.md](010-api.md) — elaborates `ARCH-RUN-10`'s endpoint surface into the full generic/hook/named classification and named-endpoint catalog, so that detail lives there instead of bloating this document.
+- [010-frontend-app.md](010-frontend-app.md) — elaborates `ARCH-RUN-06/09`'s frontend decisions and `ARCH-TEST-05/09`'s Playwright tiers into the AngularJS module/routing/API-client structure and the `data-testid` convention those tiers assert against.
 - `.claude/skills/local-infra-navigation/SKILL.md`, `.claude/skills/deploy-and-validation-cycle/SKILL.md` — both are scaffolds explicitly waiting on this document plus milestone 07/08; they are the intended destination for the run/reset/test commands defined here.
 
 ## Guiding constraint
@@ -26,7 +29,7 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirrorin
 
 **ARCH-RUN-02** Search and apply runs execute **in a background thread inside the same Flask process**, not as a separate worker or scheduled job. A run-trigger endpoint creates the `run_log` row, starts the thread, and returns the `run_log.id` immediately; the thread writes progress and outcome counts back to `run_log` (and posts/applications) incrementally. The UI polls `GET /api/run_log/{id}` — this is the mechanism behind [010-user-interface.md](010-user-interface.md)'s async-run pattern and REQ-FE-02. No Celery/RQ/redis. Rationale: the only thing a queue would buy at single-user scale is the ability to run two sweeps at once, which the next decision forbids anyway.
 
-**ARCH-RUN-03** **At most one run of each type may be in flight.** A trigger request returns `409` with the in-flight `run_log.id` if a `run_log` row of that `run_type` has `status = running`. This keeps the threading model trivially safe and prevents two scrapes competing for the same browser/session.
+**ARCH-RUN-03** **At most one run of each type may be in flight.** This is enforced atomically at the database layer, not by a check-then-act sequence in application code: `schema.sql` defines a partial unique index, `CREATE UNIQUE INDEX ux_run_log_running ON run_log(run_type) WHERE status = 'running'`, so a second `INSERT` of a `running` row for the same `run_type` fails the constraint regardless of how two request threads interleave. The run-trigger endpoint attempts the insert directly; on a `UNIQUE` constraint failure it looks up the existing `running` row for that `run_type` and returns `409` with its `run_log.id`, rather than `SELECT`-ing for an existing row before inserting — a separate pre-check would reopen the exact race (two threads both reading "no row running" before either commits) the index exists to close. This keeps the threading model trivially safe and prevents two scrapes competing for the same browser/session, even with `ARCH-RUN-07`'s `threaded=True`.
 
 **ARCH-RUN-04** Browser automation runs **in-process within that background thread** (Playwright's sync API, one browser context per run), not as a separately-launched script. The prototype's model of independent scripts writing to a shared database is what the API replaces.
 
@@ -34,7 +37,7 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirrorin
 
 **ARCH-RUN-05** **Python 3.11+**, single **`venv` + `pip` + `requirements.txt`**. Chosen over poetry/pdm/uv because it is the only option with zero install prerequisite beyond the Python already required, and because `010` ships no package and has no dependency-resolution problem worth a lockfile. Two files: `requirements.txt` (runtime: `flask`, `playwright`, `jsonschema`, `beautifulsoup4`, `html5lib`) and `requirements-dev.txt` (adds `pytest`, `pytest-timeout`, plus `-r requirements.txt`). Virtualenv at `.venv/` (already gitignored).
 
-**ARCH-RUN-06** **No node/npm anywhere in the project.** AngularJS 1.x needs no build step, so the frontend is vendored `angular.min.js` plus hand-written modules served as-is. The one thing a node toolchain would conventionally provide — a browser for tests — comes from Playwright's Python package instead (ARCH-BOT-01). This removes an entire toolchain, its lockfile, and its version drift from a POC that has roughly eight screens.
+**ARCH-RUN-06** **No node/npm anywhere in the project.** AngularJS 1.x needs no build step, so the frontend is vendored `angular.min.js` plus hand-written modules served as-is. The one thing a node toolchain would conventionally provide — a browser for tests — comes from Playwright's Python package instead (ARCH-BOT-01). This removes an entire toolchain, its lockfile, and its version drift from a POC that has roughly eight screens. (AngularJS 1.x's EOL/security-patch status is a separate, already-weighed risk — accepted for `010` specifically because of `ARCH-NET-01`'s loopback-only binding, not addressed by the no-build-step rationale above; see [release-roadmap.md](../release-roadmap.md)'s feature-table note for why that acceptance does not carry forward to `020`.)
 
 **ARCH-RUN-07** Backend start: `python -m easymcf` (a `__main__.py` calling `create_app().run(host="127.0.0.1", port=5000, threaded=True)`). The Werkzeug dev server is the production server for `010`; gunicorn/waitress buy nothing for one local user and are deferred to `020`. Config comes from defaults in `easymcf/config.py`, overridable by environment variable — no `.env` file is required for the app to run:
 
@@ -45,6 +48,8 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirrorin
 | `EASYMCF_SECRETS_DIR` | `.secrets`               | where the MCF session file lives (ARCH-BOT-03) |
 | `EASYMCF_MCF_MODE`    | `fixture`                | `fixture` \| `live` — browser target (ARCH-BOT-04) |
 | `EASYMCF_HEADLESS`    | `1`                      | headless browser                               |
+| `EASYMCF_APPLY_POLL_RETRIES` | `5`                | apply-button poll attempts before `unable_to_apply` (REQ-APPLY-07, ARCH-BOT-05) |
+| `EASYMCF_APPLY_POLL_DELAY_S` | `5`                | seconds between apply-button poll attempts (REQ-APPLY-07, ARCH-BOT-05) |
 
 **ARCH-RUN-08** `EASYMCF_MCF_MODE` **defaults to `fixture`, never `live`.** Reaching the real MCF site requires an explicit, per-invocation opt-in. This is the runtime enforcement of `CLAUDE.md`'s boundary against unattended live-site access — an agent or test run that forgets to think about it gets fixtures, not traffic to `mycareersfuture.gov.sg`.
 
@@ -52,7 +57,7 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirrorin
 
 **ARCH-RUN-09** **Flask serves the AngularJS app's static files** from `frontend/` at `/`, with `index.html` returned for unmatched non-`/api` paths (AngularJS routing). Rejected alternative: a separate `python -m http.server` or `live-server` on its own port — it would add a second process for a developer to start, a second port, a cross-origin setup, and a CORS layer, all to gain live-reload on a project with no build step. One origin, one process, zero CORS is worth more than hot reload here (a browser refresh is the reload).
 
-**ARCH-RUN-10** Because the frontend is served from `/`, the generic CRUD API (REQ-PLAT-01) is mounted under an **`/api` prefix**: `GET/PUT/DELETE /api/{table}/{id}`, `POST /api/{table}`, `POST /api/{table}/batch`, `GET /api/{table}/search`, `POST /api/{table}/delete`. The endpoint *shapes* documented in REQ-PLAT-01 and the [easymcf-backend-api](../../../.claude/skills/easymcf-backend-api/SKILL.md) skill are unchanged; only the prefix is added, so static asset paths can never shadow a table name. Any endpoint that is not one of those seven shapes (e.g. the run-trigger and session-upload endpoints) is a deliberate, named exception documented in the design milestone — not a drift back toward per-feature endpoints.
+**ARCH-RUN-10** Because the frontend is served from `/`, the generic CRUD API (REQ-PLAT-01) is mounted under an **`/api` prefix**: `GET/PUT/DELETE /api/{table}/{id}`, `POST /api/{table}`, `POST /api/{table}/batch`, `GET /api/{table}/search`, `POST /api/{table}/delete`. The endpoint *shapes* documented in REQ-PLAT-01 and the [easymcf-backend-api](../../../.claude/skills/easymcf-backend-api/SKILL.md) skill are unchanged; only the prefix is added, so static asset paths can never shadow a table name. [010-api.md](010-api.md) is the single source of truth for which entities get this generic shape unmediated, which entities get the same shape backed by a per-table write/read hook enforcing an invariant, and which operations (promote-to-lead, queue/dequeue-for-apply, run-trigger, session-upload, manual post entry) fall outside all seven shapes entirely as named endpoints — an endpoint that is neither a generic shape nor in that catalog is a drift back toward per-feature endpoints, not a deliberate exception.
 
 ### Repo layout
 
@@ -61,11 +66,11 @@ easymcf/
   easymcf/                  # backend package
     __main__.py             # entry point (ARCH-RUN-07)
     config.py               # env-var config (ARCH-RUN-07)
-    api/                    # generic CRUD blueprint + schema validation
+    api/                    # generic CRUD blueprint + schema validation + named endpoints (010-api.md)
     db/
       schema.sql            # full DDL, single file (ARCH-STO-02)
       connection.py         # WAL/pragma setup, per-thread connections
-    services/               # search, scoring, apply orchestration; run_log writes
+    services/               # search, scoring, apply orchestration; lead/application write hooks (010-api.md)
     automation/
       browser.py            # MCFBrowser interface (ARCH-BOT-02)
       live.py               # Playwright -> real MCF
@@ -81,10 +86,12 @@ easymcf/
     resetdb.py              # drop + recreate + optionally seed (ARCH-STO-06)
   tests/
     backend/                # tier 1 (ARCH-TEST-02)
+    frontend/               # tier 1b, frontend silo against mocked /api (ARCH-TEST-09)
     e2e/                    # tier 2 (ARCH-TEST-03)
     live/                   # tier 3, deselected by default (ARCH-TEST-06)
     fixtures/
       mcf/                  # canned MCF HTML + routes manifest (ARCH-TEST-04)
+      api/                  # canned /api/** JSON responses (ARCH-TEST-09)
     conftest.py
   .secrets/                 # gitignored; MCF session file (ARCH-BOT-03)
   requirements.txt
@@ -122,7 +129,7 @@ easymcf/
 
 **ARCH-NET-02** Frontend and API share the single origin `http://127.0.0.1:5000` (ARCH-RUN-09), so **no CORS configuration, no preflight handling, and no `flask-cors` dependency exist**. If a future change splits the frontend onto its own origin, CORS becomes a required part of that change — it is not pre-provisioned here.
 
-**ARCH-NET-03** The system makes **no outbound network calls except browser automation to `mycareersfuture.gov.sg`** (and its Singpass login redirect, which the user completes manually in their own browser — the app never drives it, per REQ-APPLY-06). No telemetry, no CDN for frontend assets (hence vendored `angular.min.js`), no package downloads at runtime. A developer can run the full app and the whole default test suite offline.
+**ARCH-NET-03** The system makes **no outbound network calls except browser automation to `mycareersfuture.gov.sg`**. The Singpass login step is explicitly not part of that automation: the "Log in to MCF" action opens the login URL in an ordinary, un-automated browser tab/window (equivalent to a plain hyperlink) — never a Playwright-controlled `MCFBrowser` context (ARCH-BOT-02) — and the user completes login/MFA manually in their own browser, per REQ-APPLY-06. No telemetry, no CDN for frontend assets (hence vendored `angular.min.js`), no package downloads at runtime. A developer can run the full app and the whole default test suite offline.
 
 **ARCH-NET-04** Those MCF calls happen only when `EASYMCF_MCF_MODE=live` (ARCH-RUN-08). In `fixture` mode the browser never resolves an MCF hostname — requests are intercepted before dispatch (ARCH-TEST-04). Setting `live` is a deliberate human action in that session, consistent with the `CLAUDE.md` boundary; nothing in the default run path, the seeded app, or the default test suite sets it.
 
@@ -130,11 +137,13 @@ easymcf/
 
 **ARCH-BOT-01** **Playwright (Python) with its bundled Chromium is the single browser dependency**, for search scraping, apply automation, and end-to-end tests alike. This supersedes the prototype's split of Selenium + system Chrome/chromedriver for scraping and Playwright for apply ([010-prototype.md](010-prototype.md)). Rationale: (a) it removes the chromedriver/Chrome version-matching failure mode, a named `jobsearch` local-env pain point; (b) `page.route()` interception is what makes the mock-e2e tier possible without a stub that bypasses the real scraping code (ARCH-TEST-04); (c) one browser dependency instead of two, installed by `playwright install --with-deps chromium` into a user cache — nothing system-wide, nothing in the repo. The [selenium](../../../.claude/skills/selenium/SKILL.md) skill's substance — explicit waits instead of the prototype's fixed `sleep(15)`, stable `data-testid`/`data-cy` locators — carries over unchanged; only the driver API differs. If a concrete blocker appears during milestone 09/11, reverting scraping to Selenium is a contained change behind ARCH-BOT-02's interface, but it starts as Playwright.
 
-**ARCH-BOT-02** All MCF interaction goes through **one `MCFBrowser` interface** in `easymcf/automation/browser.py`, with implementations selected by `EASYMCF_MCF_MODE`: `live.py` (real navigation) and `fixture.py` (identical code path, requests route-intercepted to the fixture corpus). Services never instantiate a browser directly. This is the seam that makes the entire automation layer testable unattended.
+**ARCH-BOT-02** All MCF interaction goes through **one `MCFBrowser` interface** in `easymcf/automation/browser.py`, with implementations selected by `EASYMCF_MCF_MODE`: `live.py` (real navigation) and `fixture.py` (identical code path, requests route-intercepted to the fixture corpus). Services never instantiate a browser directly. This is the seam that makes the entire automation layer testable unattended. The Singpass login step (ARCH-NET-03) is deliberately outside this seam — it is never routed through `MCFBrowser`, live or fixture, since automating it is explicitly out of scope (REQ-APPLY-06).
 
 **ARCH-BOT-03** **MCF session credential storage — resolves open question #1 in [010-01-requirements.md](010-01-requirements.md).** The cookie bundle uploaded via Workflow 8 is written to **`.secrets/mcf_session.json`** (directory from `EASYMCF_SECRETS_DIR`, created `0700`, file `0600`). `.secrets` is already in `.gitignore`. The `session` table stores `cookie_ref` as the **filename only** — the payload never enters SQLite, so the database file stays safe to share, copy, or attach to a bug report. Rejected: (a) storing the cookie JSON in an env var or committed `.env` — a multi-kilobyte JSON blob is a poor fit for the environment, and `.env` files get committed by accident; (b) storing the payload in the `session` row — it would spread credential material into every database dump and seed export; (c) an OS keyring — a real dependency and platform-specific behavior for a single-user POC whose threat model is "don't commit it". Test tiers never read this file: the fixture-mode browser uses a synthetic cookie fixture, so a missing or expired real session cannot break the autonomous loop.
 
 **ARCH-BOT-04** Backend startup logs the active `EASYMCF_MCF_MODE`, and any run triggered in `live` mode records it in `run_log` (as part of `outcome_counts`/error detail), so it is always answerable after the fact whether a given run touched the real site.
+
+**ARCH-BOT-05** REQ-APPLY-07's apply-button poll (production default: 5 retries, 5s apart, up to 25s to reach `unable_to_apply`) reads its retry count and delay through `EASYMCF_APPLY_POLL_RETRIES`/`EASYMCF_APPLY_POLL_DELAY_S` (ARCH-RUN-07's config table) rather than hardcoded constants — the same env-var-indirection pattern `ARCH-STO-05` uses for `clock.py::now()`. Production and the default local run never set these, so the real 25-second wait is what a human sees. Fixture-mode tests exercising the `unable_to_apply` scenario (ARCH-TEST-04's `apply/{scenario}/` corpus) set both to a small value (e.g. 2 retries, 0.01s) so the full retry loop still runs — proving the retry logic and its terminal state, not skipping it — without spending real wall-clock seconds against `pytest-timeout`'s 60s per-test budget (ARCH-TEST-02).
 
 ## 5. Testing infrastructure
 
@@ -144,19 +153,22 @@ The design goal is stronger than "tests exist": **an AI agent must be able to ru
 
 **ARCH-TEST-01** **State isolation: a fresh temp-file SQLite database per test session, seeded from `seed/*.sql`, deleted on teardown.** A `conftest.py` session fixture creates the file under pytest's `tmp_path_factory`, applies `schema.sql` + seed, and exports `EASYMCF_DB_PATH` to it; function-scoped tests that mutate data wrap in a transaction rolled back at teardown, or request a function-scoped fresh copy where a rollback is impractical. Temp *file*, not `:memory:` — an in-memory database is per-connection, which breaks the moment the app opens a second connection (it does: background run thread, ARCH-RUN-02/STO-07) and diverges from the WAL/file semantics being tested; at `010`'s data volumes the file costs milliseconds. The consequence that matters for the agent loop: **no test run ever touches `data/easymcf.db`, and no iteration inherits state from the previous one** — an agent can run the loop fifty times without a human resetting anything.
 
-**ARCH-TEST-02** **Tooling: pytest for all three tiers**, with markers `backend`, `e2e`, `live` and `pytest.ini` carrying `addopts = -m "not live" --timeout=60 -q`. Consequences: bare `pytest` runs exactly the unattended-safe tiers; a hung browser or a scraper waiting on a selector that will never appear fails in 60 seconds instead of stalling the loop indefinitely (`pytest-timeout`); exit code 0/1 is the pass/fail signal, with `--junit-xml` available when structured output is wanted. No separate test runner, no `make`, no shell wrapper — the command *is* `pytest`.
+**ARCH-TEST-02** **Tooling: pytest for all four tiers**, with markers `backend`, `frontend`, `e2e`, `live` and `pytest.ini` carrying `addopts = -m "not live" --timeout=60 -q`. Consequences: bare `pytest` runs exactly the unattended-safe tiers; a hung browser or a scraper waiting on a selector that will never appear fails in 60 seconds instead of stalling the loop indefinitely (`pytest-timeout`); exit code 0/1 is the pass/fail signal, with `--junit-xml` available when structured output is wanted. No separate test runner, no `make`, no shell wrapper — the command *is* `pytest`.
 
-| tier       | command                     | scope                                    | duration  |
-| ---------- | --------------------------- | ---------------------------------------- | --------- |
-| 1 backend  | `pytest -m backend`         | Flask test client + SQLite               | seconds   |
-| 2 mock e2e | `pytest -m e2e`             | real browser + real Flask + fixture MCF  | ~1-2 min  |
+| tier        | command                     | scope                                     | duration  |
+| ----------- | --------------------------- | ------------------------------------------ | --------- |
+| 1 backend   | `pytest -m backend`         | Flask test client + SQLite                | seconds   |
+| 1b frontend | `pytest -m frontend`        | real browser + real Flask, `/api` mocked  | seconds   |
+| 2 mock e2e  | `pytest -m e2e`             | real browser + real Flask + fixture MCF   | ~1-2 min  |
 | 3 live     | `pytest -m live --run-live` | real MCF, human-gated (REQ-DEV-05)       | on demand |
 
 ### Tier 1 — backend only (REQ-DEV-03)
 
 **ARCH-TEST-03** Flask's **built-in test client** (`app.test_client()`), not `requests`/`httpx` against a spawned server: it needs no port, no process lifecycle, and no readiness polling, and it gives tracebacks from the failing line rather than a `500` body. Coverage: every generic CRUD shape per table (including the `mcfpipe` validation checklist — required-field `400` naming the field, type and date-format validation, `404` for missing record and for unknown table), lead lifecycle transitions and close reasons, auto-expiry against the injectable clock (ARCH-STO-05), apply-outcome → lead propagation (Workflow 7's table), and `run_log` writes. Service-layer tests drive the search/apply orchestration with a stubbed `MCFBrowser` (ARCH-BOT-02) so scoring, dedup, incremental persistence (REQ-SRCH-04 — assert rows exist after an injected mid-sweep exception), and outcome propagation are all exercised without a browser starting. This is the fast loop; a backend change should be re-verified here before anything slower runs.
 
-### Tier 2 — mock end-to-end (REQ-DEV-04)
+### Tier 1b — frontend silo (STRAT-SILO-07)
+
+**ARCH-TEST-09** Confirms `010-test-strategy.md`'s `STRAT-SILO-07` proposal: a second Playwright tier, `tests/frontend/`, isolating AngularJS controller/template/rendering logic from whether the real backend and database produced the response being rendered. Mechanically it mirrors ARCH-TEST-04's fixture-interception pattern one layer up the stack — a session fixture spawns `python -m easymcf` the same way (real backend process, real Flask static-file serving, so the JS/HTML has a real HTTP origin to load from), but every `**/api/**` request is intercepted via `page.route()` and fulfilled from `tests/fixtures/api/*.json` canned responses instead of reaching the real Flask routes or SQLite. No second frontend-only server, no stubbed Angular services — the same AngularJS app and the same `page.route()` mechanism ARCH-TEST-04 already established, applied to the app's own `/api` boundary instead of MCF's. This does not replace ARCH-TEST-05's full-stack assertions — that tier remains the integration confirmation, run after this silo and ARCH-TEST-03's backend silo both pass — and it is still not a Karma/Jasmine JS unit tier (no node/npm/build toolchain, ARCH-RUN-06): the browser is Playwright's, the runner is pytest, same as every other tier.
 
 **ARCH-TEST-04** The full stack — Playwright Chromium driving the real AngularJS UI against the real Flask app against a seeded temp database — with **MCF itself replaced at the network boundary, not at the code boundary**. A session fixture spawns `python -m easymcf` on an ephemeral port with `EASYMCF_DB_PATH` set to the temp database, `EASYMCF_MCF_MODE=fixture`, and `EASYMCF_HEADLESS=1`, polls a `/api/health` endpoint until ready, and terminates it on teardown.
 
@@ -171,7 +183,7 @@ Corpus layout under `tests/fixtures/mcf/`:
 
 Fixture HTML is captured from real MCF pages once, by hand, in a live session (tier 3's territory) and committed — it is public job-listing markup, and it contains no session material. Because MCF's markup drifts (the reason `jobsearch/recommission.py` exists), a **fixture-staleness check belongs in tier 3, not tier 2**: tier 2's job is to be deterministic, and a fixture that no longer matches the live site is a real-site-drift finding, not a tier-2 failure.
 
-**ARCH-TEST-05** **Frontend verification lives in this tier; there is no separate Karma/Jasmine JS unit tier in `010`.** Assertions are DOM-level Playwright assertions on rendered text, element state, and attributes — a run's status badge reaching `success`, an error banner appearing after a failed run (REQ-FE-02), a promoted post's row switching to `already promoted`, a lead card moving tabs on stage change. The tradeoff is stated plainly: a JS unit tier would give faster isolated feedback on controllers, at the cost of introducing node/npm/karma to a build-free frontend (ARCH-RUN-06). For roughly eight screens, DOM assertions in a tier that already exists give better signal per unit of infrastructure. On failure, Playwright writes a screenshot and the page HTML to `.dev/test-artifacts/` — **diagnostic aids for a human afterward, never a substitute for a pass/fail assertion.** No test may require a person to look at a browser to determine whether it passed.
+**ARCH-TEST-05** **Full-stack frontend verification lives in this tier; there is no separate Karma/Jasmine JS unit tier in `010`.** (The frontend-silo tier, ARCH-TEST-09, is Playwright against a mocked `/api` boundary, not a JS unit-test framework — it doesn't change this.) Assertions are DOM-level Playwright assertions on rendered text, element state, and attributes — a run's status badge reaching `success`, an error banner appearing after a failed run (REQ-FE-02), a promoted post's row switching to `already promoted`, a lead card moving tabs on stage change. The tradeoff is stated plainly: a JS unit tier would give faster isolated feedback on controllers, at the cost of introducing node/npm/karma to a build-free frontend (ARCH-RUN-06). For roughly eight screens, DOM assertions in a tier that already exists give better signal per unit of infrastructure. On failure, Playwright writes a screenshot and the page HTML to `.dev/test-artifacts/` — **diagnostic aids for a human afterward, never a substitute for a pass/fail assertion.** No test may require a person to look at a browser to determine whether it passed.
 
 ### Tier 3 — live MCF (REQ-DEV-05)
 
@@ -203,6 +215,6 @@ Mirrors [010-01-requirements.md](010-01-requirements.md)'s out-of-scope section 
 - **No multi-user concerns** — no auth, no sessions (beyond the single MCF credential), no per-user data partitioning, no `user_id` columns (see [010-data-model.md](010-data-model.md)'s deliberate divergence from `mcfpipe`'s multi-user `track`), no `0.0.0.0` binding.
 - **No process manager, scheduler, or queue** — no systemd unit, cron entry, Celery/redis, or supervisor. Runs are user-initiated (REQ-SRCH-02) and in-process (ARCH-RUN-02).
 - **No migration framework, no ORM migrations, no database backup tooling** — recreate-and-reseed is the whole story (ARCH-STO-02/06).
-- **No frontend build toolchain** — no node, npm, webpack, bundler, transpiler, or JS test runner (ARCH-RUN-06, ARCH-TEST-05).
+- **No frontend build toolchain** — no node, npm, webpack, bundler, transpiler, or JS test runner (ARCH-RUN-06, ARCH-TEST-05). The frontend-silo tier (ARCH-TEST-09) adds a second Playwright tier, not a JS toolchain.
 
 Each of these becomes a live question again at `020` (MVP cloud). None of them is a live question in `010`, and adding one is a scope change to be raised with the product-manager rather than decided in an implementation PR.

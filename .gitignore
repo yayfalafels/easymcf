@@ -13,6 +13,9 @@ easymcf.code-workspace
 # credentials
 .secrets
 
+# dev scratch SQLite database (ARCH-STO-01) — never committed, regenerated via scripts/resetdb.py
+data/
+
 # real personal job-search history (source data for scripts/gen_test_data.py) — never commit
 test-data/
 

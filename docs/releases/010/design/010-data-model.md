@@ -1,8 +1,32 @@
 # Easy MCF POC Local - Data Model
 
+## Contents
+
+- [Purpose](#purpose)
+- [References](#references)
+- [Entity-relationship overview](#entity-relationship-overview)
+- [Entities](#entities)
+  - [`role`](#role)
+  - [`track`](#track)
+  - [`search_profile`](#search_profile)
+  - [`cv`](#cv)
+  - [`post`](#post)
+  - [`post_track`](#post_track)
+  - [`lead`](#lead)
+  - [`lead_event`](#lead_event)
+  - [`application`](#application)
+  - [`run_log`](#run_log)
+  - [`session`](#session)
+- [Design notes](#design-notes)
+
 ## Purpose
 
-Entities and relationships for the SQLite database (REQ-PLAT-02), derived from [010-workflows.md](010-workflows.md) — read that first; every entity/field below exists to support a specific step in one of its workflows. Field lists here are conceptual (name + intent + source requirement), not literal SQL DDL — column types, indexes, and the generic CRUD envelope (REQ-PLAT-01) are the architecture/design milestone's job.
+Entities and relationships for the SQLite database (REQ-PLAT-02), derived from the **workflows**. Read that first. Every entity/field below exists to support a specific step in one of its workflows. Field lists here are conceptual, covering name, intent, and source requirement. Column types, indexes, and the generic CRUD envelope (REQ-PLAT-01) are the architecture/design milestone's job.
+
+## References
+
+- **workflows**: [010-workflows.md](010-workflows.md) — the process steps each entity and field below exists to support.
+- **prototype extraction**: [010-prototype.md](010-prototype.md) — the `cv_select()` substring-match mechanics the `cv` entity's label is matched against.
 
 ## Entity-relationship overview
 
@@ -23,13 +47,13 @@ erDiagram
     RUN_LOG ||--o{ RUN_LOG : "search / apply"
 ```
 
-`SESSION` (the MCF credential store) is intentionally not in this diagram — it has no FK relationship to domain data, it's a singleton the apply run checks (Workflow 8).
+`SESSION`, the MCF credential store, is intentionally not in this diagram. It has no FK relationship to domain data. It's a singleton the apply run checks (Workflow 8).
 
 ## Entities
 
 ### `role`
 
-Generic job title/domain, not user-specific (glossary; REQ-SRCH-01 implicitly).
+Generic job title/domain, not user-specific (glossary, REQ-SRCH-01 implicitly).
 
 | field         | notes                |
 | ------------- | -------------------- |
@@ -39,7 +63,7 @@ Generic job title/domain, not user-specific (glossary; REQ-SRCH-01 implicitly).
 
 ### `track`
 
-A user's role at a seniority level (glossary). 010 is single-user (REQ-DEV boundary / requirements "end user" section), so no `user_id` column is needed yet — that's the one place 010's model diverges from `mcfpipe`'s multi-user `track` table, deliberately, per Decision 1 in [010-workflows.md](010-workflows.md).
+A user's role at a seniority level (glossary). 010 is single-user (REQ-DEV boundary / requirements "end user" section), so no `user_id` column is needed yet. That's the one place 010's model diverges from `mcfpipe`'s multi-user `track` table, deliberately, per Decision 1 in the **workflows**.
 
 | field           | notes                                     |
 | --------------- | ----------------------------------------- |
@@ -49,7 +73,7 @@ A user's role at a seniority level (glossary). 010 is single-user (REQ-DEV bound
 | `default_cv_id` | FK → `cv`, nullable — REQ-APPLY-02        |
 | `is_active`     | bool, default true — false ⇒ archived (REQ-SRCH-10), hidden from active track selectors |
 
-An archived (`is_active = false`) track is not physically deleted, mirroring the `post.is_open` pattern below — its historical `post_track`, `lead`, and `application` rows stay readable, only its availability in active selectors (search run, promote-to-lead, apply default CV) changes.
+An archived (`is_active = false`) track is not physically deleted, mirroring the `post.is_open` pattern below. Its historical `post_track`, `lead`, and `application` rows stay readable. Only its availability in active selectors, such as search run, promote-to-lead, or apply default CV, changes.
 
 ### `search_profile`
 
@@ -66,7 +90,7 @@ Exactly one per track (REQ-SRCH-01). Modeled as a 1:1 extension of `track` rathe
 
 ### `cv`
 
-A named CV/resume version the user can assign as a track default or an application override (REQ-APPLY-02). The actual file lives on MCF's own profile — 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring (see [010-prototype.md](010-prototype.md) `cv_select()`), so this table is a small label catalog, not file storage.
+A named CV/resume version the user can assign as a track default or an application override (REQ-APPLY-02). The actual file lives on MCF's own profile. 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring, per the **prototype extraction**'s `cv_select()`. This table is a small label catalog.
 
 | field   | notes                                                               |
 | ------- | ------------------------------------------------------------------- |
@@ -75,7 +99,7 @@ A named CV/resume version the user can assign as a track default or an applicati
 
 ### `post`
 
-Source-of-truth listing, not user-specific (glossary; REQ-SRCH-03/06/07). One row per posting regardless of how many tracks match it or how many leads it spawns.
+Source-of-truth listing, not user-specific (glossary, REQ-SRCH-03/06/07). One row per posting regardless of how many tracks match it or how many leads it spawns.
 
 | field                     | notes                                                                          |
 | ------------------------- | ------------------------------------------------------------------------------ |
@@ -86,7 +110,7 @@ Source-of-truth listing, not user-specific (glossary; REQ-SRCH-03/06/07). One ro
 | `url_ref`                 | posting reference/URL, REQ-SRCH-03                                             |
 | `posted_date`             | REQ-SRCH-03                                                                    |
 | `salary_high`             | from card if shown, REQ-SRCH-03                                                |
-| `is_open`                 | bool; false ⇒ removed from active set (REQ-SRCH-06)                            |
+| `is_open`                 | bool, false ⇒ removed from active set (REQ-SRCH-06)                            |
 | `closing_date`            | detail pass, REQ-SRCH-06                                                       |
 | `applicants`              | detail pass, REQ-SRCH-06                                                       |
 | `industry_classification` | detail pass, REQ-SRCH-06                                                       |
@@ -95,7 +119,7 @@ Source-of-truth listing, not user-specific (glossary; REQ-SRCH-03/06/07). One ro
 | `src_method`              | `scraped` \| `manual` — REQ-SRCH-07/08                                         |
 | `run_id`                  | FK → `run_log`, nullable — REQ-SRCH-08                                         |
 
-An `is_open = false` post is not physically deleted — history stays available to any lead already promoted from it, only its active-set membership changes. `run_id` is null for manually entered posts.
+An `is_open = false` post is not physically deleted. History stays available to any lead already promoted from it. Only its active-set membership changes. `run_id` is null for manually entered posts.
 
 ### `post_track`
 
@@ -109,11 +133,11 @@ Many-to-many: a post can match more than one track, each scored independently (R
 | `score_method` | e.g. `title_keyword_v1` — REQ-SRCH-09                                              |
 | `search_match` | bool — true if found by this track's search, false if auto-assigned (manual entry) |
 
-`score_method` is recorded alongside the score so a future NLP-based method can be added later without a schema change (REQ-SRCH-09). No "assigned"/primary flag lives here — which track a resulting lead belongs to is chosen by the user at promotion time (Decision 2), not pre-computed on the post.
+`score_method` is recorded alongside the score so a future NLP-based method can be added later without a schema change (REQ-SRCH-09). No "assigned"/primary flag lives here. Which track a resulting lead belongs to is chosen by the user at promotion time (Decision 2), never pre-computed on the post.
 
 ### `lead`
 
-The user's personal, trackable instance of a post for one track (glossary; REQ-CRM-01..06).
+The user's personal, trackable instance of a post for one track (glossary, REQ-CRM-01..06).
 
 | field                | notes                                                   |
 | -------------------- | ------------------------------------------------------- |
@@ -131,13 +155,13 @@ The user's personal, trackable instance of a post for one track (glossary; REQ-C
 | `last_contact_date`  | REQ-CRM-03                                              |
 | `notes`              | free text, REQ-CRM-03                                   |
 | `created_at`         | promotion timestamp                                     |
-| `updated_at`         | refreshed by each new `lead_event` written for this lead; drives auto-expiry, REQ-CRM-05 |
+| `updated_at`         | refreshed by each new `lead_event` written for this lead, drives auto-expiry, REQ-CRM-05 |
 
-Uniqueness: `post_id` — a post can be promoted into at most one lead; once promoted, it is excluded from further promotion under any track (Workflow 4).
+Uniqueness: `post_id`. A post can be promoted into at most one lead. Once promoted, it is excluded from further promotion under any track (Workflow 4).
 
 ### `lead_event`
 
-An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lead`: every stage transition, contact logged, note edit, or deadline change writes a new row rather than mutating a summary field, so the lead's full activity history is reconstructable and its last-activity time (feeding auto-expiry, REQ-CRM-05) has a source of truth beyond a bare timestamp. Scheduled interview/callback details (e.g. an interview's date/time) are captured as free text in an event's `detail` or in `lead.notes`, not as a dedicated structured field — `lead.deadline` keeps one consistent meaning throughout the lead's lifecycle rather than being repurposed per stage.
+An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lead`: every stage transition, contact logged, note edit, or deadline change writes a new row rather than mutating a summary field, so the lead's full activity history is reconstructable and its last-activity time (feeding auto-expiry, REQ-CRM-05) has a source of truth beyond a bare timestamp. Scheduled interview/callback details, such as an interview's date/time, are captured as free text in an event's `detail` or in `lead.notes`, rather than as a dedicated structured field. `lead.deadline` keeps one consistent meaning throughout the lead's lifecycle rather than being repurposed per stage.
 
 | field         | notes                                                                    |
 | ------------- | -------------------------------------------------------------------------- |
@@ -149,7 +173,7 @@ An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lea
 
 ### `application`
 
-An automated apply attempt against a lead (glossary; REQ-APPLY-01..09). One-to-many from `lead`: a retried attempt (e.g. after fixing a `cv_not_found`) is a new row, not an overwrite — REQ-APPLY-08 requires each application's outcome to not overwrite another's, and Workflow 7 relies on retry history being preserved.
+An automated apply attempt against a lead (glossary, REQ-APPLY-01..09). One-to-many from `lead`: a retried attempt, for example after fixing a `cv_not_found`, is a new row rather than an overwrite. REQ-APPLY-08 requires each application's outcome to leave every other application's outcome untouched, and Workflow 7 relies on retry history being preserved.
 
 | field          | notes                                                    |
 | -------------- | -------------------------------------------------------- |
@@ -176,11 +200,11 @@ Every automated run: search or apply (REQ-PLAT-03). Scoring is not a separate ru
 | `outcome_counts` | e.g. `{new_posts: 12, updated: 3}` — REQ-PLAT-03               |
 | `error_detail`   | nullable, REQ-PLAT-03                                          |
 
-A search run is always track-scoped; an apply run can span leads queued across multiple tracks, so `track_id` may be null there.
+A search run is always track-scoped. An apply run can span leads queued across multiple tracks, so `track_id` may be null there.
 
 ### `session`
 
-Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPLY-06). The cookie payload itself is treated as sensitive material handled like `jobsearch`'s `cookies_mcf.json` — stored as a local file/blob the backend reads, referenced (not embedded) from this row, consistent with the project boundary against committing real session exports.
+Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPLY-06). The cookie payload itself is treated as sensitive material handled like `jobsearch`'s `cookies_mcf.json`. It is stored as a local file/blob the backend reads, referenced rather than embedded from this row, consistent with the project boundary against committing real session exports.
 
 | field         | notes                                                                      |
 | ------------- | -------------------------------------------------------------------------- |
@@ -191,7 +215,7 @@ Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPL
 
 ## Design notes
 
-- `cv` is its own small catalog table (vs. a free-text field on `track`/`application`), so the UI can offer a dropdown of known CVs rather than free text.
+- `cv` is its own small catalog table rather than a free-text field on `track`/`application`, so the UI can offer a dropdown of known CVs rather than free text.
 - `run_log` unifies search and apply run logging into one table (`run_type` discriminator) rather than two, since both need the same start/end/outcome/error shape (REQ-PLAT-03).
 - `track.is_active` follows the same soft-delete shape as `post.is_open` — a bool flip rather than a row deletion, so archived tracks keep every dependent row (`post_track`, `lead`, `application`) intact.
-- `lead_event` makes lead activity an append-only log rather than a single mutable `updated_at` column, mirroring why `application` is one-to-many from `lead` rather than a single overwritten row (REQ-APPLY-08) — both exist so retry/activity history survives rather than being clobbered by the next update.
+- `lead_event` makes lead activity an append-only log rather than a single mutable `updated_at` column, mirroring why `application` is one-to-many from `lead` rather than a single overwritten row (REQ-APPLY-08). Both exist so retry/activity history survives rather than being clobbered by the next update.

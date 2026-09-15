@@ -5,7 +5,7 @@ description: Domain knowledge for easymcf's search-by-keywords and match-scoring
 
 # Jobs pipeline: search by keywords
 
-Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requirements.md)'s "Search by keywords" section (REQ-SRCH-01..09). For scrape mechanics and site markup, see [mycareerfutures](../mycareerfutures/SKILL.md) and [webscraping](../webscraping/SKILL.md); for the browser-automation layer, see [selenium](../selenium/SKILL.md).
+Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requirements.md)'s "Search by keywords" section (REQ-SRCH-01..09). For scrape mechanics and site markup, see [mycareerfutures](../mycareerfutures/SKILL.md) and [webscraping](../webscraping/SKILL.md); for the browser-automation layer, see [playwright](../playwright/SKILL.md).
 
 ## Core entities
 

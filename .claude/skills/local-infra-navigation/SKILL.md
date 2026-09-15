@@ -11,14 +11,18 @@ Supports [010-01-requirements.md](../../../docs/releases/010/010-01-requirements
 
 There are exactly two reusable Python virtual environments for this project. **Never create a disposable, one-off, or on-the-fly venv (`python -m venv /tmp/...`, a throwaway `.venv` in some scratch dir, etc.) for any operation, ever** — a fresh ad hoc env for every task is exactly the clutter this rule exists to avoid. Every Python operation in this project's development runs through one of the two below.
 
+Both live **inside the repo, at the repo root** — never a home-directory or other external path (`CLAUDE.md`'s hard rule), referenced relative to wherever the repo is checked out:
+
 | Env | Path | Dependency manifest (git-tracked) | Used for |
 |---|---|---|---|
-| **dev-env** | `~/.dev/dev-env` | [python-envs/dev-env/pyproject.toml](../../../python-envs/dev-env/pyproject.toml) | One-time/throwaway development tasks: debugging probes, ad hoc diagnostics, generating mock/seed data from rules, exploratory scripts. Nothing here is part of the app's runtime. |
-| **ops env** ("main"/operational env) | `~/env` | [python-envs/ops-env/pyproject.toml](../../../python-envs/ops-env/pyproject.toml) | Anything in the app's actual lifecycle, dev or prod: running the Flask backend, DB init/seed loading, CRUD modules, scraping and apply-automation runs, and maintenance/commissioning/support tasks (data patching, infra stand-up) an operator would run against a real deployment later. |
+| **dev-env** | `.dev/dev-env` | [python-envs/dev-env/pyproject.toml](../../../python-envs/dev-env/pyproject.toml) | One-time/throwaway development tasks: debugging probes, ad hoc diagnostics, generating mock/seed data from rules, exploratory scripts. Nothing here is part of the app's runtime. |
+| **ops env** ("main"/operational env) | `env` | [python-envs/ops-env/pyproject.toml](../../../python-envs/ops-env/pyproject.toml) | Anything in the app's actual lifecycle, dev or prod: running the Flask backend, DB init/seed loading, CRUD modules, scraping and apply-automation runs, and maintenance/commissioning/support tasks (data patching, infra stand-up) an operator would run against a real deployment later. |
+
+Both are gitignored (the venv contents, not the manifests) — invoke them as `env/bin/python`, `.dev/dev-env/bin/python` from the repo root, never `~/env`/`~/.dev/dev-env` or a bare `python`.
 
 Rule of thumb from the examples that motivated this: "would this code/task still make sense to run against a live/production instance of the app?" — if yes (run the app, init/patch the DB, scrape/apply, CRUD), it's the **ops env**. If it's disposable scaffolding to get through *this* dev session (a debug probe, a mock-data generator, a scratch script answering "why is X broken") it's the **dev env**.
 
-Both envs are created with `python3 -m venv --without-pip <path>` (this machine's system Python has no `pip`/`ensurepip`/`python3-venv`, and installing those needs `sudo`, which agent sessions don't have) then bootstrapped via `bootstrap.pypa.io/get-pip.py` inside the venv. To (re)sync an env's packages with its `pyproject.toml` after editing dependencies:
+Both envs are created with plain `python3 -m venv <path>` — this machine's system Python already includes `ensurepip`, so `pip` is present in a freshly created venv with no extra bootstrap step. To (re)sync an env's packages with its `pyproject.toml` after editing dependencies:
 
 ```bash
 <env-path>/bin/python -c "
@@ -30,16 +34,42 @@ print('\n'.join(deps))
 
 Adding a new dependency: edit the relevant `pyproject.toml` (git-tracked, so the manifest is reviewable like any other code change) and re-run the sync command above — don't `pip install` a package into an env without also recording it in its `pyproject.toml`, or the manifest drifts from what's actually installed.
 
-## Status: partial scaffold — envs exist, app doesn't yet
+## Running the app locally
 
-The two Python environments above are set up and installable, but milestones 07 (local dev and test env) and 08 (seed data) haven't otherwise landed — there is no backend run command, frontend serve command, or seed-data location to document yet. This skill exists so it's the obvious place to fill in once they do, rather than letting that knowledge scatter across ad hoc `CLAUDE.md` edits or session memory.
+No separate frontend install/build step — the AngularJS frontend is vendored (`frontend/vendor/angular.min.js`/`angular-route.min.js`, committed to git, no npm) and served by the same Flask process as the API, one origin, no CORS. Chromium's binary (for automation/tests) is a one-time download into a user cache, not part of either venv:
 
-**When milestone 07/08 work adds a real setup procedure, update this file** with:
-- how to install frontend (AngularJS/npm) dependencies (Python deps are covered above)
-- the actual local run commands for backend, frontend, and SQLite
-- where the SQLite database file lives and how to reset it to a clean or seeded state
-- where seed/sample data (representative postings, leads, tracks/search profiles) lives and how it's loaded (REQ-DEV-02)
-- how to run the automated test suite locally against seed data without live browser automation (REQ-DEV-03)
+```bash
+env/bin/python -m playwright install chromium          # once, or after a Playwright version bump
+env/bin/python -m easymcf &                              # starts the backend + serves the frontend
+curl -sf http://127.0.0.1:5000/api/v1/health             # confirm it's up
+# browser: http://127.0.0.1:5000
+kill %1                                                   # stop it when done
+```
+
+If Chromium's binary is present but fails to *launch* (a `libnspr4.so`/similar dynamic-linker error), the sandboxed OS is missing shared libraries `playwright install` alone doesn't provide — that needs a one-time, human-run `sudo env/bin/python -m playwright install --with-deps chromium` (or the equivalent `apt-get install`); an agent session has no `sudo` by default.
+
+## Database — location, reset, seed data
+
+The dev scratch database is a single SQLite file at `data/easymcf.db` (gitignored — never committed, never hand-edited). Seed/sample data (representative postings, leads, tracks/search profiles, REQ-DEV-02) lives as plain SQL text under `seed/*.sql`, applied on top of the schema, never opened as a database itself.
+
+```bash
+env/bin/python scripts/resetdb.py --seed     # drop + recreate schema + apply seed/*.sql — the only sanctioned reset path
+env/bin/python scripts/db_util.py <table> search '{}'    # direct CRUD against any table, bypassing Flask entirely
+```
+
+## Automated tests (REQ-DEV-03)
+
+Three tiers, no live browser automation by default — `pytest.ini` deselects the `live` marker (real MCF site, human-gated, never run unattended):
+
+```bash
+env/bin/python scripts/envcheck.py && env/bin/python -m pytest
+```
+
+`envcheck.py` is a preflight (right venv active, Chromium present, vendor assets present, db schema current, port free, `MCF_MODE` not `live`) — run it before trusting any test failure as a code defect. Narrower runs: `pytest -m backend` (Flask test client, no browser), `pytest -m frontend` (Playwright against a mocked `/api`), `pytest -m e2e` (full stack, real backend + real frontend).
+
+## Configuration
+
+No `.env` file is required — every setting has a default. `.env.example` (git-tracked, at the repo root) documents every override-able variable (`DB_PATH`, `PORT`, `SECRETS_DIR`, `MCF_MODE`, `HEADLESS`, `APPLY_POLL_RETRIES`, `APPLY_POLL_DELAY_S` — no project-specific prefix, an accepted tradeoff given only two venvs and no other project sharing this shell); copy it to `.env` and edit only what you want to change. `.env` itself stays gitignored and is loaded automatically (`python-dotenv`) by `python -m easymcf` and every `scripts/*.py` entry point — never by the test suite, which sets its own env vars explicitly per session so a personal `.env` can't leak into test behavior.
 
 ## Repo layout today
 

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!-- ng-app root (FE-APP-01, ENV-SETUP-06). Load order: vendor -> app -> routes,
+     per FE-APP-03. No build step (ARCH-RUN-06) — every script is listed here
+     explicitly, nothing is bundled or minified by this project's own tooling. -->
+<html lang="en" ng-app="easymcfApp">
+<head>
+  <meta charset="utf-8">
+  <!-- required by ngRoute's html5Mode(true) (FE-RTE-01) — Angular throws
+       $location:nobase and never bootstraps without it. -->
+  <base href="/">
+  <title>Easy MCF</title>
+</head>
+<body>
+  <div ng-view></div>
+
+  <script src="vendor/angular.min.js"></script>
+  <script src="vendor/angular-route.min.js"></script>
+  <script src="app/app.module.js"></script>
+  <script src="app/env-status/env-status.controller.js"></script>
+  <script src="app/app.routes.js"></script>
+</body>
+</html>

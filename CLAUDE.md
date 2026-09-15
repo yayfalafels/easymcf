@@ -16,7 +16,7 @@ Easy MCF streamlines the job search and application process for job seekers in S
 Scoped in [docs/releases/010/010-claude-agent.md](docs/releases/010/010-claude-agent.md).
 
 **Skills** (`.claude/skills/`) — load on demand, don't need to be manually invoked:
-- Generic: `mycareerfutures` (site markup), `webscraping` (persistence/dedup patterns), `selenium` (wait/locator patterns).
+- Generic: `mycareerfutures` (site markup), `webscraping` (persistence/dedup patterns), `playwright` (wait/locator patterns).
 - Domain: `easymcf-jobs-pipeline`, `easymcf-crm`, `easymcf-apply`, `easymcf-backend-api`, `easymcf-frontend` (one per functional area of the requirements), `local-infra-navigation`, `deploy-and-validation-cycle`.
 
 **Subagents** (`.claude/agents/`) — delegate to these for role-scoped work: `product-manager` (requirements/milestones/scope/QA), `architect` (data model/architecture/design), `backend-api-developer` (Flask/SQLite), `frontend-ui-developer` (AngularJS), `automation-engineer` (scraping/apply browser automation), `testing-validation` (test strategy, test runs, requirement validation).
@@ -73,7 +73,7 @@ out-of-compliance
 - Never issue requests against the live `mycareersfuture.gov.sg` site, or read/commit a real session cookie export, `.env`, or `.secrets`, in an automated/unattended context — only when the user explicitly asks to run something live in that turn. Development and tests run against seed/fixture data (REQ-DEV-03).
 - Don't `git push` or take other high-blast-radius git actions without the user's explicit confirmation in that turn, even though `.claude/settings.json` pre-approves routine local Bash/file-write operations.
 - Cloud deployment, multi-user support, and CI/CD are out of scope for `010` — don't introduce AWS/cloud SDKs, credentials, or infrastructure as part of this release's work.
-- Only two Python virtual environments exist for this project — `~/.dev/dev-env` (one-time/throwaway dev tasks) and `~/env` (anything in the app's operational lifecycle: running the app, DB init/seed, CRUD, maintenance/data-patching, scraping and apply automation). **Never create an ad hoc/disposable venv for any operation, ever** — always run Python work through one of these two. See [local-infra-navigation](.claude/skills/local-infra-navigation/SKILL.md) for which env a given task belongs in and how to sync dependencies.
+- Only two Python virtual environments exist for this project, both nested inside the repo (never a home-directory or other external path) — `.dev/dev-env` (one-time/throwaway dev tasks) and `env` (anything in the app's operational lifecycle: running the app, DB init/seed, CRUD, maintenance/data-patching, scraping and apply automation). **Never create an ad hoc/disposable venv for any operation, ever** — always run Python work through one of these two, referenced relative to the repo root (`env/bin/python`, `.dev/dev-env/bin/python`). See [local-infra-navigation](.claude/skills/local-infra-navigation/SKILL.md) for which env a given task belongs in and how to sync dependencies.
 
 ## Verifying changes
 

@@ -8,17 +8,17 @@ The `seq` column present in earlier drafts of this table is dropped (per [010-is
 | -- | ------- | -------  | ---------------------------------------- |
 | 01 | 010     | closed   | requirements                             |
 | 02 | 010     | closed   | test strategy                            |
-| 03 | 010     | open     | test cases                               |
+| 03 | 010     | closed   | test cases                               |
 | 04 | 010     | closed   | data model                               |
 | 05 | 010     | closed   | architecture                             |
 | 06 | 010     | closed   | design                                   |
-| 07 | 010     | pending  | local dev and test env                   |
-| 08 | 010     | pending  | setup database seed data                 |
+| 07 | 010     | closed   | local dev and test env                   |
+| 08 | 010     | open     | setup database seed data                 |
 | 09 | 010     | pending  | job leads tracking                       |
 | 10 | 010     | pending  | search by keywords                       |
 | 11 | 010     | pending  | apply automation                         |
 
-Architecture (05), data model (04), and test strategy (02) are each independently sequenced and consumed by later milestones (test strategy builds on `ARCH-TEST-01..08`; architecture's storage section is concrete about data model's tables), so each gets its own top-level row. Test cases (03) has no document yet (`010-test-cases.md` does not exist) — it stays `open` as the concrete case set milestone 02 (test strategy) scopes but has not yet been instantiated into.
+Architecture (05), data model (04), and test strategy (02) are each independently sequenced and consumed by later milestones (test strategy builds on `ARCH-TEST-01..08`; architecture's storage section is concrete about data model's tables), so each gets its own top-level row. Test cases (03) is [010-test-cases.md](010-test-cases.md) — the concrete case set milestone 02 (test strategy) scopes, organized by the same silo breakdown, with `STRAT-CASE-01` traceability back to every functional `REQ-*`.
 
 _06 (closed) design_
 
@@ -41,3 +41,4 @@ Every document below exists, is complete per its own Purpose section (no open `T
 | 06.05 | 05  | closed  | claude agent ([010-claude-agent.md](010-claude-agent.md)) — Claude Code tooling scope (`CLAUDE.md`, skills, subagents) supporting the build |
 | 06.06 | 06  | closed  | api design ([010-api.md](010-api.md)) — elaborates `ARCH-RUN-10`/REQ-PLAT-01 into the per-entity generic/hook/named classification and named-endpoint catalog; resolves ISS-02 |
 | 06.07 | 07  | closed  | frontend app ([010-frontend-app.md](010-frontend-app.md)) — AngularJS module/routing/API-client/async-run design elaborating 010-user-interface.md and 010-api.md into an implementable app structure |
+| 06.08 | 08  | closed  | development env ([010-development-env.md](010-development-env.md)) — elaborates `ARCH-RUN`/`STO`/`BOT`/`TEST` and `STRAT-SILO`/`LOOP` into the install/config/script/agent-loop runbook milestone 07 is implemented against |

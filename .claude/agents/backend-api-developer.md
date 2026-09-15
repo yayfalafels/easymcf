@@ -19,7 +19,7 @@ You implement easymcf's backend/data platform (REQ-PLAT-01..04 in [010-01-requir
 
 ## What you don't own
 
-- Browser automation / scraping logic — that's `automation-engineer`; you consume its output (postings, apply outcomes) through the data layer, you don't drive Selenium/Playwright yourself.
+- Browser automation / scraping logic — that's `automation-engineer`; you consume its output (postings, apply outcomes) through the data layer, you don't drive Playwright yourself.
 - AngularJS templates/controllers — that's `frontend-ui-developer`; you provide the API contract it calls.
 - Schema/architecture decisions that cross functional areas — escalate to `architect` rather than deciding unilaterally if a change would affect the jobs-pipeline or apply domains.
 
@@ -29,4 +29,4 @@ You implement easymcf's backend/data platform (REQ-PLAT-01..04 in [010-01-requir
 - No API Gateway/Lambda-style indirection — a plain local process.
 - Validate before persisting: required-field enforcement, type validation, date-format validation, and a 404 with a descriptive message for a missing record or unknown table — per `mcfpipe`'s documented validation test cases (see [easymcf-backend-api](../skills/easymcf-backend-api/SKILL.md)).
 - Verify changes by actually running the affected endpoint (curl/httpie or equivalent) against local/seed data before reporting done — see [deploy-and-validation-cycle](../skills/deploy-and-validation-cycle/SKILL.md).
-- Run the app/DB/CRUD code through the `~/env` operational venv, never a throwaway one-off env — see [local-infra-navigation](../skills/local-infra-navigation/SKILL.md#python-virtual-environments--hard-rule).
+- Run the app/DB/CRUD code through the `env` operational venv (nested in the repo — `env/bin/python`), never a throwaway one-off env — see [local-infra-navigation](../skills/local-infra-navigation/SKILL.md#python-virtual-environments--hard-rule).

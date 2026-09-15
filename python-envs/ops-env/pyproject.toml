@@ -1,15 +1,18 @@
 [project]
 name = "easymcf-ops-env"
 version = "0.1.0"
-description = "Dependency manifest for the ~/env venv — anything in the app's operational lifecycle: running the Flask backend, DB init/seed/CRUD, scraping and apply automation, maintenance/data-patching. Not a buildable package; installed via `pip install -r` against the dependencies list below, not `pip install .`. See .claude/skills/local-infra-navigation/SKILL.md."
+description = "Dependency manifest for the env venv — anything in the app's operational lifecycle: running the Flask backend, DB init/seed/CRUD, scraping and apply automation, maintenance/data-patching. Not a buildable package; installed via `pip install -r` against the dependencies list below, not `pip install .`. See .claude/skills/local-infra-navigation/SKILL.md."
 requires-python = ">=3.11"
 dependencies = [
     "flask",
     "python-dotenv",
     "requests",
     "beautifulsoup4",
-    "selenium",
+    "html5lib",
+    "playwright",
+    "jsonschema",
+    "pytest",
+    "pytest-timeout",
     "pandas",
     "numpy",
-    "scikit-learn",
 ]

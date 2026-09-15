@@ -32,7 +32,7 @@ Per-card fields and selectors (`get_jobRecord_fromcard`):
 | `urlid` | slug from the card's `<a href>`, with the `/job/` prefix and any query string stripped |
 | card container | elements whose `id` starts with `job-card-` |
 
-Cards render client-side — a plain HTTP GET without JS execution will not see them; a real (or headless) browser render is required, which is why this project uses Selenium (see [selenium](../selenium/SKILL.md)) rather than `requests` alone for this page.
+Cards render client-side — a plain HTTP GET without JS execution will not see them; a real (or headless) browser render is required, which is why this project uses Playwright (see [playwright](../playwright/SKILL.md)) rather than `requests` alone for this page.
 
 ## Deterministic posting id
 

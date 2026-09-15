@@ -62,7 +62,7 @@ Direct against `scripts/db_util.py` and a temp SQLite database (`STRAT-SILO-01`)
 - **TC-DB-005** — Inserting a `lead` row with a `track_id` that doesn't exist in `track` fails the FK constraint, `PRAGMA foreign_keys = ON` is active on the connection, rather than silently succeeding.
 - **TC-DB-006** — Two `INSERT`s of `run_log(run_type='search', status='running')` in the same database: the second fails `ux_run_log_running`'s constraint even without an application-level pre-check. This is the regression `ISS-03` named.
 - **TC-DB-007** — `DELETE FROM cv WHERE id=?` for a `cv.id` still referenced by `track.default_cv_id` or `application.cv_id` fails the FK constraint, backing the **api doc**'s `cv` `409`-translation rule.
-- **TC-DB-008** — Two `post` rows built from the same `source`+`posting_reference`+`posted_date` collapse to the same primary key value. Inserting the second is a no-op/upsert, never a duplicate row.
+- **TC-DB-008** — Two `post` rows built from the same `source`+`posting_reference`+`posted_date` collapse to the same primary key value. A raw duplicate insert is rejected by the database. Search-service upsert behavior belongs to the later jobs-pipeline milestone.
 - **TC-DB-009** — Pointing the backend at a temp database whose `meta.schema_version` doesn't match the code's expected version fails startup with the explicit `"database is version N, code expects M"` message, not a downstream `no such column` error.
 
 ## 2. Backend API silo

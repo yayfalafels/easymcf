@@ -1,6 +1,0 @@
--- Placeholder seed (ARCH-STO-04). Milestone 08 owns the real seed dataset
--- (tracks, posts, leads, applications, run_log rows — see Scope's "out of
--- scope" note in docs/releases/010/features/010.07-local-dev-env.md). This
--- file exists only so `scripts/resetdb.py --seed` has something real to
--- apply before milestone 08 lands — no-op on the milestone-07 schema
--- (the `meta` table is seeded by `easymcf/db/schema.sql` itself).

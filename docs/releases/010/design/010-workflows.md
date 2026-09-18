@@ -36,17 +36,18 @@ Read the **requirements** doc first for the requirement IDs, `REQ-*`, referenced
 4. **Session establishment UX.** There is in-app UI for this, Workflow 8: the app redirects the user to MCF's Singpass-federated login. Login and MFA itself stays manual and out of scope per REQ-APPLY-06. A custom upload dialog lets the user paste or upload the exported session cookie afterward.
 5. **Track archival.** Track deletion is a soft delete, REQ-SRCH-10: an archived track is hidden from active track selectors, including search run, promote-to-lead, and apply default CV, but its historical posts, leads, and applications remain intact and readable.
 6. **Apply-queue removal.** Removing a queued, not-yet-run, application from the queue closes the owning lead with close reason `withdrawn`, per REQ-APPLY-11, rather than reverting it to stage `PROSPECT`. A removed application is not recycled into a future batch.
-7. **Lead activity as an event log.** A lead's activity, such as stage transitions, contact logged, note edits, and deadline changes, is recorded as an append-only per-lead event log, REQ-CRM-08, which is the basis for the lead's last-activity timestamp feeding auto-expiry, REQ-CRM-05, and for its activity history view. Scheduled interview and callback details are captured as free text within notes or an event entry rather than as dedicated per-stage date fields. The lead's `deadline` field keeps one consistent meaning throughout its lifecycle rather than being repurposed per stage.
+7. **Lead activity as an event log.** A lead's activity, such as stage transitions, contact logged, note additions, and deadline changes, is recorded as an append-only per-lead event log, REQ-CRM-08, which is the basis for the lead's `deadline` maintenance feeding auto-expiry, REQ-CRM-05, and for its activity history view. Scheduled interview and callback details are captured as free text within a `lead_note` or an event entry rather than as dedicated per-stage date fields. The lead's `deadline` field is maintained by the system across its lifecycle per REQ-CRM-05 — copied from the post's `closing_date` at promotion, reset at the `APPLIED` transition, and refreshed on every activity from `CALLBACK` onward — rather than a value fixed once at creation.
 
 ## 1. Track & search profile setup
 
 - User creates a **track**, role plus seniority, per REQ-SRCH-01. Creating a track creates its one **search profile** in the same step: keyword(s), minimum salary, maximum posting age, minimum match score, and employment type, defaulting to Full Time.
 - User may set a **default CV** for the track, per REQ-APPLY-02, used by the apply run unless overridden per application.
 - User can archive a track, REQ-SRCH-10 and **Decision 5**: a soft delete that hides it from active track selectors while preserving its historical posts, leads, and applications.
+- User can switch on a repeating schedule for the track's search run, REQ-SRCH-11: on/off, an interval, and the next run time, edited on the same form as the rest of the search profile.
 
 ## 2. Search run
 
-Trigger: user-initiated per track from the UI, REQ-SRCH-02. No scheduler exists in 010.
+Trigger: user-initiated per track from the UI, REQ-SRCH-02, or fired automatically once a track's schedule comes due, REQ-SRCH-11 and `ARCH-SCHED-01..06`, an in-process tick thread rather than an OS-level cron/scheduler. Either trigger runs the identical flow below and writes the same `run_log` row, distinguished only by `trigger_source`.
 
 ```mermaid
 flowchart TD
@@ -104,6 +105,8 @@ stateDiagram-v2
     CLOSED --> [*]
 ```
 
+This diagram is the complete, closed list of legal `stage` transitions. `API-HOOK-01`'s `PUT /api/v1/lead/{id}` rejects any transition not drawn here with `409` — no skip-ahead (`APPLIED` straight to `INTERVIEW`, bypassing `CALLBACK`) and no backward move (`INTERVIEW` back to `APPLIED`) is legal, only the adjacent forward step for each stage plus `CLOSED` from anywhere open.
+
 - `CLOSED` records one close reason, per REQ-CRM-02:
   01. offer accepted
   02. rejected
@@ -112,8 +115,8 @@ stateDiagram-v2
   05. cancelled
   06. duplicate
   07. apply failed
-- **Activity log**, REQ-CRM-08 and **Decision 7**: every update to a lead, whether a stage change, contact logged, notes edited, or deadline changed, is recorded as a timestamped event in an append-only per-lead log, rather than only mutating a bare `updated_at` field. This log is the basis for both the lead's last-activity time, feeding auto-expiry below, and the activity history shown to the user, per the **user interface** design's Lead Detail. Scheduled interview and callback details are captured as free text within notes or an event entry rather than as dedicated per-stage date fields.
-- **Auto-expiry**, REQ-CRM-05: a lead auto-closes as `expired` once 28 days pass with no activity on it. The expiry threshold is the lead's latest activity-log entry plus 28 days, and applies at every open stage, `PROSPECT` through `OFFER`. It is evaluated on each backend list call, for example `GET /lead/search` per REQ-PLAT-01, rather than by a background job, since 010 has no scheduler, so the UI reflects current expiry state on every page load or refresh.
+- **Activity log**, REQ-CRM-08 and **Decision 7**: every update to a lead, whether a stage change, contact logged, note added, or deadline changed, is recorded as a timestamped event in an append-only per-lead log, rather than only mutating a bare `updated_at` field. This log is the basis for both the lead's `deadline` maintenance, feeding auto-expiry below, and the activity history shown to the user, per the **user interface** design's Lead Detail. Scheduled interview and callback details are captured as free text within a `lead_note` or an event entry rather than as dedicated per-stage date fields.
+- **Auto-expiry**, REQ-CRM-05: a lead auto-closes (`close_reason='expired'`) once the current date passes its `deadline`. `deadline` is set from the post's `closing_date` at promotion, defaulted to 28 days from `posted_date` if absent or to 1 week from the promotion date if already past, reset to 28 days from `applied_date` on the `APPLIED` transition, and refreshed to 28 days from the most recent activity on every update from `CALLBACK` onward — never simply the lead's raw last-updated timestamp. It is evaluated on each backend list call, for example `GET /lead/search` per REQ-PLAT-01, rather than by the search-run tick thread, `ARCH-SCHED-01`, which only ever fires a search run, so the UI reflects current expiry state on every page load or refresh rather than waiting on a tick. Only a lead not already `CLOSED` is ever evaluated.
 - **Auto apply-failed close**: see Workflow 7 for the specific outcomes that trigger this and the ones that leave the lead open.
 - **Manual withdrawal via queue removal**, REQ-APPLY-11 and **Decision 6**: removing a queued application from the Applications page closes its lead as `withdrawn` rather than reverting it to `PROSPECT`. See Workflow 6.
 

@@ -1,11 +1,13 @@
 -- Easy MCF POC local - schema (ARCH-STO-02, single hand-maintained file, no migrations).
 -- schema_version 2 adds the release-010 data model to the milestone-07 base.
+-- schema_version 3 adds `user`, `match_score`, `lead_note`, and explicit `user_id`
+-- ownership columns on `track`/`cv`/`session` (see docs/releases/010/design/010-data-model.md).
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (2);
+INSERT INTO meta (schema_version) VALUES (3);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -13,13 +15,22 @@ CREATE TABLE role (
     description TEXT
 );
 
+CREATE TABLE user (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    status TEXT NOT NULL
+);
+
 CREATE TABLE cv (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user(id),
     label TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE track (
     id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user(id),
     role_id INTEGER NOT NULL REFERENCES role(id),
     seniority TEXT NOT NULL,
     default_cv_id INTEGER REFERENCES cv(id),
@@ -71,12 +82,19 @@ CREATE INDEX idx_post_run_id ON post(run_id);
 CREATE TABLE post_track (
     post_id TEXT NOT NULL REFERENCES post(id),
     track_id INTEGER NOT NULL REFERENCES track(id),
-    match_score REAL NOT NULL CHECK (match_score >= 0 AND match_score <= 1),
-    score_method TEXT NOT NULL,
     search_match INTEGER NOT NULL CHECK (search_match IN (0, 1)),
     PRIMARY KEY (post_id, track_id)
 );
 CREATE INDEX idx_post_track_track_id ON post_track(track_id);
+
+CREATE TABLE match_score (
+    post_id TEXT NOT NULL,
+    track_id INTEGER NOT NULL,
+    match_score REAL NOT NULL CHECK (match_score >= 0 AND match_score <= 1),
+    score_method TEXT NOT NULL,
+    PRIMARY KEY (post_id, track_id),
+    FOREIGN KEY (post_id, track_id) REFERENCES post_track(post_id, track_id)
+);
 
 CREATE TABLE lead (
     id INTEGER PRIMARY KEY,
@@ -91,12 +109,19 @@ CREATE TABLE lead (
     applied_date TEXT,
     first_attempt_date TEXT,
     last_contact_date TEXT,
-    notes TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 CREATE INDEX idx_lead_track_id ON lead(track_id);
 CREATE INDEX idx_lead_status_stage ON lead(status, stage);
+
+CREATE TABLE lead_note (
+    id INTEGER PRIMARY KEY,
+    lead_id INTEGER NOT NULL REFERENCES lead(id),
+    note TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX idx_lead_note_lead_id ON lead_note(lead_id);
 
 CREATE TABLE lead_event (
     id INTEGER PRIMARY KEY,
@@ -121,6 +146,7 @@ CREATE INDEX idx_application_run_id ON application(run_id);
 
 CREATE TABLE session (
     id INTEGER PRIMARY KEY CHECK (id = 1),
+    user_id INTEGER NOT NULL REFERENCES user(id),
     status TEXT NOT NULL CHECK (status IN ('valid', 'expired', 'missing')),
     uploaded_at TEXT,
     cookie_ref TEXT

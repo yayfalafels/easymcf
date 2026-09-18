@@ -67,6 +67,20 @@ env/bin/python scripts/envcheck.py && env/bin/python -m pytest
 
 `envcheck.py` is a preflight (right venv active, Chromium present, vendor assets present, db schema current, port free, `MCF_MODE` not `live`) — run it before trusting any test failure as a code defect. Narrower runs: `pytest -m backend` (Flask test client, no browser), `pytest -m frontend` (Playwright against a mocked `/api`), `pytest -m e2e` (full stack, real backend + real frontend).
 
+## Validation utilities — ad hoc/iterative agent checking (010.12)
+
+Two scripts, standalone and independent of the pytest tiers above, for driving and checking a running instance while implementing or debugging one endpoint or screen — see `deploy-and-validation-cycle` for when to reach for these versus the pytest tiers.
+
+```bash
+# backend — batch-replay every case in a file, or one named case
+env/bin/python scripts/api_tester.py --case tests/backend/cases/health.json --label <your-task-id>
+
+# frontend — spawns its own app/browser, batch-replays every check in a file
+env/bin/python scripts/ui_tester.py --case tests/frontend/checks/selftest_ui_tester.json --label <your-task-id>
+```
+
+Both exit `0` only if every case passes, and write one JSON-lines record per case to `.dev/logs/<ts>-<label>-<tool>.log` alongside the familiar `[PASS]`/`[FAIL]` stdout lines — the log file is what a later analysis step or another agent session reads, not stdout.
+
 ## Configuration
 
 No `.env` file is required — every setting has a default. `.env.example` (git-tracked, at the repo root) documents every override-able variable (`DB_PATH`, `PORT`, `SECRETS_DIR`, `MCF_MODE`, `HEADLESS`, `APPLY_POLL_RETRIES`, `APPLY_POLL_DELAY_S` — no project-specific prefix, an accepted tradeoff given only two venvs and no other project sharing this shell); copy it to `.env` and edit only what you want to change. `.env` itself stays gitignored and is loaded automatically (`python-dotenv`) by `python -m easymcf` and every `scripts/*.py` entry point — never by the test suite, which sets its own env vars explicitly per session so a personal `.env` can't leak into test behavior.

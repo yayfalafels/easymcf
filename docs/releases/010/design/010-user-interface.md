@@ -13,6 +13,7 @@
   - [Empty / loading states](#empty--loading-states)
 - [Page inventory](#page-inventory)
   - [1. Tracks](#1-tracks)
+  - [1b. Search Profiles](#1b-search-profiles)
   - [2. CVs](#2-cvs)
   - [3. Posts](#3-posts)
   - [4. Manual Post Entry (dialog)](#4-manual-post-entry-dialog)
@@ -45,7 +46,7 @@ The fifth destination, **Automation**, is deliberately not an entity the user cu
 
 Neither is something the user "manages" day to day the way they manage a lead or a track. They're checked occasionally, usually when something looks wrong elsewhere. Bundling them into one admin-adjacent nav item keeps the primary nav to the four things the user actually works with, rather than diluting it with two ops or diagnostic screens that would otherwise sit as peers to "Leads."
 
-This makes the page count line up with the nav count. Every nav destination is exactly one page. The two contextual views, Manual Post Entry and Lead Detail, are reached *from* a page rather than sitting in the nav themselves.
+This makes the page count line up with the nav count. Every nav destination is exactly one page. The contextual views, CVs, Search Profiles, Manual Post Entry, and Lead Detail, are reached *from* a page rather than sitting in the nav themselves.
 
 ## Navigation structure
 
@@ -98,13 +99,22 @@ Every list-bearing page, meaning Posts, Leads, Applications, and Automation, def
 
 ### 1. Tracks
 
-**Purpose:** configure the tracks a user is pursuing, Workflow 1. This is the root config everything else hangs off.
+**Purpose:** configure the tracks a user is pursuing, Workflow 1, and their identity/lifecycle. This is the root config everything else hangs off — a lead cannot exist without a track (REQ-CRM-01).
 
-- List of existing tracks, role plus seniority. Each shows its search profile summary: keywords, minimum salary, maximum age, minimum match score, and its assigned default CV inline.
-- Create or edit a track: role name and seniority fields, and the search-profile fields in the same form. The two are 1:1, so there's no reason to split into two steps.
+- List of existing tracks, role plus seniority. Each row shows a read-only summary of its search profile — keywords, minimum salary, maximum age, minimum match score, and, if scheduled, when its next run fires — with a "Configure search" link to that track's Search Profiles page (1b). The search criteria are edited there, not on this page.
+- Create or edit a track: role name and seniority fields only. A newly created track has no search profile until the user configures one on Search Profiles (1b); it simply cannot run a search yet.
 - Default CV picker per track, sourced from the CV catalog, the data model's `cv` table. A "Manage CVs" link opens page 2 for adding or editing labels. If the catalog is empty, the picker itself surfaces that link inline rather than leaving the user stuck on an empty dropdown.
 - Archive action per track, a soft delete per REQ-SRCH-10: archived tracks drop out of the active list and out of every track selector elsewhere in the app, including Posts, promote-to-lead, and apply default CV, by default, with a toggle on this page to show archived tracks and unarchive one. Historical posts, leads, and applications tied to an archived track remain intact and browsable.
-- No search-trigger action lives here. Triggering a run happens from Posts, scoped to a track selected there, keeping "configure" and "run" separate.
+- No on-demand search-trigger action lives here, and no search-profile editing either. Triggering a run on demand happens from Posts, scoped to a track selected there. This page is exclusively track identity and lifecycle.
+
+### 1b. Search Profiles
+
+**Purpose:** configure the search criteria for one track, REQ-SRCH-01. Reached from the "Configure search" row action on Tracks (page 1) rather than a standalone nav entry — the same reached-from-a-page pattern as CVs (page 2), since a search profile has no lifecycle independent of its owning track (Information architecture above).
+
+- One form per track, 1:1 by `track_id`: keywords, minimum salary, maximum post age, minimum match score, and employment type, defaulting to Full Time.
+- Schedule fields, REQ-SRCH-11: an on/off switch, an interval, and the next run time. Off by default for a new track. These are plain fields on this same form, not a separate dialog, since REQ-SRCH-11 keeps schedule configuration in the same place as the rest of the search criteria.
+- No track-identity fields here. Role, seniority, default CV, and archive state stay on Tracks (page 1); this page cannot delete or archive the owning track.
+- No on-demand search-trigger action here either, for the same reason it isn't on Tracks: triggering a run happens from Posts, scoped to a track selected there.
 
 ### 2. CVs
 

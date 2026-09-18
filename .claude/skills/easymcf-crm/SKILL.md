@@ -1,11 +1,11 @@
 ---
 name: easymcf-crm
-description: Domain knowledge for easymcf's job-leads tracking / CRM pipeline feature (REQ-CRM-01..07) — the lead status state machine and the named regression (unconditional status overwrite) this release must not repeat. Use when implementing or reviewing lead promotion, status transitions, or expiry handling.
+description: Domain knowledge for easymcf's job-leads tracking / CRM pipeline feature (REQ-CRM-01..08) — the lead status/stage state machine, the deadline-maintenance rule behind auto-expiry, and the named regression (unconditional status overwrite) this release must not repeat. Use when implementing or reviewing lead promotion, stage transitions, or expiry handling.
 ---
 
 # Job leads tracking (CRM pipeline)
 
-Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requirements.md)'s "Job leads tracking" section (REQ-CRM-01..07).
+Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requirements.md)'s "Job leads tracking" section (REQ-CRM-01..08).
 
 ## Core distinction: pipeline status vs. apply status
 
@@ -16,24 +16,30 @@ These are two different questions and must stay two different fields, never conf
 
 The prototype's `screened.apply` flag conflated both ("queued to apply" and, after a later step ran, "apply succeeded") — see [010-prototype.md](../../../docs/releases/010/010-prototype.md). Do not reintroduce a single flag doing both jobs.
 
-## Status state machine (REQ-CRM-02)
+## Stage state machine (REQ-CRM-02)
 
-```
-OPEN (default) → TOAPPLY (user queues for apply run)
-                → APPLIED (auto on successful apply, or manual)
-                → INTERVIEW (manual)
-CLOSED — reachable from ANY status (manual, terminal, archive)
-```
+A lead carries two separate fields — conflating them is exactly the kind of mistake the "Core distinction" above warns against, and neither is ever the same thing as apply status:
 
-A lead promoted from a posting (REQ-CRM-01) defaults to `OPEN`. `TOAPPLY` replaces the prototype's `screened.apply` flag as the "queue for apply" signal. `APPLIED` is set automatically when an apply attempt records status `applied` (REQ-APPLY-09) or manually.
+- `status`: `OPEN` (default) or `CLOSED` — whether the lead is active at all.
+- `stage`: `PROSPECT` → `TOAPPLY` → `APPLIED` → `CALLBACK` → `INTERVIEW` → `OFFER`, with `CLOSED` reachable from any of them (manual close, or auto: expiry/apply-failure). See [010-workflows.md](../../../docs/releases/010/design/010-workflows.md) Workflow 5 for the full stage diagram.
 
-## The regression to guard against (REQ-CRM-05)
+A lead promoted from a posting (REQ-CRM-01) defaults to `status=OPEN`/`stage=PROSPECT`. `TOAPPLY` replaces the prototype's `screened.apply` flag as the "queue for apply" signal. `APPLIED` is set automatically when an apply attempt records status `applied` (REQ-APPLY-09) or manually.
 
-The prototype's `updateOpenExpired()` scanned deadlines and **unconditionally overwrote status to `"expired"`** for any row past its deadline — including leads already `APPLIED`, `INTERVIEW`, or `CLOSED`. This is a defect, not a design choice. The 010 equivalent must only auto-transition to `EXPIRED` when current status is *not already* `APPLIED`, `INTERVIEW`, or `CLOSED`. Any code that updates lead status on a schedule/condition (not a direct user action) must check current status first — treat an unconditional status write as a bug, not a simplification.
+## Auto-expiry and the regression to guard against (REQ-CRM-05)
+
+The prototype's `updateOpenExpired()` scanned deadlines and **unconditionally overwrote status to `"expired"`** for any row past its deadline — including leads already applied, interviewing, or closed. This is a defect, not a design choice, but the fix is not a set of exempt stages: the only guard is that a lead already `status='CLOSED'` is never re-evaluated or rewritten. Every open stage, `PROSPECT` through `OFFER`, is a legitimate expiry candidate.
+
+`lead.deadline` is a system-maintained field, not a value fixed once at creation. It resets at defined lifecycle points:
+
+1. at promotion, copied from the post's `closing_date`, defaulted to 28 days from the post's `posted_date` if absent, or to 1 week from the promotion date if that computed date has already passed
+2. reset to 28 days from `applied_date` on the transition to `APPLIED`
+3. from `CALLBACK` onward (`CALLBACK`, `INTERVIEW`, `OFFER`), refreshed to 28 days from the most recent logged activity on every update — a genuinely rolling window
+
+A lead auto-closes (`close_reason='expired'`) once the current date passes whatever `deadline` currently holds. Any code that updates lead state on a schedule/condition, rather than a direct user action, must check `status` first — treat an unconditional write as a bug, not a simplification.
 
 ## Lead fields (REQ-CRM-03/04)
 
-deadline, applied date, first-attempt date, last-contact date, free-text notes, link back to posting profile — mirrors the prototype's `open` sheet. A lead may override title/company independently of its source posting (REQ-CRM-04) without mutating the posting record — posting and lead are always separate records, never the same row.
+deadline, applied date, first-attempt date, last-contact date, free-text notes, link back to posting profile — mirrors the prototype's `open` sheet. `deadline` is not simply user-set — see "Auto-expiry" above for how the system maintains it across the lifecycle; a user's own manual edit to it fires the same `deadline_changed` event an automatic reset does. A lead may override title/company independently of its source posting (REQ-CRM-04) without mutating the posting record — posting and lead are always separate records, never the same row.
 
 ## Interaction model (REQ-CRM-07)
 

@@ -1,0 +1,14 @@
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff', 2, 0.04, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff', 1, 0.04, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('MyCareerFutures-ba8ace4ad4d006a1f179ace0860a9657', 1, 0.04, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('MyCareerFutures-706df6d5e0363c9405c7b687472ba79e', 1, 0.05, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-1', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-2', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-3', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-4', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-5', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-6', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-closed', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-11', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-12', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-13', 1, 0.8, 'title_keyword_v1');

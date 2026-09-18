@@ -6,8 +6,9 @@
 - [References](#references)
 - [Guiding constraint](#guiding-constraint)
 - [6. Out of scope](#6-out-of-scope)
-- [1. Runtime and compute](#1-runtime-and-compute) — `ARCH-RUN-01..10`
+- [1. Runtime and compute](#1-runtime-and-compute) — `ARCH-RUN-01..10`, `ARCH-SCHED-01..06`
   - [Topology](#topology)
+  - [Scheduled runs](#scheduled-runs) — `ARCH-SCHED-01..06`
   - [Language, dependencies, entry points](#language-dependencies-entry-points)
   - [Frontend serving](#frontend-serving)
   - [Repo layout](#repo-layout)
@@ -25,7 +26,7 @@
 
 Physical and runtime architecture for release `010` (POC local): what processes exist, what they run on, where data and credentials live on disk, and how every tier of testing is invoked. The **workflows** say *what* happens, the **data model** says *what is stored*, and the **user interface design** says *what the user sees*. This document says *what runs where* and is the direct input to milestone 07 (local dev and test env) and 08 (seed data). It is intended to be complete enough that 07 can be implemented without further design decisions.
 
-Decisions carry an `ARCH-*` id (grouped `RUN`/`STO`/`NET`/`BOT`/`TEST`, mirroring the `REQ-*` grouping convention in the **requirements**) so later docs, skills, and commit messages can reference them.
+Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, mirroring the `REQ-*` grouping convention in the **requirements**) so later docs, skills, and commit messages can reference them.
 
 ## References
 
@@ -63,8 +64,8 @@ Mirrors the **requirements**' out-of-scope section and the **project instruction
 - **No cloud anything** — no AWS/GCP/Azure SDK, credential file, deployment target, or hosted service dependency. No S3/DynamoDB/RDS/Lambda/API Gateway. `010` runs offline apart from the gated MCF automation calls (ARCH-NET-03).
 - **No containers or orchestration** — no Dockerfile, docker-compose, Kubernetes, or VM image. The install procedure is `python -m venv`, `pip install -r`, `playwright install chromium`.
 - **No CI/CD** — no GitHub Actions workflow, no pipeline configuration, no automated deploy. Tests are run locally by a developer or an agent, on demand.
-- **No multi-user concerns** — no auth, no sessions beyond the single MCF credential, no per-user data partitioning, and no `user_id` columns, a deliberate divergence from `mcfpipe`'s multi-user `track` documented in the **data model**, and no `0.0.0.0` binding.
-- **No process manager, scheduler, or queue** — no systemd unit, cron entry, Celery/redis, or supervisor. Runs are user-initiated (REQ-SRCH-02) and in-process (ARCH-RUN-02).
+- **No multi-user concerns** — no auth, no sessions beyond the single MCF credential, no per-user data partitioning, and no `0.0.0.0` binding. `track`, `cv`, and `session` do carry a `user_id` column, per the **data model**, but it names an ownership boundary rather than activating one. Exactly one `user` row is ever seeded, and no application code resolves identity per request.
+- **No process manager, external scheduler, or queue** — no systemd unit or timer, cron entry, Celery/redis/celery-beat, APScheduler, or supervisor. Runs are either user-initiated (REQ-SRCH-02) or fired by the in-process tick thread `ARCH-SCHED-01` defines (REQ-SRCH-11), and both paths execute in-process through the same code path (ARCH-RUN-02) under the same one-run-at-a-time guard (ARCH-RUN-03). Scheduling in `010` is a loop inside the single Flask process reading `search_schedule` rows, never a second process and never a scheduling library.
 - **No migration framework, no ORM migrations, no database backup tooling** — recreate-and-reseed is the whole story (ARCH-STO-02/06).
 - **No frontend build toolchain** — no node, npm, webpack, bundler, transpiler, or JS test runner (ARCH-RUN-06, ARCH-TEST-05). The frontend-silo tier (ARCH-TEST-09) adds a second Playwright tier rather than a JS toolchain.
 
@@ -91,6 +92,40 @@ Each of these becomes a live question again at `020` (MVP cloud). None of them i
 
 **ARCH-RUN-04** Browser automation runs **in-process within that background thread** (Playwright's sync API, one browser context per run), not as a separately-launched script. The prototype's model of independent scripts writing to a shared database is what the API replaces.
 
+### Scheduled runs
+
+REQ-SRCH-11 adds a second way to start a search run alongside REQ-SRCH-02's on-demand trigger: a per-track schedule the user configures in the UI. This subsection is the whole of that mechanism. It was added after the first version of this document, which flatly excluded any scheduler — the out-of-scope bullet above is the amended text, and nothing below relaxes any other boundary in it.
+
+**ARCH-SCHED-01** A scheduled run is fired by **one in-process daemon thread that wakes on a fixed tick, asks the database which schedules are due, and calls the same in-process run-trigger service function `API-EP-04` calls**. There is no cron entry, no systemd timer, no separate scheduler process, and no scheduling library. The thread waits on a `threading.Event` rather than `time.sleep()`, so process shutdown and tests both interrupt it immediately instead of after a full tick, and it holds its own SQLite connection per ARCH-STO-07 exactly as a run thread does. The scheduled path and the HTTP path converge on the same function, not on an HTTP call the app makes to itself: everything ARCH-RUN-02 says about how a run executes, and everything ARCH-RUN-03 says about how two of them contend, applies unchanged to a scheduled run. At one user and a handful of tracks, a tick is one indexed `SELECT` and at most one run start.
+
+Rejected alternatives:
+
+01. **a cron entry or systemd timer calling `curl` against the run endpoint.** It puts the schedule outside the application, where the UI can neither read nor edit it — REQ-SRCH-11 requires the user to configure it from the UI, not by editing a crontab — makes the feature OS-specific, and adds precisely the process-manager dependency the **guiding constraint** and the out-of-scope list both refuse.
+02. **APScheduler (or any pure-Python scheduling library) inside the same process.** It solves this problem correctly and is still the wrong trade here. It introduces a second source of truth for schedule state, its own job registry alongside the `search_schedule` rows the UI edits, so "what is scheduled" becomes answerable two ways that can disagree. It layers its own misfire/coalescing/`max_instances` semantics over ARCH-RUN-03's database-level guard, which already decides the same question with a stronger mechanism. And it adds a runtime dependency to a manifest ARCH-RUN-05 deliberately keeps at seven packages, to replace a loop, a query, and a timestamp update. The **guiding constraint**'s burden of proof for adding a tool is not met.
+03. **Celery beat, RQ-scheduler, or any broker-backed scheduler.** Already refused by ARCH-RUN-02 for the run itself, for the same reason: the only capability it adds is concurrency this design forbids.
+
+**ARCH-SCHED-02** **The schedule is its own `search_schedule` table, a 1:1 extension of `track` the same way `search_profile` is.** It carries `schedule_enabled`, `schedule_interval_hours`, and `next_run_at` (see the **data model**), keyed on `track_id`, and those three columns are the complete definition of a schedule. It is reachable through the generic CRUD shape at `/api/v1/search_schedule/{track_id}`, the same pattern `search_profile` already uses. Because milestone 08's schema is already implemented, this is a schema change under ARCH-STO-02's recreate-don't-migrate rule: edit `schema.sql`, bump `meta.schema_version` 3 → 4 per ARCH-STO-03, re-run `scripts/resetdb.py --seed`. Milestone 10 owns that edit.
+
+Rejected alternatives:
+
+01. **generalizing to a table keyed by `(run_type, track_id)`, covering apply runs too.** Nothing asks for scheduled apply runs: `010`'s apply run takes no track scope (ARCH-RUN-02, `run_log.track_id` nullable for apply) and is deliberately a decision the user makes after reviewing a queue. The cost of generalizing now is a join on every tick and a wider key to hold one row per track that a plain `track_id` key already covers. If `020` needs scheduled apply, widening the key is a contained change under the same recreate rule.
+02. **a cron expression string.** It is the general answer and it drags in a parser — `croniter`, or APScheduler by the back door — and a UI for authoring a syntax the user should not have to learn. An enable flag, an interval, and a next-fire instant cover "every night at 8pm" and "every 6 hours", which is the whole of the stated need.
+03. **a `last_run_at` column.** Rejected as duplicate state: `run_log` already records every run with its `track_id` and `started_at`, so "when did this track last search" has a source of truth. A second copy on `search_schedule` could only drift from it.
+
+**ARCH-SCHED-03** **Due evaluation is `schedule_enabled = 1 AND (next_run_at IS NULL OR next_run_at <= now())`, read through `clock.py::now()`** per ARCH-STO-05, so a test controls "now" instead of waiting for it. `next_run_at` is user-writable — setting it is how the user picks the first fire time, and "daily at 08:00" is expressed as `next_run_at` = tomorrow 08:00 with `schedule_interval_hours` = 24, rather than as a separate time-of-day column. After the first fire the scheduler owns the column. The `NULL` branch is what makes this work without a write hook: enabling a schedule without naming a first fire time leaves `next_run_at` null, the next tick treats it as due, starts a run, and writes the column forward. `search_schedule` is therefore its own `API-CAT-01` pure generic resource in the **API reference**, the same shape `search_profile` already uses — REQ-SRCH-11 adds a new generic resource, but no table-specific write hook and no named endpoint.
+
+**implementation decision** — **missed windows coalesce into at most one run.** If the app was closed for three days against a daily schedule, `next_run_at` is three days stale at boot; the scheduler starts **one** run and advances `next_run_at` in whole multiples of the interval to the next instant in the future, rather than replaying the missed windows or advancing by exactly one interval into the past. A search run re-scrapes current listings, so three replayed runs would produce what one produces, three times as slowly. This is the one piece of behavior a scheduling library would have given for free, and it is the arithmetic above.
+
+**ARCH-SCHED-04** **A scheduled trigger that collides with an in-flight run skips, logs, and retries on the next tick.** ARCH-RUN-03's partial unique index is the guard and is unchanged: the scheduler attempts the same insert the endpoint attempts and catches the same `UNIQUE` failure. What differs is the handling. There is no request context, so there is no `409` to return and nobody to show it to — the scheduler logs one line naming the skipped track and the in-flight `run_log.id`, and leaves `next_run_at` untouched. Leaving it untouched is the load-bearing half: because the column advances only after a run actually starts, the skipped schedule is retried on the next tick and fires as soon as the conflicting run ends, instead of being silently dropped until tomorrow. It also cannot cascade, since a schedule that never starts never accumulates missed windows to catch up on.
+
+Note the emergent consequence, which is intended rather than incidental: the index is on `run_type` alone, not `(run_type, track_id)`, so two tracks scheduled at the same instant do not search concurrently. The first starts, the second skips and starts when the first finishes. That is the correct behavior for a single MCF session and one browser (ARCH-RUN-03), and it means a user can schedule every track at 08:00 without thinking about it.
+
+**ARCH-SCHED-05** **`run_log` gains a `trigger_source` discriminator (`manual` | `scheduled`, defaulting to `manual`)** so the run history answers "did last night's schedule actually fire" rather than leaving a scheduled run indistinguishable from one the user started. It is set by whichever path created the row.
+
+**implementation decision** — **a skipped tick writes no `run_log` row, and no `skipped` value is added to `run_log.status`.** `run_log` is the record of runs that happened; a trigger that never started a run is not one. Widening that closed vocabulary would ripple into milestone 08's `CHECK` constraint, its seed enumeration oracle, and the UI's status badge, to represent a non-event whose only reader is a developer reading the log. The skip is an application-log line (ARCH-SCHED-04) and nothing more.
+
+**ARCH-SCHED-06** **The tick thread is started by `__main__.py`, never by `create_app()`**, and is governed by two entries in ARCH-RUN-07's config table: `SCHEDULER_ENABLED` (default `1`) and `SCHEDULER_TICK_S` (default `60`). The split matters for the test tiers. Tier 1 uses `app.test_client()` against `create_app()` (ARCH-TEST-03), which must not acquire a background thread that fires runs at wall-clock intervals underneath an assertion; a scheduler test instead constructs the tick function and calls it directly against a controlled clock. Tier 1b/2 spawn `python -m easymcf` (ARCH-TEST-04/09) and set `SCHEDULER_ENABLED=0` unless the test is about scheduling, in which case it sets a sub-second `SCHEDULER_TICK_S` so the full loop still runs rather than being stubbed out — the same env-var-indirection pattern, and the same "shrink the wait, don't skip the code path" rule, as ARCH-BOT-05's apply-poll timings. The default local run sets neither, so a user who starts the app gets the scheduler.
+
 ### Language, dependencies, entry points
 
 **ARCH-RUN-05** **Python 3.11+**, single **`venv` + `pip` + `pyproject.toml`**. Chosen over poetry/pdm/uv because it is the only option with zero install prerequisite beyond the Python already required, and because `010` ships no package and has no dependency-resolution problem worth a lockfile. This release keeps one manifest per venv instead of splitting a manifest into runtime and dev variants: `010` makes no runtime/dev process split, since the same venv runs the app and its own tests, so a single git-tracked `pyproject.toml`, listing `flask`, `playwright`, `jsonschema`, `beautifulsoup4`, `html5lib`, `pytest`, and `pytest-timeout` as dependencies, already gives everything a `requirements.txt`/`requirements-dev.txt` pair would. The **project instructions**' two-venv rule fixes where the venv actually lives, `.dev/dev-env` and `env`, both nested inside the repo at the repo root, never a home-directory or other external path, and never literally named `.venv/`. It also names its git-tracked manifests, `python-envs/dev-env/pyproject.toml` and `python-envs/ops-env/pyproject.toml`. The **development env runbook**'s `ENV-SETUP-01..03` gives the concrete target contents and install/sync commands.
@@ -108,6 +143,8 @@ Each of these becomes a live question again at `020` (MVP cloud). None of them i
 | `HEADLESS`            | `1`                      | headless browser                               |
 | `APPLY_POLL_RETRIES`  | `5`                | apply-button poll attempts before failing (REQ-APPLY-07)       |
 | `APPLY_POLL_DELAY_S`  | `5`                | seconds between apply-button poll attempts (REQ-APPLY-07)      |
+| `SCHEDULER_ENABLED`   | `1`                | run ARCH-SCHED-01's tick thread — `0` disables it              |
+| `SCHEDULER_TICK_S`    | `60`               | seconds between scheduler ticks (ARCH-SCHED-06)                |
 
 **implementation decision** — no project-specific prefix, previously \`\`, on these names. With only two venvs and no other project sharing this shell, per the **project instructions**' two-venv rule, the collision risk a prefix would guard against, another tool on the same machine also reading `PORT`/`DB_PATH`/`HEADLESS`, is accepted as a known and deliberate tradeoff. If it bites in practice, reintroducing a prefix is a contained rename rather than a re-architecture.
 
@@ -146,6 +183,7 @@ easymcf/
       schema.sql            # full DDL, single file (ARCH-STO-02)
       connection.py         # WAL/pragma setup, per-thread connections
     services/               # search, scoring, apply orchestration; lead/application write hooks (010-api.md)
+      scheduler.py          # due-schedule tick thread (ARCH-SCHED-01)
     automation/
       browser.py            # MCFBrowser interface (ARCH-BOT-02)
       live.py               # Playwright -> real MCF
@@ -174,7 +212,7 @@ easymcf/
 
 ## 2. Storage
 
-**ARCH-STO-01** One SQLite file holds every table in the **data model**: `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `lead`, `lead_event`, `application`, `run_log`, `session`. The dev database is **`data/easymcf.db`**. `data/` is gitignored in its entirety, so no database binary is ever committed. Path is overridable via `DB_PATH`, which is how tests get their own.
+**ARCH-STO-01** One SQLite file holds every table in the **data model**: `user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `session`. The dev database is **`data/easymcf.db`**. `data/` is gitignored in its entirety, so no database binary is ever committed. Path is overridable via `DB_PATH`, which is how tests get their own.
 
 **ARCH-STO-02** Schema is a **single hand-maintained `easymcf/db/schema.sql`** applied by `scripts/initdb.py`. No Alembic, no migration chain. During `010` a schema change is: edit `schema.sql`, run `scripts/resetdb.py --seed`, done — the database holds nothing a developer can't regenerate, and a migration framework's whole value (preserving production data) does not exist yet.
 

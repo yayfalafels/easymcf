@@ -35,6 +35,31 @@ def test_track_and_post_coverage(conn):
     assert conn.execute("SELECT COUNT(*) FROM (SELECT post_id FROM post_track GROUP BY post_id HAVING COUNT(*) > 1)").fetchone()[0] >= 1
 
 
+def test_user_ownership(conn):
+    assert conn.execute("SELECT COUNT(*) FROM user").fetchone()[0] == 1
+    (user_id,) = conn.execute("SELECT id FROM user").fetchone()
+    assert conn.execute("SELECT COUNT(*) FROM track WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM cv WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM session WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
+
+
+def test_match_score_paired_with_post_track(conn):
+    unpaired = conn.execute(
+        "SELECT COUNT(*) FROM post_track pt LEFT JOIN match_score ms "
+        "ON ms.post_id = pt.post_id AND ms.track_id = pt.track_id WHERE ms.post_id IS NULL"
+    ).fetchone()[0]
+    assert unpaired == 0
+    assert conn.execute("SELECT COUNT(*) FROM match_score").fetchone()[0] >= 1
+
+
+def test_lead_note_history(conn):
+    assert conn.execute("SELECT COUNT(*) FROM lead_note").fetchone()[0] >= 1
+    bad = conn.execute(
+        "SELECT ln.id FROM lead_note ln LEFT JOIN lead l ON l.id = ln.lead_id WHERE l.id IS NULL"
+    ).fetchall()
+    assert bad == []
+
+
 def test_closed_vocabularies_are_complete(conn):
     assert LEAD_STAGES <= distinct(conn, "SELECT DISTINCT stage FROM lead")
     assert CLOSE_REASONS <= distinct(conn, "SELECT DISTINCT close_reason FROM lead WHERE status = 'CLOSED'")

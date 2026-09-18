@@ -8,6 +8,8 @@ INSERT INTO lead_event (id, lead_id, event_type, detail, occurred_at) VALUES (3,
 INSERT INTO lead_event (id, lead_id, event_type, detail, occurred_at) VALUES (4, 4, 'stage_change', 'seed stage fixture', '2026-09-15 07:00:00');
 -- synthetic activity fixture
 INSERT INTO lead_event (id, lead_id, event_type, detail, occurred_at) VALUES (5, 5, 'stage_change', 'seed stage fixture', '2026-09-15 07:00:00');
+-- synthetic note-history coverage
+INSERT INTO lead_event (id, lead_id, event_type, detail, occurred_at) VALUES (101, 5, 'note_edited', 'note added', '2026-09-15 07:00:00');
 -- synthetic activity fixture
 INSERT INTO lead_event (id, lead_id, event_type, detail, occurred_at) VALUES (6, 6, 'stage_change', 'seed stage fixture', '2026-09-15 07:00:00');
 -- synthetic activity fixture

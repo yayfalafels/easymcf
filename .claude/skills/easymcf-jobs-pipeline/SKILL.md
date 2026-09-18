@@ -1,6 +1,6 @@
 ---
 name: easymcf-jobs-pipeline
-description: Domain knowledge for easymcf's search-by-keywords and match-scoring feature (REQ-SRCH-01..09) — tracks/search profiles, the scrape-dedup-detail-score pipeline, and the swappable scoring-method constraint. Use when implementing or reviewing track configuration, search runs, posting persistence, or match scoring.
+description: Domain knowledge for easymcf's search-by-keywords and match-scoring feature (REQ-SRCH-01..11) — tracks/search profiles, the scrape-dedup-detail-score pipeline, the swappable scoring-method constraint, and the scheduled-run mechanism. Use when implementing or reviewing track configuration, search runs, posting persistence, or match scoring.
 ---
 
 # Jobs pipeline: search by keywords
@@ -10,13 +10,13 @@ Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requiremen
 ## Core entities
 
 - **track** — a user's role at a seniority level (e.g. "Data Engineer, Senior"), carrying exactly one search profile.
-- **search profile** — a track's keyword(s), minimum salary, maximum posting age, employment type (defaults Full Time).
+- **search profile** — a track's keyword(s), minimum salary, maximum posting age, employment type (defaults Full Time), and its scheduled-run configuration (REQ-SRCH-11): an on/off switch, a repeat interval, and the next run time.
 - **posting** — source-of-truth listing (role/company/URL), not user-specific; found by search or entered manually.
 - **match score** — 0–1 relevance score per (posting, track) pair, recorded with the *method* that produced it (REQ-SRCH-09), so an alternative method (e.g. BERT-based) can be added later without a schema change. See `mcfpipe`'s `track_score` table (`method` column) in [010-prototype.md](../../../docs/releases/010/010-prototype.md) for the reference shape.
 
 ## Pipeline shape
 
-1. **Search run** (REQ-SRCH-02/03): triggered on demand from the UI for one track. Pages a keyword's search results until a page returns zero results (see [mycareerfutures](../mycareerfutures/SKILL.md) URL scheme), capturing title, company, reference/URL, posted date, salary-if-shown per card.
+1. **Search run** (REQ-SRCH-02/03): triggered on demand from the UI for one track, or automatically once that track's schedule comes due (REQ-SRCH-11) — an in-process tick thread, not an OS-level cron/scheduler; either trigger runs the same pipeline and writes the same `run_log` row, distinguished by `trigger_source`. Pages a keyword's search results until a page returns zero results (see [mycareerfutures](../mycareerfutures/SKILL.md) URL scheme), capturing title, company, reference/URL, posted date, salary-if-shown per card.
 2. **Persist incrementally** (REQ-SRCH-04): write postings as found, not only at sweep end — this is the specific defect the prototype had; see [webscraping](../webscraping/SKILL.md).
 3. **Dedup** (REQ-SRCH-05): stable identifier from source + posting reference + posted date.
 4. **Detail fetch** (REQ-SRCH-06): distinct second pass over postings not yet detailed; a posting found closed during this pass is removed from the active set, not retained stale.

@@ -48,14 +48,14 @@ Single local job seeker, running the system on their own machine. Multi-user sup
 - **MCF** MyCareerFutures
 - **role:** A generic job title/domain (e.g. "Data Engineer"), not tied to any one user.
 - **track:** A user's role at a given seniority level. The unit search profiles, CVs, and match scores are organized by.
-- **search profile:** The keyword/salary/age search criteria for one track.
+- **search profile:** The keyword/salary/age search criteria for one track, together with that track's scheduled-run configuration (REQ-SRCH-11).
 - **lead:** A single user's personal, trackable instance of a post for one track, followed from initial interest through to a closed outcome, either success or fail. Created when the user promotes a post under a track. Its first stage is `PROSPECT`.
 - **application:** An MCF automated application that is managed by the app from selected-to-apply to submission success or fail.
 - **pipeline status:** Where a post sits in the system's post search acquisition process — distinct from a lead's status/stage.
 - **lead status:** Coarse open/closed indicator for a lead — `OPEN` while active, `CLOSED` once resolved.
 - **lead stage:** Where an open lead sits within its lifecycle: `PROSPECT` (default on promotion) → `TOAPPLY` (queued for apply) → `APPLIED` → `CALLBACK` → `INTERVIEW` → `OFFER`. A closed lead's stage instead records why it closed: offer accepted, rejected, withdrawn, expired, cancelled, duplicate, or apply failed.
 - **apply status:** The mechanical outcome of an automated application apply attempt, tracked separately from lead status/stage.
-- **lead activity log:** The append-only, timestamped record of updates to a lead, covering stage transitions, contact logged, notes edits, and deadline changes. Its latest entry drives auto-expiry and backs the lead's activity history (REQ-CRM-08).
+- **lead activity log:** The append-only, timestamped record of updates to a lead, covering stage transitions, contact logged, notes edits, and deadline changes. It backs the lead's `deadline` maintenance and auto-expiry (REQ-CRM-05) and the lead's activity history (REQ-CRM-08).
 
 See each feature section below for the concrete structure and enumerations behind these terms.
 
@@ -70,7 +70,6 @@ See each feature section below for the concrete structure and enumerations behin
 - Automated MCF login, including MFA or CAPTCHA handling.
 - Multi-step questionnaire application automation.
 - Analytics/BI/reporting pipelines (ETL, warehouse, dashboards) beyond in-app run status.
-- Scheduled/cron-triggered runs — 010 runs are user-initiated from the UI.
 - NLP/semantic-based match scoring (title + job description) — deferred to release `020` (MVP cloud) per the release roadmap's match-algorithm feature row.
 - Salary-percentile match scoring: a `jobsearch` prototype feature, deprecated and not carried forward into `010` (see match-algorithm feature row: prototype `primitive + salary` → `010` `primitive title`).
 
@@ -78,7 +77,7 @@ See each feature section below for the concrete structure and enumerations behin
 
 ### Search by keywords
 
-On demand from the UI, easymcf runs a search against `MCF` for a track, retrieves matching posts, and fetches full detail for any post not already on file, so the results a user reviews are never a stale or partial snapshot. The user configures one or more tracks — a role at a given seniority level — each carrying its own search keywords, target salary, and maximum post age. Every post is scored for relevance against the track(s) it matches so the user can prioritize what to review first, and a post found elsewhere can also be entered manually and folds into the same review and scoring flow rather than living outside the system.
+On demand from the UI, or on a repeating schedule the user configures there for that track, easymcf runs a search against `MCF` for a track, retrieves matching posts, and fetches full detail for any post not already on file, so the results a user reviews are never a stale or partial snapshot. The user configures one or more tracks — a role at a given seniority level — each carrying its own search keywords, target salary, and maximum post age. Every post is scored for relevance against the track(s) it matches so the user can prioritize what to review first, and a post found elsewhere can also be entered manually and folds into the same review and scoring flow rather than living outside the system.
 
 This reuses the job-search workflow and matching approach already proven in the `jobsearch` prototype largely as-is for 010. See the **prototype extraction** for its scraping, deduplication, and scoring mechanics. One improvement is made for this release: results must be saved as they are found rather than only once at the end of a full run.
 
@@ -94,6 +93,7 @@ The `jobsearch` prototype's match score combined a primitive title-keyword compo
 - **REQ-SRCH-08** Each post is associated with the search run, and implicitly the track, that discovered it, or flagged as manually entered. A post may match more than one track, with each match scored independently (REQ-SRCH-09). The one track a resulting lead is filed under is a choice the user makes at promotion (REQ-CRM-01); it is never assigned automatically.
 - **REQ-SRCH-09** Each post has a computed match score (0–1) per track it matches, visible to the user for prioritization, using the `jobsearch` prototype's primitive title-keyword approach, per the **prototype extraction**. Its salary-percentile component is deprecated and dropped from `010`, per the Out of scope section above. Posts are screened by a configurable maximum age and minimum score. The score is recorded together with its scoring method so semantic/NLP-based matching, title plus job description, targeted for release `020`, can be added later without a schema change.
 - **REQ-SRCH-10** User can archive a track without deleting it. An archived track is hidden from active track selectors (search run, promote-to-lead, apply default CV) but its historical posts, leads, and applications remain intact and readable, with a toggle available to view archived tracks.
+- **REQ-SRCH-11** User can configure a repeating schedule for a track's search run from the UI — switching it on or off, and setting how often it repeats and when it next runs — alongside REQ-SRCH-02's on-demand trigger. A track has no schedule until the user gives it one, and the schedule is part of that track's search profile (REQ-SRCH-01), edited in the same place as its other search criteria rather than anywhere outside the app. Once triggered, a scheduled run is indistinguishable from an on-demand one: same run history record (REQ-PLAT-03), same incremental persistence, deduplication, detail pass, and scoring (REQ-SRCH-03..09), with the run history additionally recording which of the two started it. Schedules never stack up duplicate work. A run that falls due while a search run is already in progress does not run alongside it or get dropped, it starts once the in-progress run finishes, and a schedule whose due time passed while the app was closed produces one catch-up run on next start rather than one run per missed interval.
 
 ### Job leads tracking
 
@@ -130,10 +130,10 @@ _lead closed reasons_
 - **REQ-CRM-02** A lead's status defaults to `OPEN` and remains open until `CLOSED`. While open, it progresses through the stages below (`TOAPPLY` replaces `jobsearch`'s `screened.apply` flag), distinct from its post's pipeline status and an application's apply status (REQ-APPLY-04):
 - **REQ-CRM-03** A lead carries: deadline, applied date, first-attempt date, last-contact date, free-text notes, and a link back to its post's profile/description — mirroring the `open` sheet's fields.
 - **REQ-CRM-04** User can override a lead's title/company independently of the source post, without mutating the post record (post vs. lead separation).
-- **REQ-CRM-05** A lead is automatically closed (stage `expired`) once 28 days pass with no activity recorded on it. The expiry threshold is the lead's last-updated timestamp plus 28 days, refreshed by any update to the lead (stage change, contact logged, notes edited, etc.), and applies at every open stage, `PROSPECT` through `OFFER`, until the lead is `CLOSED`.
+- **REQ-CRM-05** A lead is automatically closed (`close_reason='expired'`) once the current date passes its `deadline`. `deadline` is a maintained field rather than a single value fixed at creation: at promotion (REQ-CRM-01) it is copied from the post's `closing_date`, defaulted to 28 days from the post's `posted_date` if the post carries no closing date, or to 1 week from the promotion date if that computed date has already passed; on transition to `APPLIED` it resets to 28 days from `applied_date`; from `CALLBACK` onward (`CALLBACK`, `INTERVIEW`, `OFFER`) it becomes a rolling window, refreshed to 28 days from the most recent logged activity on every update, so continued activity keeps postponing expiry. Only a lead not already `CLOSED` is ever evaluated or rewritten. Every automatic reset of `deadline` is itself recorded as a `deadline_changed` event (REQ-CRM-08).
 - **REQ-CRM-06** User can close/archive a lead from any stage. It is removed from the active pipeline view while its history is preserved.
 - **REQ-CRM-07** All lead interactions happen through the AngularJS UI (REQ-FE-01). Spreadsheet-editing and menu-script-driven transitions, as used in `jobsearch`, are not carried forward as the interaction model.
-- **REQ-CRM-08** Every update to a lead (stage transition, contact logged, note edit, deadline change) is recorded as a timestamped, append-only event in a per-lead activity log. This log's latest entry is the lead's last-activity time, feeding auto-expiry (REQ-CRM-05), and is shown to the user as an activity history alongside the lead's application attempts. Scheduled interview/callback details are captured as free text within notes or an event entry. There is no dedicated per-stage date field for them.
+- **REQ-CRM-08** Every update to a lead (stage transition, contact logged, note edit, deadline change, or another field edit) is recorded as a timestamped, append-only event in a per-lead activity log. This log backs `deadline`'s maintenance, feeding auto-expiry (REQ-CRM-05), and is shown to the user as an activity history alongside the lead's application attempts. Scheduled interview/callback details are captured as free text within notes or an event entry. There is no dedicated per-stage date field for them.
 
 ### Automated apply
 
@@ -179,7 +179,7 @@ The backend is a locally-run Python service exposing the search, pipeline, and a
 
 The frontend is a single local web application the user interacts with directly, replacing every spreadsheet tab and menu action the prototype relied on with an equivalent screen or control. See the **prototype extraction** for what those were. 010 commits to AngularJS per the roadmap's feature table.
 
-- **REQ-FE-01** Frontend is an AngularJS single-page app, served locally, providing: track/search-profile configuration, post/results browsing with match scores, lead management by stage, apply-queue review and results, and MCF session establishment/status (REQ-APPLY-06).
+- **REQ-FE-01** Frontend is an AngularJS single-page app, served locally, providing: track configuration, search-profile configuration, post/results browsing with match scores, lead management by stage, apply-queue review and results, and MCF session establishment/status (REQ-APPLY-06). Track configuration and search-profile configuration are separate screens (**user interface design** pages 1 and 1b), split along a milestone boundary rather than a UX one: track identity/lifecycle, what a lead is scoped to and archived against (REQ-CRM-01, REQ-SRCH-10), belongs to job leads tracking; search-execution criteria (keywords, salary, age, schedule) belongs to search by keywords.
 - **REQ-FE-02** The UI surfaces run status and errors from backend-triggered search and apply runs, so failures are visible to the user instead of being confined to a console or log file.
 
 ### Local dev/test environment and seed data

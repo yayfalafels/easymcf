@@ -9,13 +9,16 @@
 - [2. What's missing, and how it's inferred](#2-whats-missing-and-how-its-inferred) — `TESTDATA-GAP-01..04`
 - [3. Column-level cleaning rules](#3-column-level-cleaning-rules)
 - [4. Reference schema → target schema mapping](#4-reference-schema--target-schema-mapping) — `TESTDATA-MAP-*`
+  - [`user`](#user)
   - [`role`](#role)
   - [`track`](#track)
   - [`search_profile`](#search_profile)
   - [`cv`](#cv)
   - [`post`](#post)
   - [`post_track`](#post_track)
+  - [`match_score`](#match_score)
   - [`lead`](#lead)
+  - [`lead_note`](#lead_note)
   - [`lead_event`](#lead_event)
   - [`application`](#application)
   - [`run_log`](#run_log)
@@ -37,7 +40,7 @@ Decisions carry a `TESTDATA-*` id grouped `SRC`/`GAP`/`MAP`/`GEN`, mirroring the
 
 ## References
 
-- **data model**: [010-data-model.md](010-data-model.md) — the target entities (`role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `lead`, `lead_event`, `application`, `run_log`, `session`) every mapping below produces rows for.
+- **data model**: [010-data-model.md](010-data-model.md) — the target entities (`user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `session`) every mapping below produces rows for.
 - **workflows doc**: [010-workflows.md](010-workflows.md) — the process logic the **data model** was itself derived to support, referenced here only to explain this document's own relationship to the **data model**.
 - **architecture doc**: [010-architecture.md](010-architecture.md) `ARCH-STO-04..06` — seed is text SQL, dates are relative-to-load-time via a shift, and the minimum enumeration the seed set must cover.
 - **test-strategy doc**: [010-test-strategy.md](010-test-strategy.md) `STRAT-CASE-05` — closed vocabularies (apply-status codes, close reasons, `src_method`) each need at least one seeded row.
@@ -91,7 +94,7 @@ Each CSV corresponds to a stage or a view carved out of one:
 
 ## 3. Column-level cleaning rules
 
-01. **Percent-as-string → float.** `track-assignment.csv`'s `match_score` is a string like `"100%"`/`"62%"`. Convert to a `0-1` float (`"62%" → 0.62`), matching `post_track.match_score`'s documented range.
+01. **Percent-as-string → float.** `track-assignment.csv`'s `match_score` is a string like `"100%"`/`"62%"`. Convert to a `0-1` float (`"62%" → 0.62`), matching `match_score.match_score`'s documented range.
 02. **Boolean spelling.** Source booleans appear as `'TRUE'`/`'FALSE'` (`track-assignment.csv`), `'1'`/`'0'`/`''` (`screened.csv`), and implied by tab membership (`open.csv` vs `closed.csv`). Normalize all to Python `bool`/SQLite `0`/`1` at the boundary, once, rather than re-parsing per field.
 03. **Blank rows.** `open.csv` has at least one fully-blank leading data row, a stray sheet artifact. Skip any row whose `jobid` is empty, across every file.
 04. **Redacted URLs.** Recent `MyCareerFutures`-sourced rows in `active.csv`/`open.csv` show `link` as literal `***`. The user appears to have redacted these before export, unrelated to any actual data-loss. Where `url_ref` is `***` or blank, synthesize a placeholder MCF-shaped URL from the post id, per the **mycareerfutures skill**'s URL scheme, rather than leaving it blank. The tier-2 fixture corpus keys detail pages off the URL slug (`ARCH-TEST-04`), so a null/garbage `url_ref` would silently break fixture wiring for those posts.
@@ -101,6 +104,10 @@ Each CSV corresponds to a stage or a view carved out of one:
 ## 4. Reference schema → target schema mapping
 
 For each target table: source file(s), field mapping, and the transform/inference the generator applies. "Shift" below always refers to the single global date-shift anchor defined in `TESTDATA-MAP-08`. No field is date-shifted independently.
+
+### `user`
+
+No source file. The prototype predates any user concept, one installation, one person. The generator emits exactly one fabricated `user` row, flagged synthetic, `id=1`, a placeholder `name`/`email`, and `status='active'`. Every `track`/`cv`/`session` row generated below carries `user_id=1`.
 
 ### `role`
 
@@ -113,6 +120,7 @@ Source: `track-cv.csv` (`track_id`, `track`, `cv_version`).
 | target field | source | notes |
 | --- | --- | --- |
 | `id` | `track_id` | direct |
+| `user_id` | — | constant `1`, the sole generated `user` row |
 | `role_id` | `track` (name) | FK lookup into generated `role` |
 | `seniority` | — | no source signal; set to a constant placeholder (`"mid"`) for every row — flagged as synthetic since the prototype never modeled seniority independently of role name |
 | `default_cv_id` | `cv_version` | FK lookup into generated `cv` (`TESTDATA-MAP` below) |
@@ -124,7 +132,7 @@ Source: `config.csv`, a single global row (`salary_min=10000`, `keywords="Data S
 
 ### `cv`
 
-Source: distinct `cv_version` values across `track-cv.csv` (`13.2`, `11.4`, `14.0`). `cv.label` is the version string verbatim. Three rows.
+Source: distinct `cv_version` values across `track-cv.csv` (`13.2`, `11.4`, `14.0`). `cv.label` is the version string verbatim. `cv.user_id` is a constant `1`, the sole generated `user` row. Three rows.
 
 ### `post`
 
@@ -152,17 +160,26 @@ Primary source: `screened.csv` for scored posts. `track-assignment.csv` and `app
 
 ### `post_track`
 
-Primary source: `track-assignment.csv` (`jobid`, `trackid`, `match_score`), covering 3477 of 3478 lead jobids directly.
+Primary source: `track-assignment.csv` (`jobid`, `trackid`), covering 3477 of 3478 lead jobids directly.
 
 | target field | source | notes |
 | --- | --- | --- |
 | `post_id` | `jobid` | |
 | `track_id` | `trackid` | |
-| `match_score` | `match_score`, `"NN%"` → float | |
-| `score_method` | — | constant `'title_keyword_v1'`, matching [010-prototype.md](010-prototype.md)'s actual `match.py` bigram-title method name |
 | `search_match` | — | `true` for every row sourced from `track-assignment.csv`/`screened.csv` (both are search-pipeline outputs); `false` for rows belonging to a `post` tagged `src_method='manual'` (per REQ-SRCH-07, a manual post's track match is auto-assigned by scoring, not discovered by search) |
 
-`TESTDATA-GAP-01`'s synthesized below-threshold posts get a `post_track` row here too, with `match_score` set below the owning track's `search_profile.min_match_score`. No separate table/flag exists for "screened out." It's purely a function of the two values at query time.
+Each `post_track` row is paired one-to-one with a `match_score` row below, written in the same generator pass. `TESTDATA-GAP-01`'s synthesized below-threshold posts get a `post_track`/`match_score` pair here too, with `match_score` set below the owning track's `search_profile.min_match_score`. No separate table/flag exists for "screened out." It's purely a function of the two values at query time.
+
+### `match_score`
+
+Primary source: `track-assignment.csv` (`jobid`, `trackid`, `match_score`), the same rows that produce `post_track` above, one `match_score` row per `post_track` pairing.
+
+| target field | source | notes |
+| --- | --- | --- |
+| `post_id` | `jobid` | matches the paired `post_track` row |
+| `track_id` | `trackid` | matches the paired `post_track` row |
+| `match_score` | `match_score`, `"NN%"` → float | |
+| `score_method` | — | constant `'title_keyword_v1'`, matching [010-prototype.md](010-prototype.md)'s actual `match.py` bigram-title method name |
 
 ### `lead`
 
@@ -202,10 +219,14 @@ Note on `offer rejected`: `010`'s close-reason enum, REQ-CRM section, has no ded
 Other field mappings, five groups.
 
 01. `title_override`/`company_override` map to `NULL` for every migrated row, since the prototype has no equivalent concept, so nothing was ever overridden.
-02. `deadline`/`applied_date`/`first_attempt_date`/`last_contact_date`/`notes` copy directly from `applied-leads.deadline`/`applied`/`1st attempt`/`last contact`/`notes` (shifted where a date).
+02. `deadline`/`applied_date`/`first_attempt_date`/`last_contact_date` copy directly from `applied-leads.deadline`/`applied`/`1st attempt`/`last contact` (shifted where a date). `notes` no longer copies onto `lead` directly. See `lead_note` below.
 03. `track_id` comes from the `track` column, a direct numeric FK into `track-cv.csv`'s `track_id`.
 04. `created_at` comes from the earliest known activity date, `applied_date`, falling back to `posted_date` minus a small offset if even that's missing.
 05. `updated_at` comes from the latest known activity date across the lead's own fields and any matched `response-stages.csv` events.
+
+### `lead_note`
+
+Source: `applied-leads.csv`'s `notes` column, one `lead_note` row per non-blank value, `created_at` set to the same activity date `lead.updated_at` derives from above. Where `TESTDATA-MAP-05` collapses two source rows into one `lead` row, both rows' `notes` values, if both non-blank, become two separate `lead_note` rows rather than one being discarded, preserving the retry's own note history. Every `lead_note.note` sourced from a real row is subject to `TESTDATA-GEN-05`'s anonymization rule below, the same as `lead_event.detail`.
 
 ### `lead_event`
 
@@ -235,7 +256,7 @@ No source data (`TESTDATA-GAP-01`). Entirely synthesized, two `run_type`s:
 
 ### `session`
 
-No source data. Real MCF session cookies are explicitly out of scope to ever hold, per CLAUDE.md's boundary. Seed emits a single singleton row with `status='missing'`, the safe default, since nothing in the seeded state implies apply automation can reach the live site. Any test needing `status='valid'` inserts its own row directly via `db_util.py` (`STRAT-SILO-01`) rather than relying on seed data implying a working session exists.
+No source data. Real MCF session cookies are explicitly out of scope to ever hold, per CLAUDE.md's boundary. Seed emits a single singleton row with `status='missing'`, the safe default, since nothing in the seeded state implies apply automation can reach the live site, and `user_id` set to the constant `1`. Any test needing `status='valid'` inserts its own row directly via `db_util.py` (`STRAT-SILO-01`) rather than relying on seed data implying a working session exists.
 
 **TESTDATA-MAP-08 The global date-shift anchor.** `ARCH-STO-05` requires seed dates to be relative-to-load-time, not absolute. The source data's date columns already encode meaningful **day-count deltas** that later become test assertions. `callbacks.csv`'s `callback_days`, `interviews.csv`'s `call_int_days`/`app_int_days`, `offers.csv`'s `*_days` columns, and `open.csv`'s precomputed `age_days` are all differences between two dates in the same row. Shifting each date column independently, for example "make every `applied_date` 10 days ago" without correspondingly shifting `last_contact_date`, would destroy those deltas and could produce nonsensical rows, such as a callback dated before its lead was applied to. Instead, the generator computes **one** shift delta at generation time, `anchor = (today) - (latest date appearing anywhere in the source data)`, and applies that single delta to every date/timestamp field, in every table, uniformly. Relative gaps between dates are exactly preserved. Only the whole timeline's position relative to "now" moves. This is also what makes REQ-CRM-05's 28-day-expiry boundary cases (`STRAT-CASE-03`) land where the generator intends: a lead's real day-count gap since last activity is preserved by the shift, so picking source rows with the right historical gap is sufficient to seed both sides of the boundary without hand-computing dates.
 

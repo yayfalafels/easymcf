@@ -1,0 +1,32 @@
+[
+  {
+    "name": "selftest — env-status heading renders",
+    "route": "/",
+    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"env-status-heading\"]" }],
+    "expect": [
+      {
+        "op": "text_equals",
+        "selector": "[data-testid=\"env-status-heading\"]",
+        "value": "Easy MCF — local dev environment ready"
+      }
+    ]
+  },
+  {
+    "name": "selftest — deliberately wrong expected heading text",
+    "route": "/",
+    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"env-status-heading\"]" }],
+    "expect": [
+      {
+        "op": "text_equals",
+        "selector": "[data-testid=\"env-status-heading\"]",
+        "value": "this text will never render"
+      }
+    ]
+  },
+  {
+    "name": "selftest — nonexistent selector times out",
+    "route": "/",
+    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"this-does-not-exist\"]", "timeout_ms": 2000 }],
+    "expect": []
+  }
+]

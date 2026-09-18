@@ -18,8 +18,8 @@ from easymcf.db.connection import get_connection
 SOURCE_DIR = os.path.join(ROOT, "test-data")
 SCHEMA_PATH = os.path.join(ROOT, "easymcf", "db", "schema.sql")
 TABLES = [
-    "role", "cv", "track", "search_profile", "run_log", "post",
-    "post_track", "lead", "lead_event", "application", "session",
+    "role", "user", "cv", "track", "search_profile", "run_log", "post",
+    "post_track", "match_score", "lead", "lead_note", "lead_event", "application", "session",
 ]
 STAGES = ["PROSPECT", "TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
 CLOSE_REASONS = ["offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed"]
@@ -99,10 +99,11 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     source, shift = source_rows(anchor, 8 if mode == "sample" else 3)
     roles = [{"id": 1, "name": "Data Analyst", "description": None},
              {"id": 2, "name": "Sustainability Consultant", "description": None}]
-    cvs = [{"id": 1, "label": "13.2"}, {"id": 2, "label": "11.4"}]
+    users = [{"id": 1, "name": "Alex Tan", "email": "alex.tan@example.com", "status": "active"}]
+    cvs = [{"id": 1, "user_id": 1, "label": "13.2"}, {"id": 2, "user_id": 1, "label": "11.4"}]
     tracks = [
-        {"id": 1, "role_id": 1, "seniority": "mid", "default_cv_id": 1, "is_active": 1},
-        {"id": 2, "role_id": 2, "seniority": "mid", "default_cv_id": 2, "is_active": 0},
+        {"id": 1, "user_id": 1, "role_id": 1, "seniority": "mid", "default_cv_id": 1, "is_active": 1},
+        {"id": 2, "user_id": 1, "role_id": 2, "seniority": "mid", "default_cv_id": 2, "is_active": 0},
     ]
     profiles = [
         {"track_id": 1, "keywords": "Data Analyst", "min_salary": 10000, "max_age_weeks": 4, "min_match_score": 0.3, "employment_type": "Full Time"},
@@ -111,6 +112,8 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     sql = {table: "" for table in TABLES}
     for row in roles:
         sql["role"] += insert("role", row)
+    for row in users:
+        sql["user"] += insert("user", row)
     for row in cvs:
         sql["cv"] += insert("cv", row)
     for row in tracks:
@@ -142,21 +145,29 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
 
     for index, post in enumerate(posts):
         track_id = 1 if index else 2
-        sql["post_track"] += insert("post_track", {"post_id": post["id"], "track_id": track_id, "match_score": post["score"], "score_method": "title_keyword_v1", "search_match": 0 if post["source"] == "Synthetic" else 1})
+        search_match = 0 if post["source"] == "Synthetic" else 1
+        sql["post_track"] += insert("post_track", {"post_id": post["id"], "track_id": track_id, "search_match": search_match})
+        sql["match_score"] += insert("match_score", {"post_id": post["id"], "track_id": track_id, "match_score": post["score"], "score_method": "title_keyword_v1"})
         if index == 0:
-            sql["post_track"] += insert("post_track", {"post_id": post["id"], "track_id": 1, "match_score": post["score"], "score_method": "title_keyword_v1", "search_match": 1})
+            sql["post_track"] += insert("post_track", {"post_id": post["id"], "track_id": 1, "search_match": 1})
+            sql["match_score"] += insert("match_score", {"post_id": post["id"], "track_id": 1, "match_score": post["score"], "score_method": "title_keyword_v1"})
 
     leads = []
     for index, stage in enumerate(STAGES, start=1):
         post_id = posts[index - 1]["id"]
         close_reason = None if stage != "CLOSED" else CLOSE_REASONS[0]
-        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat() if stage not in ("PROSPECT", "TOAPPLY") else None, "first_attempt_date": None, "last_contact_date": None, "notes": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat() if stage not in ("PROSPECT", "TOAPPLY") else None, "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
     for index, reason in enumerate(CLOSE_REASONS[1:], start=8):
         post = posts[index - 1]
-        leads.append({"id": index, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "notes": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+    note_id = 1
     for row in leads:
         sql["lead"] += insert("lead", row, "synthetic stage or close-reason coverage")
         sql["lead_event"] += insert("lead_event", {"id": row["id"], "lead_id": row["id"], "event_type": "stage_change", "detail": "seed stage fixture", "occurred_at": f"{anchor} 07:00:00"}, "synthetic activity fixture")
+        if row["stage"] == "INTERVIEW":
+            sql["lead_note"] += insert("lead_note", {"id": note_id, "lead_id": row["id"], "note": "Interview scheduled with hiring manager", "created_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
+            sql["lead_event"] += insert("lead_event", {"id": 100 + note_id, "lead_id": row["id"], "event_type": "note_edited", "detail": "note added", "occurred_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
+            note_id += 1
 
     app_id = 1
     for status in APPLICATION_STATUSES:
@@ -168,7 +179,7 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     for attempt in range(2):
         sql["application"] += insert("application", {"id": app_id, "lead_id": 3, "cv_id": 1, "status": "applied", "error_detail": None, "attempted_at": f"{anchor} 09:0{attempt + 1}:00", "run_id": 3}, "synthetic retry pair")
         app_id += 1
-    sql["session"] = insert("session", {"id": 1, "status": "missing", "uploaded_at": None, "cookie_ref": None})
+    sql["session"] = insert("session", {"id": 1, "user_id": 1, "status": "missing", "uploaded_at": None, "cookie_ref": None})
     return sql
 
 

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "selftest — health check passes",
+    "method": "GET",
+    "path": "/api/v1/health",
+    "expected_status": 200,
+    "expected_body": { "status": "ok" }
+  },
+  {
+    "name": "selftest — deliberately wrong expected body",
+    "method": "GET",
+    "path": "/api/v1/health",
+    "expected_status": 200,
+    "expected_body": { "status": "definitely-not-ok" }
+  },
+  {
+    "name": "selftest — non-JSON body where JSON expected",
+    "method": "GET",
+    "path": "/this/route/does/not/exist",
+    "expected_status": 200,
+    "expected_body": { "status": "ok" }
+  }
+]

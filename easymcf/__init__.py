@@ -14,9 +14,10 @@ from flask import Flask, abort, jsonify, send_from_directory
 from werkzeug.exceptions import NotFound
 
 from .config import Config
+from .api import init_api
 from .db.connection import schema_version
 
-SCHEMA_VERSION = 3  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
+SCHEMA_VERSION = 4  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")
@@ -36,6 +37,7 @@ def create_app(config: Config | None = None) -> Flask:
     # itself (ARCH-RUN-09), so /api/v1/* routes can't ever be shadowed by it.
     app = Flask(__name__, static_folder=None)
     app.config["EASYMCF_CONFIG"] = config
+    init_api(app)
 
     @app.get("/api/v1/health")
     def health():
@@ -54,6 +56,8 @@ def create_app(config: Config | None = None) -> Flask:
         # send_from_directory raises werkzeug's NotFound, not a plain
         # FileNotFoundError, when the path doesn't resolve — the original
         # `except FileNotFoundError` here never actually caught anything.
+        if path == "api" or path.startswith("api/"):
+            return jsonify(error="not_found", message=f"no such API path: /{path}"), 404
         try:
             return send_from_directory(_FRONTEND_DIR, path)
         except NotFound:

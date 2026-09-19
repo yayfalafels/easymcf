@@ -220,7 +220,7 @@ An append-only note history for a lead (REQ-CRM-03). One-to-many from `lead`: ea
 
 ### `lead_event`
 
-An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lead`: every stage transition, contact logged, note added, deadline change, or other field edit writes a new row rather than mutating a summary field, so the lead's full activity history is reconstructable and its `deadline` maintenance (feeding auto-expiry, REQ-CRM-05) has a source of truth beyond a bare field mutation. Scheduled interview/callback details, such as an interview's date/time, are captured as free text in an event's `detail` or in a `lead_note`, rather than as a dedicated structured field. `lead.deadline` is maintained by the system across the lead's lifecycle rather than fixed once at creation: copied from the post's `closing_date` (or a computed default) at promotion, reset to 28 days from `applied_date` on the `APPLIED` transition, and refreshed to 28 days from the most recent activity on every update from `CALLBACK` onward (REQ-CRM-05). Each automatic reset is itself written here as a `deadline_changed` row, the same event type a user's manual edit uses.
+An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lead`: every stage transition, contact logged, note added, deadline change, or other field edit writes a new row rather than mutating a summary field, so the lead's full activity history is reconstructable and its `deadline` maintenance (feeding auto-expiry, REQ-CRM-05) has a source of truth beyond a bare field mutation. Scheduled interview/callback details, such as an interview's date/time, are captured as free text in an event's `detail` or in a `lead_note`, rather than as a dedicated structured field. `lead.deadline` is maintained by the system across the lead's lifecycle rather than fixed once at creation: derived from the post at promotion (its `closing_date`, else `posted_date` plus 28 days, else the promotion date plus 1 week when `closing_date` is on or before the promotion date) and refreshed to 28 days from the most recent activity on every update from `CALLBACK` onward (REQ-CRM-05). Each automatic reset is itself written here as a `deadline_changed` row, the same event type a user's manual edit uses.
 
 | field         | notes                                                                    |
 | ------------- | -------------------------------------------------------------------------- |
@@ -294,6 +294,7 @@ Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPL
 | 01 | 1       | 07        | `meta` only — milestone-07 placeholder                                 |
 | 02 | 2       | 08        | the 13-table release-010 data model                                    |
 | 03 | 3       | 08        | adds `user`, `match_score`, `lead_note`, `user_id` ownership columns   |
-| 04 | 4       | 10        | adds `search_schedule` table, `run_log.trigger_source`                 |
+| 04 | 4       | 09        | adds `search_schedule` table, `field_edited` in `lead_event.event_type` |
+| 05 | 5       | 10        | adds `run_log.trigger_source`                                          |
 
-Version 4 is specified here and implemented by milestone 10, not by this document. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).
+Version 4 is implemented by milestone 09 and version 5 is specified here for milestone 10 to implement. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).

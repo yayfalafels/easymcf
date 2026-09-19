@@ -2,12 +2,14 @@
 -- schema_version 2 adds the release-010 data model to the milestone-07 base.
 -- schema_version 3 adds `user`, `match_score`, `lead_note`, and explicit `user_id`
 -- ownership columns on `track`/`cv`/`session` (see docs/releases/010/design/010-data-model.md).
+-- schema_version 4 adds `search_schedule` and `field_edited` in lead_event.event_type
+-- (see docs/releases/010/design/010-data-model.md, Schema versions).
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (3);
+INSERT INTO meta (schema_version) VALUES (4);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -44,6 +46,13 @@ CREATE TABLE search_profile (
     max_age_weeks INTEGER,
     min_match_score REAL NOT NULL,
     employment_type TEXT NOT NULL DEFAULT 'Full Time'
+);
+
+CREATE TABLE search_schedule (
+    track_id INTEGER PRIMARY KEY REFERENCES track(id),
+    schedule_enabled INTEGER NOT NULL DEFAULT 0 CHECK (schedule_enabled IN (0, 1)),
+    schedule_interval_hours INTEGER NOT NULL DEFAULT 24 CHECK (schedule_interval_hours > 0),
+    next_run_at TEXT
 );
 
 CREATE TABLE run_log (
@@ -126,7 +135,7 @@ CREATE INDEX idx_lead_note_lead_id ON lead_note(lead_id);
 CREATE TABLE lead_event (
     id INTEGER PRIMARY KEY,
     lead_id INTEGER NOT NULL REFERENCES lead(id),
-    event_type TEXT NOT NULL CHECK (event_type IN ('stage_change', 'contact_logged', 'note_edited', 'deadline_changed')),
+    event_type TEXT NOT NULL CHECK (event_type IN ('stage_change', 'contact_logged', 'note_edited', 'deadline_changed', 'field_edited')),
     detail TEXT,
     occurred_at TEXT NOT NULL
 );

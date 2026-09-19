@@ -1,0 +1,43 @@
+<h1 data-testid="leads-heading">Leads</h1>
+<div class="lead-toolbar">
+  <label class="page-filter">Track
+    <select ng-model="vm.trackId" data-testid="leads-track-filter">
+      <option value="">All tracks</option>
+      <option ng-repeat="t in vm.tracks" value="{{t.id}}">{{t.role_name}} / {{t.seniority}}</option>
+    </select>
+  </label>
+  <label class="page-filter">Search leads
+    <input ng-model="vm.query" placeholder="Title or company" data-testid="leads-search">
+  </label>
+  <button type="button" ng-click="vm.startManual()" data-testid="lead-add">Add lead</button>
+</div>
+
+<form class="manual-lead-form" ng-if="vm.adding" ng-submit="vm.createManual()" data-testid="manual-lead-form">
+  <h2>Add a lead</h2>
+  <label>Role title <input required ng-model="vm.manual.position_title" data-testid="manual-lead-title"></label>
+  <label>Company <input required ng-model="vm.manual.company_name" data-testid="manual-lead-company"></label>
+  <label>Track <select required ng-model="vm.manual.track_id" ng-options="t.id as (t.role_name + ' / ' + t.seniority) for t in vm.tracks" data-testid="manual-lead-track"></select></label>
+  <label>Post URL <input type="url" ng-model="vm.manual.url_ref" data-testid="manual-lead-url"></label>
+  <label>Salary <input type="number" min="0" ng-model="vm.manual.salary_high" data-testid="manual-lead-salary"></label>
+  <label>Posted <input type="date" ng-model="vm.manual.posted_date" data-testid="manual-lead-posted"></label>
+  <div><button type="submit" data-testid="manual-lead-save">Create lead</button><button type="button" class="secondary" ng-click="vm.cancelManual()">Cancel</button></div>
+  <span ng-if="vm.manualFieldError" data-testid="manual-lead-field-error">{{vm.manualFieldError.message}}</span>
+</form>
+
+<div class="lead-tabs">
+  <button ng-repeat="tab in vm.tabs" ng-click="vm.tab = tab" data-testid="leads-tab-{{tab.key}}">
+    {{tab.label}} ({{vm.count(tab)}})
+  </button>
+</div>
+
+<div class="lead-board">
+  <div ng-repeat="stage in vm.tab.stages" data-testid="leads-column-{{stage}}">
+    <h2>{{stage}}</h2>
+    <div ng-repeat="l in vm.inStages([stage])" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
+      <strong>{{vm.title(l)}}</strong><span>{{vm.company(l)}}</span>
+      <span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span>
+    </div>
+  </div>
+</div>
+
+<div ng-if="vm.selected" ng-controller="LeadDetailCtrl as detail" ng-include="'app/leads/lead-detail.html'"></div>

@@ -1,0 +1,39 @@
+[
+  {
+    "name": "create a track",
+    "method": "POST",
+    "path": "/api/v1/track",
+    "body": {
+      "role_id": 3,
+      "seniority": "senior"
+    },
+    "expected_status": 201
+  },
+  {
+    "name": "edit a track",
+    "method": "PUT",
+    "path": "/api/v1/track/3",
+    "body": {
+      "seniority": "lead"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "archive a track",
+    "method": "PUT",
+    "path": "/api/v1/track/1",
+    "body": {
+      "is_active": false
+    },
+    "expected_status": 200,
+    "expected_body": {
+      "id": 1,
+      "user_id": 1,
+      "role_id": 1,
+      "seniority": "mid",
+      "default_cv_id": 1,
+      "is_active": false,
+      "role_name": "Data Analyst"
+    }
+  }
+]

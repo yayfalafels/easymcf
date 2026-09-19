@@ -18,7 +18,7 @@ from easymcf.db.connection import get_connection
 SOURCE_DIR = os.path.join(ROOT, "test-data")
 SCHEMA_PATH = os.path.join(ROOT, "easymcf", "db", "schema.sql")
 TABLES = [
-    "role", "user", "cv", "track", "search_profile", "run_log", "post",
+    "role", "user", "cv", "track", "search_profile", "search_schedule", "run_log", "post",
     "post_track", "match_score", "lead", "lead_note", "lead_event", "application", "session",
 ]
 STAGES = ["PROSPECT", "TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
@@ -99,16 +99,25 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     source, shift = source_rows(anchor, 8 if mode == "sample" else 3)
     roles = [{"id": 1, "name": "Data Analyst", "description": None},
              {"id": 2, "name": "Sustainability Consultant", "description": None}]
-    users = [{"id": 1, "name": "Alex Tan", "email": "alex.tan@example.com", "status": "active"}]
+    users = [{"id": 1, "name": "Taylor Hickem", "email": "yayfalafels@gmail.com", "status": "active"}]
     cvs = [{"id": 1, "user_id": 1, "label": "13.2"}, {"id": 2, "user_id": 1, "label": "11.4"}]
     tracks = [
         {"id": 1, "user_id": 1, "role_id": 1, "seniority": "mid", "default_cv_id": 1, "is_active": 1},
-        {"id": 2, "user_id": 1, "role_id": 2, "seniority": "mid", "default_cv_id": 2, "is_active": 0},
+        {"id": 2, "user_id": 1, "role_id": 2, "seniority": "mid", "default_cv_id": 1, "is_active": 0},
     ]
     profiles = [
         {"track_id": 1, "keywords": "Data Analyst", "min_salary": 10000, "max_age_weeks": 4, "min_match_score": 0.3, "employment_type": "Full Time"},
         {"track_id": 2, "keywords": "Sustainability Consultant", "min_salary": 10000, "max_age_weeks": 4, "min_match_score": 0.3, "employment_type": "Full Time"},
     ]
+    roles += [{"id": i, "name": name, "description": None} for i, name in
+              ((3, "Data Engineer"), (4, "Data Scientist"), (5, "Software Developer"), (6, "Gen AI Developer"))]
+    for role in roles[2:]:
+        tracks.append({"id": role["id"], "user_id": 1, "role_id": role["id"], "seniority": "mid",
+                       "default_cv_id": 1, "is_active": 1})
+        profiles.append({"track_id": role["id"], "keywords": role["name"], "min_salary": 10000,
+                         "max_age_weeks": 4, "min_match_score": 0.3, "employment_type": "Full Time"})
+    schedules = [{"track_id": t["id"], "schedule_enabled": 0, "schedule_interval_hours": 24, "next_run_at": None}
+                 for t in tracks]
     sql = {table: "" for table in TABLES}
     for row in roles:
         sql["role"] += insert("role", row)
@@ -120,6 +129,8 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
         sql["track"] += insert("track", row)
     for row in profiles:
         sql["search_profile"] += insert("search_profile", row)
+    for row in schedules:
+        sql["search_schedule"] += insert("search_schedule", row, "synthetic schedule default")
 
     run_rows = [
         {"id": 1, "run_type": "search", "track_id": 1, "started_at": f"{anchor} 08:00:00", "ended_at": f"{anchor} 08:02:00", "status": "success", "outcome_counts": '{"new_posts": 3}', "error_detail": None},
@@ -138,6 +149,8 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     while len(posts) < 13:
         index = len(posts) + 1
         posts.append({"id": f"synthetic-close-{index}", "source": "Synthetic", "position_title": "Seed close reason role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-close-{index}", "posted_date": (anchor - timedelta(days=index)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.8})
+    for name, closing in (("future", anchor + timedelta(days=14)), ("nodate", None), ("past", anchor - timedelta(days=2))):
+        posts.append({"id": f"synthetic-promote-{name}", "source": "Synthetic", "position_title": f"Seed promote {name} role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-promote-{name}", "posted_date": (anchor - timedelta(days=3)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": closing.isoformat() if closing else None, "applicants": 0, "description": None, "score": 0.8})
     for post in posts:
         fields = {key: post[key] for key in ("id", "source", "position_title", "company_name", "url_ref", "posted_date", "salary_high", "is_open", "closing_date", "applicants", "description")}
         fields.update({"industry_classification": None, "mcf_ref": None, "src_method": "scraped" if post["source"] != "Synthetic" else "manual", "run_id": 1 if post["source"] != "Synthetic" else None})
@@ -156,10 +169,13 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     for index, stage in enumerate(STAGES, start=1):
         post_id = posts[index - 1]["id"]
         close_reason = None if stage != "CLOSED" else CLOSE_REASONS[0]
-        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat() if stage not in ("PROSPECT", "TOAPPLY") else None, "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(), "applied_date": anchor.isoformat() if stage not in ("PROSPECT", "TOAPPLY") else None, "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
     for index, reason in enumerate(CLOSE_REASONS[1:], start=8):
         post = posts[index - 1]
         leads.append({"id": index, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+    for row in leads:
+        if row["stage"] == "CALLBACK":
+            row["last_contact_date"] = anchor.isoformat()
     note_id = 1
     for row in leads:
         sql["lead"] += insert("lead", row, "synthetic stage or close-reason coverage")
@@ -168,6 +184,11 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
             sql["lead_note"] += insert("lead_note", {"id": note_id, "lead_id": row["id"], "note": "Interview scheduled with hiring manager", "created_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
             sql["lead_event"] += insert("lead_event", {"id": 100 + note_id, "lead_id": row["id"], "event_type": "note_edited", "detail": "note added", "occurred_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
             note_id += 1
+
+    callback_id = next(row["id"] for row in leads if row["stage"] == "CALLBACK")
+    sql["lead_event"] += insert("lead_event", {"id": 201, "lead_id": callback_id, "event_type": "contact_logged", "detail": f"last_contact_date: None -> {anchor}", "occurred_at": f"{anchor} 07:40:00"}, "synthetic contact-log coverage")
+    sql["lead_event"] += insert("lead_event", {"id": 202, "lead_id": callback_id, "event_type": "deadline_changed", "detail": f"deadline: {anchor} -> {anchor + timedelta(days=28)}", "occurred_at": f"{anchor} 07:41:00"}, "synthetic deadline-refresh coverage")
+    sql["lead_event"] += insert("lead_event", {"id": 200, "lead_id": 2, "event_type": "field_edited", "detail": "company_override: None -> Seed Co", "occurred_at": f"{anchor} 07:30:00"}, "synthetic field-edit coverage")
 
     app_id = 1
     for status in APPLICATION_STATUSES:

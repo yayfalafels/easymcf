@@ -1,0 +1,24 @@
+[
+  {
+    "name": "tracks form carries track fields only",
+    "route": "/tracks",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"track-form\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "count_equals",
+        "selector": "[data-testid=\"track-form\"] [data-testid^=\"search-profile-\"]",
+        "value": 0
+      },
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"track-role-select\"]",
+        "value": true
+      }
+    ]
+  }
+]

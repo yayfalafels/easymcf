@@ -1,0 +1,12 @@
+[
+  {
+    "name": "add a lead note",
+    "method": "POST",
+    "path": "/api/v1/lead_note",
+    "body": {
+      "lead_id": 4,
+      "note": "Interview scheduled with hiring manager"
+    },
+    "expected_status": 201
+  }
+]

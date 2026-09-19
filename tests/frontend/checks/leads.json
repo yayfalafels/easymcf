@@ -1,0 +1,49 @@
+[
+  {
+    "name": "leads page renders six tabs",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"leads-tab-pipeline\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "count_equals",
+        "selector": "[data-testid^=\"leads-tab-\"]",
+        "value": 6
+      }
+    ]
+  },
+  {
+    "name": "lead detail opens from a row",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "click",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-detail\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"lead-detail-field-deadline\"]",
+        "value": true
+      },
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"lead-detail-field-title_override\"]",
+        "value": true
+      }
+    ]
+  }
+]

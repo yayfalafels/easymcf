@@ -70,3 +70,33 @@ def app(db_path):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+from datetime import datetime
+
+
+@pytest.fixture()
+def fixed_clock():
+    from easymcf import clock
+
+    def _pin(value: str) -> None:
+        clock.set_fixed(datetime.fromisoformat(value))
+
+    yield _pin
+    clock.set_fixed(None)
+
+
+@pytest.fixture()
+def isolated_db(tmp_path):
+    path = str(tmp_path / "easymcf.db")
+    apply_schema(path)
+    apply_seed(path)
+    return path
+
+
+@pytest.fixture()
+def isolated_client(isolated_db):
+    from easymcf import create_app
+    from easymcf.config import Config
+
+    return create_app(Config(db_path=isolated_db)).test_client()

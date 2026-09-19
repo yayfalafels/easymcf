@@ -1,0 +1,16 @@
+<section class="config-page" data-testid="cvs-page">
+  <button type="button" class="secondary" ng-click="vm.back()">Back to tracks</button>
+  <h1>CV labels</h1>
+  <p>Labels are matched against resumes already stored in your MCF profile.</p>
+  <form class="inline-form" ng-submit="vm.save()" data-testid="cv-form">
+    <label>CV label <input required ng-model="vm.form.label" placeholder="e.g. Software CV 2026" data-testid="cv-label"></label>
+    <button type="submit" data-testid="cv-save">{{vm.form.id ? 'Save label' : 'Add label'}}</button>
+    <span ng-if="vm.fieldError" data-testid="cv-field-error">{{vm.fieldError.message}}</span>
+  </form>
+  <table><thead><tr><th>Label</th><th>Actions</th></tr></thead><tbody>
+    <tr ng-repeat="cv in vm.cvs" data-testid="cv-row-{{cv.id}}"><td>{{cv.label}}</td><td>
+      <button type="button" class="secondary" ng-click="vm.edit(cv)">Rename</button>
+      <button type="button" class="danger" ng-click="vm.remove(cv)">Remove</button>
+    </td></tr>
+  </tbody></table>
+</section>

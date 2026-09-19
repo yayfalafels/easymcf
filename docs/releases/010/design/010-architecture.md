@@ -104,7 +104,7 @@ Rejected alternatives:
 02. **APScheduler (or any pure-Python scheduling library) inside the same process.** It solves this problem correctly and is still the wrong trade here. It introduces a second source of truth for schedule state, its own job registry alongside the `search_schedule` rows the UI edits, so "what is scheduled" becomes answerable two ways that can disagree. It layers its own misfire/coalescing/`max_instances` semantics over ARCH-RUN-03's database-level guard, which already decides the same question with a stronger mechanism. And it adds a runtime dependency to a manifest ARCH-RUN-05 deliberately keeps at seven packages, to replace a loop, a query, and a timestamp update. The **guiding constraint**'s burden of proof for adding a tool is not met.
 03. **Celery beat, RQ-scheduler, or any broker-backed scheduler.** Already refused by ARCH-RUN-02 for the run itself, for the same reason: the only capability it adds is concurrency this design forbids.
 
-**ARCH-SCHED-02** **The schedule is its own `search_schedule` table, a 1:1 extension of `track` the same way `search_profile` is.** It carries `schedule_enabled`, `schedule_interval_hours`, and `next_run_at` (see the **data model**), keyed on `track_id`, and those three columns are the complete definition of a schedule. It is reachable through the generic CRUD shape at `/api/v1/search_schedule/{track_id}`, the same pattern `search_profile` already uses. Because milestone 08's schema is already implemented, this is a schema change under ARCH-STO-02's recreate-don't-migrate rule: edit `schema.sql`, bump `meta.schema_version` 3 → 4 per ARCH-STO-03, re-run `scripts/resetdb.py --seed`. Milestone 10 owns that edit.
+**ARCH-SCHED-02** **The schedule is its own `search_schedule` table, a 1:1 extension of `track` the same way `search_profile` is.** It carries `schedule_enabled`, `schedule_interval_hours`, and `next_run_at` (see the **data model**), keyed on `track_id`, and those three columns are the complete definition of a schedule. It is reachable through the generic CRUD shape at `/api/v1/search_schedule/{track_id}`, the same pattern `search_profile` already uses. Because milestone 08's schema is already implemented, this is a schema change under ARCH-STO-02's recreate-don't-migrate rule: edit `schema.sql`, the `search_schedule` table lands in schema version 4 with milestone 09's seed update, and milestone 10's `run_log.trigger_source` edit bumps `meta.schema_version` to 5 per ARCH-STO-03, followed by `scripts/resetdb.py --seed`.
 
 Rejected alternatives:
 
@@ -230,7 +230,7 @@ easymcf/
 
 **ARCH-STO-05** **Time-relative seed data.** Auto-expiry (REQ-CRM-05, 28 days of inactivity) and post-age screening (REQ-SRCH-09) make absolute dates in a seed file rot: a fixture written today asserts differently next month. Two rules apply.
 
-01. the seed loader writes date and timestamp columns **relative to load time**. For example, a lead 27 days stale and one 29 days stale, both computed at load.
+01. the seed loader writes date and timestamp columns **relative to load time**. For example, a `CALLBACK` lead with its last activity 27 days old and one 29 days old, both computed at load.
 02. all application code reads current time through a single `easymcf/clock.py::now()` indirection, so a test can substitute a fixed clock instead of sleeping or waiting for wall-clock drift.
 
 Without rule 02, REQ-CRM-05 is not deterministically testable.

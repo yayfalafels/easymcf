@@ -1,0 +1,31 @@
+<h1 data-testid="tracks-heading">Tracks</h1>
+<label class="archive-toggle"><input type="checkbox" ng-model="vm.showArchived" data-testid="tracks-show-archived"> Show archived</label>
+<button type="button" class="subtle-action" ng-click="vm.manageCvs()" data-testid="manage-cvs">Manage CVs</button>
+
+<form data-testid="track-form" ng-submit="vm.save()">
+  <label class="track-form-field">Role
+    <select ng-model="vm.form.role_id" ng-options="r.id as r.name for r in vm.roles" data-testid="track-role-select"></select>
+  </label>
+  <label class="track-form-field">Seniority
+    <input ng-model="vm.form.seniority" placeholder="e.g. senior" data-testid="track-seniority-input">
+  </label>
+  <label class="track-form-field">Default CV
+    <select ng-model="vm.form.default_cv_id" ng-options="c.id as c.label for c in vm.cvs" data-testid="track-cv-select">
+      <option value="">No default CV</option>
+    </select>
+  </label>
+  <button type="submit" data-testid="track-save">Save</button>
+  <span data-testid="track-field-error" ng-if="vm.fieldError">{{vm.fieldError.message}}</span>
+</form>
+
+<table>
+  <thead><tr><th>Track</th><th>Search focus</th><th>Actions</th></tr></thead>
+  <tr ng-repeat="t in vm.visible()" data-testid="track-row-{{t.id}}">
+    <td>{{t.role_name}} / {{t.seniority}}</td>
+    <td data-testid="track-profile-{{t.id}}">{{vm.profiles[t.id].keywords}}</td>
+    <td><button ng-click="vm.edit(t)" data-testid="track-edit-{{t.id}}">Edit</button>
+        <button ng-if="t.is_active" ng-click="vm.setActive(t, false)" data-testid="track-archive-{{t.id}}">Archive</button>
+        <button ng-if="!t.is_active" ng-click="vm.setActive(t, true)" data-testid="track-unarchive-{{t.id}}">Unarchive</button>
+        <button ng-click="vm.configureSearch(t)" data-testid="configure-search-{{t.id}}">Configure search</button></td>
+  </tr>
+</table>

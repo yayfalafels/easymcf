@@ -1,0 +1,109 @@
+[
+  {
+    "name": "promote a post with a future closing date",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-future",
+      "track_id": 1
+    },
+    "expected_status": 201
+  },
+  {
+    "name": "promote the same post again",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-future",
+      "track_id": 1
+    },
+    "expected_status": 409
+  },
+  {
+    "name": "PROSPECT to TOAPPLY",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "stage": "TOAPPLY"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "TOAPPLY to APPLIED",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "stage": "APPLIED"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "APPLIED to CALLBACK",
+    "method": "PUT",
+    "path": "/api/v1/lead/3",
+    "body": {
+      "stage": "CALLBACK"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "CALLBACK to INTERVIEW",
+    "method": "PUT",
+    "path": "/api/v1/lead/4",
+    "body": {
+      "stage": "INTERVIEW"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "INTERVIEW to OFFER",
+    "method": "PUT",
+    "path": "/api/v1/lead/5",
+    "body": {
+      "stage": "OFFER"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "OFFER to CLOSED with a reason",
+    "method": "PUT",
+    "path": "/api/v1/lead/6",
+    "body": {
+      "stage": "CLOSED",
+      "close_reason": "offer_accepted"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "skip-ahead is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "stage": "INTERVIEW"
+    },
+    "expected_status": 409
+  },
+  {
+    "name": "backward move is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/5",
+    "body": {
+      "stage": "APPLIED"
+    },
+    "expected_status": 409
+  },
+  {
+    "name": "closing without a reason",
+    "method": "PUT",
+    "path": "/api/v1/lead/3",
+    "body": {
+      "stage": "CLOSED"
+    },
+    "expected_status": 400,
+    "expected_body": {
+      "error": "validation_error",
+      "field": "close_reason",
+      "message": "close_reason is required when closing"
+    }
+  }
+]

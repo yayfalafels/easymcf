@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date, timedelta
 
 import pytest
 
@@ -74,3 +75,139 @@ def test_retry_pair_and_apply_failed_linkage(conn):
         "WHERE a.status IN ('post_closed', 'post_unavailable') AND l.close_reason != 'apply_failed'"
     ).fetchall()
     assert bad == []
+
+
+EVENT_TYPES = {"stage_change", "contact_logged", "note_edited", "deadline_changed", "field_edited"}
+SEEDED_ROLES = {"Data Analyst", "Sustainability Consultant", "Data Engineer", "Data Scientist",
+                "Software Developer", "Gen AI Developer"}
+
+
+def test_event_type_enumeration_is_complete(conn):
+    assert EVENT_TYPES <= distinct(conn, "SELECT DISTINCT event_type FROM lead_event")
+
+
+def test_seeded_user_identity(conn):
+    assert conn.execute("SELECT name, email FROM user").fetchall() == [("Taylor Hickem", "yayfalafels@gmail.com")]
+
+
+def test_seeded_roles_and_tracks(conn):
+    assert distinct(conn, "SELECT name FROM role") == SEEDED_ROLES
+    rows = conn.execute("SELECT r.name, t.is_active, t.default_cv_id FROM track t JOIN role r ON r.id = t.role_id").fetchall()
+    assert {row[0] for row in rows} == SEEDED_ROLES
+    new = {row[0]: row for row in rows if row[0] in SEEDED_ROLES - {"Data Analyst", "Sustainability Consultant"}}
+    assert len(new) == 4 and all(row[1] == 1 for row in new.values())
+    assert all(row[2] == 1 for row in rows)
+
+
+def test_every_track_has_a_profile_and_a_disabled_schedule(conn):
+    tracks = distinct(conn, "SELECT id FROM track")
+    assert distinct(conn, "SELECT track_id FROM search_profile") == tracks
+    schedules = conn.execute("SELECT track_id, schedule_enabled, schedule_interval_hours, next_run_at FROM search_schedule").fetchall()
+    assert {row[0] for row in schedules} == tracks
+    assert all(row[1:] == (0, 24, None) for row in schedules)
+
+
+def test_new_track_profiles_use_the_role_name_as_keywords(conn):
+    rows = conn.execute("SELECT r.name, p.keywords FROM search_profile p JOIN track t ON t.id = p.track_id JOIN role r ON r.id = t.role_id").fetchall()
+    assert all(name == keywords for name, keywords in rows)
+
+
+def test_promotable_posts_cover_the_three_deadline_branches(conn):
+    rows = conn.execute(
+        "SELECT p.id, p.closing_date, p.posted_date FROM post p LEFT JOIN lead l ON l.post_id = p.id "
+        "WHERE p.id LIKE 'synthetic-promote-%' AND l.id IS NULL ORDER BY p.id").fetchall()
+    assert [row[0] for row in rows] == ["synthetic-promote-future", "synthetic-promote-nodate", "synthetic-promote-past"]
+    future, nodate, past = rows
+    assert future[1] > future[2] and nodate[1] is None and past[1] is not None
+    assert conn.execute("SELECT COUNT(*) FROM post_track WHERE post_id LIKE 'synthetic-promote-%'").fetchone()[0] == 3
+
+
+def test_open_leads_start_inside_their_deadline(conn):
+    assert conn.execute(
+        "SELECT COUNT(*) FROM lead WHERE status = 'OPEN' AND deadline <= date(created_at)").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM lead WHERE status = 'OPEN' AND deadline IS NULL").fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("post,offset_days", [
+    ("synthetic-promote-future", None),
+    ("synthetic-promote-nodate", "posted_plus_28"),
+    ("synthetic-promote-past", 7),
+])
+def test_initial_deadline_branches(isolated_client, isolated_db, fixed_clock, post, offset_days):
+    posted, closing = sqlite3.connect(isolated_db).execute(
+        "SELECT posted_date, closing_date FROM post WHERE id = ?", (post,)).fetchone()
+    promoted_on = date.fromisoformat(posted) + timedelta(days=3)
+    fixed_clock(f"{promoted_on}T07:00:00")
+    lead = isolated_client.post("/api/v1/lead", json={"post_id": post, "track_id": 1}).get_json()
+    expected = {None: closing,
+                "posted_plus_28": (date.fromisoformat(posted) + timedelta(days=28)).isoformat(),
+                7: (promoted_on + timedelta(days=7)).isoformat()}[offset_days]
+    assert lead["deadline"] == expected
+
+
+def test_rolling_deadline_27_and_29_days(isolated_client, isolated_db, fixed_clock):
+    conn = sqlite3.connect(isolated_db)
+    conn.execute("UPDATE lead SET stage = 'CALLBACK', deadline = '2026-10-12' WHERE id = 1")
+    conn.execute("UPDATE lead SET stage = 'CALLBACK', deadline = '2026-10-10' WHERE id = 2")
+    conn.commit()
+    fixed_clock("2026-10-11T07:00:00")
+    leads = {l["id"]: l for l in isolated_client.get("/api/v1/lead/search").get_json()}
+    assert leads[1]["status"] == "OPEN"
+    assert leads[2]["status"] == "CLOSED" and leads[2]["close_reason"] == "expired"
+
+
+def test_open_stages_expire_and_closed_leads_keep_state(isolated_client, isolated_db, fixed_clock):
+    conn = sqlite3.connect(isolated_db)
+    conn.execute("UPDATE lead SET deadline = '2026-01-01'")
+    conn.commit()
+    closed_before = conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' ORDER BY id").fetchall()
+    fixed_clock("2026-09-15T07:00:00")
+    leads = isolated_client.get("/api/v1/lead/search").get_json()
+    assert all(l["close_reason"] == "expired" for l in leads if l["id"] <= 6)
+    assert conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' AND id >= 7 ORDER BY id").fetchall() == closed_before
+
+
+def _pin_after_anchor(isolated_db, fixed_clock, days: int) -> date:
+    anchor = sqlite3.connect(isolated_db).execute("SELECT substr(created_at, 1, 10) FROM lead WHERE id = 1").fetchone()[0]
+    day = date.fromisoformat(anchor) + timedelta(days=days)
+    fixed_clock(f"{day}T07:00:00")
+    return day
+
+
+def _events(isolated_db, lead_id: int) -> list[str]:
+    rows = sqlite3.connect(isolated_db).execute("SELECT event_type FROM lead_event WHERE lead_id = ? ORDER BY id", (lead_id,))
+    return [row[0] for row in rows]
+
+
+def test_callback_transition_moves_deadline_and_logs_it(isolated_client, isolated_db, fixed_clock):
+    day = _pin_after_anchor(isolated_db, fixed_clock, 5)
+    response = isolated_client.put("/api/v1/lead/3", json={"stage": "CALLBACK"})
+    assert response.status_code == 200
+    assert response.get_json()["deadline"] == (day + timedelta(days=28)).isoformat()
+    assert _events(isolated_db, 3)[-2:] == ["stage_change", "deadline_changed"]
+
+
+def test_activity_at_callback_or_later_keeps_the_window_rolling(isolated_client, isolated_db, fixed_clock):
+    day = _pin_after_anchor(isolated_db, fixed_clock, 5)
+    isolated_client.post("/api/v1/lead_note", json={"lead_id": 4, "note": "chased"})
+    assert isolated_client.get("/api/v1/lead/4").get_json()["deadline"] == (day + timedelta(days=28)).isoformat()
+    assert _events(isolated_db, 4)[-2:] == ["note_edited", "deadline_changed"]
+    later = _pin_after_anchor(isolated_db, fixed_clock, 12)
+    isolated_client.put("/api/v1/lead/4", json={"last_contact_date": later.isoformat()})
+    assert isolated_client.get("/api/v1/lead/4").get_json()["deadline"] == (later + timedelta(days=28)).isoformat()
+    assert _events(isolated_db, 4)[-2:] == ["contact_logged", "deadline_changed"]
+
+
+def test_activity_before_callback_leaves_the_deadline(isolated_client, isolated_db, fixed_clock):
+    _pin_after_anchor(isolated_db, fixed_clock, 5)
+    before = isolated_client.get("/api/v1/lead/2").get_json()["deadline"]
+    isolated_client.put("/api/v1/lead/2", json={"company_override": "Seed Co"})
+    assert isolated_client.get("/api/v1/lead/2").get_json()["deadline"] == before
+    assert "deadline_changed" not in _events(isolated_db, 2)[-2:]
+
+
+def test_a_deadline_set_in_the_request_takes_precedence(isolated_client, isolated_db, fixed_clock):
+    _pin_after_anchor(isolated_db, fixed_clock, 5)
+    response = isolated_client.put("/api/v1/lead/4", json={"stage": "INTERVIEW", "deadline": "2031-01-01"})
+    assert response.get_json()["deadline"] == "2031-01-01"
+    assert _events(isolated_db, 4)[-1] == "stage_change"

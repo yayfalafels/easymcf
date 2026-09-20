@@ -14,12 +14,13 @@
   - [Repo layout](#repo-layout)
 - [2. Storage](#2-storage) — `ARCH-STO-01..07`
 - [3. Networking](#3-networking) — `ARCH-NET-01..04`
+- [7. Accounts and authentication](#7-accounts-and-authentication) — `ARCH-AUTH-01..10`
 - [4. Browser automation infrastructure](#4-browser-automation-infrastructure) — `ARCH-BOT-01..05`
 - [5. Testing infrastructure](#5-testing-infrastructure) — `ARCH-TEST-01..09`
   - [Common mechanics](#common-mechanics)
   - [Tier 1 — backend only (REQ-DEV-03)](#tier-1--backend-only-req-dev-03)
   - [Tier 1b — frontend silo (STRAT-SILO-07)](#tier-1b--frontend-silo-strat-silo-07)
-  - [Tier 3 — live MCF (REQ-DEV-05)](#tier-3--live-mcf-req-dev-05)
+  - [Tier 3 — live MCF and Google sign-in (REQ-DEV-05, REQ-DEV-06)](#tier-3--live-mcf-and-google-sign-in-req-dev-05-req-dev-06)
   - [The agent's build → test → debug loop](#the-agents-build--test--debug-loop)
 
 ## Purpose
@@ -61,10 +62,10 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, 
 
 Mirrors the **requirements**' out-of-scope section and the **project instructions**' boundaries. This is restated here so milestone 07/08 doesn't drift into it while building the local environment:
 
-- **No cloud anything** — no AWS/GCP/Azure SDK, credential file, deployment target, or hosted service dependency. No S3/DynamoDB/RDS/Lambda/API Gateway. `010` runs offline apart from the gated MCF automation calls (ARCH-NET-03).
+- **No cloud anything** — no AWS/GCP/Azure SDK, credential file, deployment target, or hosted service dependency. No S3/DynamoDB/RDS/Lambda/API Gateway. `010` runs offline apart from the gated MCF automation calls and the Google sign-in flow (ARCH-NET-03).
 - **No containers or orchestration** — no Dockerfile, docker-compose, Kubernetes, or VM image. The install procedure is `python -m venv`, `pip install -r`, `playwright install chromium`.
 - **No CI/CD** — no GitHub Actions workflow, no pipeline configuration, no automated deploy. Tests are run locally by a developer or an agent, on demand.
-- **No multi-user concerns** — no auth, no sessions beyond the single MCF credential, no per-user data partitioning, and no `0.0.0.0` binding. `track`, `cv`, and `session` do carry a `user_id` column, per the **data model**, but it names an ownership boundary rather than activating one. Exactly one `user` row is ever seeded, and no application code resolves identity per request.
+- **No roles, teams, or hosted identity** — accounts are local rows in the one SQLite file, every user has the same capabilities, and there is no admin console, no sharing between users, no email verification or reset, no hosted identity provider, and no `0.0.0.0` binding. Sign-in uses the standard mechanisms `ARCH-AUTH-01..10` defines and no scheme of its own.
 - **No process manager, external scheduler, or queue** — no systemd unit or timer, cron entry, Celery/redis/celery-beat, APScheduler, or supervisor. Runs are either user-initiated (REQ-SRCH-02) or fired by the in-process tick thread `ARCH-SCHED-01` defines (REQ-SRCH-11), and both paths execute in-process through the same code path (ARCH-RUN-02) under the same one-run-at-a-time guard (ARCH-RUN-03). Scheduling in `010` is a loop inside the single Flask process reading `search_schedule` rows, never a second process and never a scheduling library.
 - **No migration framework, no ORM migrations, no database backup tooling** — recreate-and-reseed is the whole story (ARCH-STO-02/06).
 - **No frontend build toolchain** — no node, npm, webpack, bundler, transpiler, or JS test runner (ARCH-RUN-06, ARCH-TEST-05). The frontend-silo tier (ARCH-TEST-09) adds a second Playwright tier rather than a JS toolchain.
@@ -75,7 +76,7 @@ Each of these becomes a live question again at `020` (MVP cloud). None of them i
 
 ### Topology
 
-**ARCH-RUN-01** The entire system is **one machine, one user, one long-lived OS process**: a Flask application that serves both the JSON API and the AngularJS frontend's static files. There is none of the following.
+**ARCH-RUN-01** The entire system is **one machine, one long-lived OS process serving every account**: a Flask application that serves both the JSON API and the AngularJS frontend's static files. There is none of the following.
 
 01. a container.
 02. a VM.
@@ -86,9 +87,9 @@ Each of these becomes a live question again at `020` (MVP cloud). None of them i
 
 `mcfpipe`'s serverless/multi-tier topology is the explicit anti-pattern this release avoids, per the **release roadmap**. The correct number of moving parts for `010` is one.
 
-**ARCH-RUN-02** Search and apply runs execute **in a background thread inside the same Flask process**, not as a separate worker or scheduled job. A run-trigger endpoint creates the `run_log` row, starts the thread, and returns the `run_log.id` immediately. The thread writes progress and outcome counts back to `run_log` (and posts/applications) incrementally. The UI polls `GET /api/v1/run_log/{id}` — this is the mechanism behind the **user interface design**'s async-run pattern and REQ-FE-02. No Celery/RQ/redis. Rationale: the only thing a queue would buy at single-user scale is the ability to run two sweeps at once, which the next decision forbids anyway.
+**ARCH-RUN-02** Search and apply runs execute **in a background thread inside the same Flask process**, not as a separate worker or scheduled job. A run-trigger endpoint creates the `run_log` row, starts the thread, and returns the `run_log.id` immediately. The thread writes progress and outcome counts back to `run_log` (and posts/applications) incrementally. The UI polls `GET /api/v1/run_log/{id}` — this is the mechanism behind the **user interface design**'s async-run pattern and REQ-FE-02. No Celery/RQ/redis. Rationale: the only thing a queue would buy at this scale is the ability to run two sweeps of one user at once, which the next decision forbids anyway.
 
-**ARCH-RUN-03** **At most one run of each type may be in flight.** This is enforced atomically at the database layer, not by a check-then-act sequence in application code: `schema.sql` defines a partial unique index, `CREATE UNIQUE INDEX ux_run_log_running ON run_log(run_type) WHERE status = 'running'`, so a second `INSERT` of a `running` row for the same `run_type` fails the constraint regardless of how two request threads interleave. The run-trigger endpoint attempts the insert directly. On a `UNIQUE` constraint failure it looks up the existing `running` row for that `run_type` and returns `409` with its `run_log.id`, rather than `SELECT`-ing for an existing row before inserting. A separate pre-check would reopen the exact race the index exists to close, where two threads both read "no row running" before either commits. This keeps the threading model trivially safe and prevents two scrapes competing for the same browser/session, even with `ARCH-RUN-07`'s `threaded=True`.
+**ARCH-RUN-03** **At most one run of each type per user may be in flight.** This is enforced atomically at the database layer, not by a check-then-act sequence in application code: `schema.sql` defines a partial unique index, `CREATE UNIQUE INDEX ux_run_log_running ON run_log(user_id, run_type) WHERE status = 'running'`, so a second `INSERT` of a `running` row for the same user and `run_type` fails the constraint regardless of how two request threads interleave. The run-trigger endpoint attempts the insert directly. On a `UNIQUE` constraint failure it looks up the existing `running` row for that user and `run_type` and returns `409` with its `run_log.id`, rather than `SELECT`-ing for an existing row before inserting. A separate pre-check would reopen the exact race the index exists to close, where two threads both read "no row running" before either commits. This keeps the threading model trivially safe and prevents one user's two scrapes competing for the same browser and MCF session, even with `ARCH-RUN-07`'s `threaded=True`, while different users' runs proceed independently.
 
 **ARCH-RUN-04** Browser automation runs **in-process within that background thread** (Playwright's sync API, one browser context per run), not as a separately-launched script. The prototype's model of independent scripts writing to a shared database is what the API replaces.
 
@@ -96,15 +97,15 @@ Each of these becomes a live question again at `020` (MVP cloud). None of them i
 
 REQ-SRCH-11 adds a second way to start a search run alongside REQ-SRCH-02's on-demand trigger: a per-track schedule the user configures in the UI. This subsection is the whole of that mechanism. It was added after the first version of this document, which flatly excluded any scheduler — the out-of-scope bullet above is the amended text, and nothing below relaxes any other boundary in it.
 
-**ARCH-SCHED-01** A scheduled run is fired by **one in-process daemon thread that wakes on a fixed tick, asks the database which schedules are due, and calls the same in-process run-trigger service function `API-EP-04` calls**. There is no cron entry, no systemd timer, no separate scheduler process, and no scheduling library. The thread waits on a `threading.Event` rather than `time.sleep()`, so process shutdown and tests both interrupt it immediately instead of after a full tick, and it holds its own SQLite connection per ARCH-STO-07 exactly as a run thread does. The scheduled path and the HTTP path converge on the same function, not on an HTTP call the app makes to itself: everything ARCH-RUN-02 says about how a run executes, and everything ARCH-RUN-03 says about how two of them contend, applies unchanged to a scheduled run. At one user and a handful of tracks, a tick is one indexed `SELECT` and at most one run start.
+**ARCH-SCHED-01** A scheduled run is fired by **one in-process daemon thread that wakes on a fixed tick, asks the database which schedules are due, and calls the same in-process run-trigger service function `API-EP-04` calls**. There is no cron entry, no systemd timer, no separate scheduler process, and no scheduling library. The thread waits on a `threading.Event` rather than `time.sleep()`, so process shutdown and tests both interrupt it immediately instead of after a full tick, and it holds its own SQLite connection per ARCH-STO-07 exactly as a run thread does. The scheduled path and the HTTP path converge on the same function, not on an HTTP call the app makes to itself: everything ARCH-RUN-02 says about how a run executes, and everything ARCH-RUN-03 says about how two of them contend, applies unchanged to a scheduled run. At a handful of users and tracks, a tick is one indexed `SELECT` and at most one run start per user.
 
 Rejected alternatives:
 
 01. **a cron entry or systemd timer calling `curl` against the run endpoint.** It puts the schedule outside the application, where the UI can neither read nor edit it — REQ-SRCH-11 requires the user to configure it from the UI, not by editing a crontab — makes the feature OS-specific, and adds precisely the process-manager dependency the **guiding constraint** and the out-of-scope list both refuse.
-02. **APScheduler (or any pure-Python scheduling library) inside the same process.** It solves this problem correctly and is still the wrong trade here. It introduces a second source of truth for schedule state, its own job registry alongside the `search_schedule` rows the UI edits, so "what is scheduled" becomes answerable two ways that can disagree. It layers its own misfire/coalescing/`max_instances` semantics over ARCH-RUN-03's database-level guard, which already decides the same question with a stronger mechanism. And it adds a runtime dependency to a manifest ARCH-RUN-05 deliberately keeps at seven packages, to replace a loop, a query, and a timestamp update. The **guiding constraint**'s burden of proof for adding a tool is not met.
+02. **APScheduler (or any pure-Python scheduling library) inside the same process.** It solves this problem correctly and is still the wrong trade here. It introduces a second source of truth for schedule state, its own job registry alongside the `search_schedule` rows the UI edits, so "what is scheduled" becomes answerable two ways that can disagree. It layers its own misfire/coalescing/`max_instances` semantics over ARCH-RUN-03's database-level guard, which already decides the same question with a stronger mechanism. And it adds a runtime dependency to a manifest ARCH-RUN-05 deliberately keeps at nine packages, to replace a loop, a query, and a timestamp update. The **guiding constraint**'s burden of proof for adding a tool is not met.
 03. **Celery beat, RQ-scheduler, or any broker-backed scheduler.** Already refused by ARCH-RUN-02 for the run itself, for the same reason: the only capability it adds is concurrency this design forbids.
 
-**ARCH-SCHED-02** **The schedule is its own `search_schedule` table, a 1:1 extension of `track` the same way `search_profile` is.** It carries `schedule_enabled`, `schedule_interval_hours`, and `next_run_at` (see the **data model**), keyed on `track_id`, and those three columns are the complete definition of a schedule. It is reachable through the generic CRUD shape at `/api/v1/search_schedule/{track_id}`, the same pattern `search_profile` already uses. Because milestone 08's schema is already implemented, this is a schema change under ARCH-STO-02's recreate-don't-migrate rule: edit `schema.sql`, the `search_schedule` table lands in schema version 4 with milestone 09's seed update, and milestone 10's `run_log.trigger_source` edit bumps `meta.schema_version` to 5 per ARCH-STO-03, followed by `scripts/resetdb.py --seed`.
+**ARCH-SCHED-02** **The schedule is its own `search_schedule` table, a 1:1 extension of `track` the same way `search_profile` is.** It carries `schedule_enabled`, `schedule_interval_hours`, and `next_run_at` (see the **data model**), keyed on `track_id`, and those three columns are the complete definition of a schedule. It is reachable through the generic CRUD shape at `/api/v1/search_schedule/{track_id}`, the same pattern `search_profile` already uses. Because milestone 08's schema is already implemented, this is a schema change under ARCH-STO-02's recreate-don't-migrate rule: edit `schema.sql`, the `search_schedule` table lands in schema version 4 with milestone 09's seed update, task 09.13's lead and offer changes land in version 6, feature 13's account and ownership changes land in version 7, and milestone 10's `run_log.trigger_source` edit bumps `meta.schema_version` to 8 per ARCH-STO-03, followed by `scripts/resetdb.py --seed`.
 
 Rejected alternatives:
 
@@ -118,7 +119,7 @@ Rejected alternatives:
 
 **ARCH-SCHED-04** **A scheduled trigger that collides with an in-flight run skips, logs, and retries on the next tick.** ARCH-RUN-03's partial unique index is the guard and is unchanged: the scheduler attempts the same insert the endpoint attempts and catches the same `UNIQUE` failure. What differs is the handling. There is no request context, so there is no `409` to return and nobody to show it to — the scheduler logs one line naming the skipped track and the in-flight `run_log.id`, and leaves `next_run_at` untouched. Leaving it untouched is the load-bearing half: because the column advances only after a run actually starts, the skipped schedule is retried on the next tick and fires as soon as the conflicting run ends, instead of being silently dropped until tomorrow. It also cannot cascade, since a schedule that never starts never accumulates missed windows to catch up on.
 
-Note the emergent consequence, which is intended rather than incidental: the index is on `run_type` alone, not `(run_type, track_id)`, so two tracks scheduled at the same instant do not search concurrently. The first starts, the second skips and starts when the first finishes. That is the correct behavior for a single MCF session and one browser (ARCH-RUN-03), and it means a user can schedule every track at 08:00 without thinking about it.
+Note the emergent consequence, which is intended rather than incidental: the index is on `(user_id, run_type)`, not on `track_id`, so two tracks of one user scheduled at the same instant do not search concurrently. The first starts, the second skips and starts when the first finishes. That is the correct behavior for one MCF session and one browser per user (ARCH-RUN-03), and it means a user can schedule every track at 08:00 without thinking about it. A skip applies to the colliding user only. The tick logs it, leaves that schedule's `next_run_at` untouched, skips the remaining due schedules of the same user for this tick, and continues with the due schedules of other users, whose runs do not collide. The tick reads the run's user from `track.user_id`, since no request context exists.
 
 **ARCH-SCHED-05** **`run_log` gains a `trigger_source` discriminator (`manual` | `scheduled`, defaulting to `manual`)** so the run history answers "did last night's schedule actually fire" rather than leaving a scheduled run indistinguishable from one the user started. It is set by whichever path created the row.
 
@@ -128,23 +129,36 @@ Note the emergent consequence, which is intended rather than incidental: the ind
 
 ### Language, dependencies, entry points
 
-**ARCH-RUN-05** **Python 3.11+**, single **`venv` + `pip` + `pyproject.toml`**. Chosen over poetry/pdm/uv because it is the only option with zero install prerequisite beyond the Python already required, and because `010` ships no package and has no dependency-resolution problem worth a lockfile. This release keeps one manifest per venv instead of splitting a manifest into runtime and dev variants: `010` makes no runtime/dev process split, since the same venv runs the app and its own tests, so a single git-tracked `pyproject.toml`, listing `flask`, `playwright`, `jsonschema`, `beautifulsoup4`, `html5lib`, `pytest`, and `pytest-timeout` as dependencies, already gives everything a `requirements.txt`/`requirements-dev.txt` pair would. The **project instructions**' two-venv rule fixes where the venv actually lives, `.dev/dev-env` and `env`, both nested inside the repo at the repo root, never a home-directory or other external path, and never literally named `.venv/`. It also names its git-tracked manifests, `python-envs/dev-env/pyproject.toml` and `python-envs/ops-env/pyproject.toml`. The **development env runbook**'s `ENV-SETUP-01..03` gives the concrete target contents and install/sync commands.
+**ARCH-RUN-05** **Python 3.11+**, single **`venv` + `pip` + `pyproject.toml`**. Chosen over poetry/pdm/uv because it is the only option with zero install prerequisite beyond the Python already required, and because `010` ships no package and has no dependency-resolution problem worth a lockfile. This release keeps one manifest per venv instead of splitting a manifest into runtime and dev variants: `010` makes no runtime/dev process split, since the same venv runs the app and its own tests, so a single git-tracked `pyproject.toml`, listing `flask`, `authlib`, `pillow`, `playwright`, `jsonschema`, `beautifulsoup4`, `html5lib`, `pytest`, and `pytest-timeout` as dependencies, already gives everything a `requirements.txt`/`requirements-dev.txt` pair would. The **project instructions**' two-venv rule fixes where the venv actually lives, `.dev/dev-env` and `env`, both nested inside the repo at the repo root, never a home-directory or other external path, and never literally named `.venv/`. It also names its git-tracked manifests, `python-envs/dev-env/pyproject.toml` and `python-envs/ops-env/pyproject.toml`. The **development env runbook**'s `ENV-SETUP-01..03` gives the concrete target contents and install/sync commands.
 
-**ARCH-RUN-06** **No node/npm anywhere in the project.** AngularJS 1.x needs no build step, so the frontend is vendored `angular.min.js` plus hand-written modules served as-is. The one thing a node toolchain would conventionally provide, a browser for tests, comes from Playwright's Python package instead (ARCH-BOT-01). This removes an entire toolchain, its lockfile, and its version drift from a POC that has roughly eight screens. AngularJS 1.x's EOL/security-patch status is a separate, already-weighed risk. It is accepted for `010` specifically because of `ARCH-NET-01`'s loopback-only binding, an acceptance independent of the no-build-step rationale above. See the **release roadmap**'s feature-table note for why that acceptance does not carry forward to `020`.
+**ARCH-RUN-06** **No node/npm anywhere in the project.** AngularJS 1.x needs no build step, so the frontend is vendored `angular.min.js` plus hand-written modules served as-is. The one thing a node toolchain would conventionally provide, a browser for tests, comes from Playwright's Python package instead (ARCH-BOT-01). This removes an entire toolchain, its lockfile, and its version drift from a POC that has roughly eight screens. AngularJS 1.x's EOL/security-patch status is a separate, already-weighed risk. It is accepted for `010` specifically because of `ARCH-NET-01`'s loopback-only binding and `ARCH-AUTH-02`'s HttpOnly session cookie, which keeps a script-injection flaw in the frontend from reading the session token. This acceptance is independent of the no-build-step rationale above. See the **release roadmap**'s feature-table note for why that acceptance does not carry forward to `020`.
 
-**ARCH-RUN-07** Backend start: `python -m easymcf` (a `__main__.py` calling `create_app().run(host="127.0.0.1", port=5000, threaded=True)`). The Werkzeug dev server is the production server for `010`; gunicorn/waitress buy nothing for one local user and are deferred to `020`. Config comes from defaults in `easymcf/config.py`, overridable by environment variable — no `.env` file is required for the app to run:
+**ARCH-RUN-07** Backend start: `python -m easymcf` (a `__main__.py` calling `create_app().run(host="127.0.0.1", port=5000, threaded=True)`). The Werkzeug dev server is the production server for `010`; gunicorn/waitress buy nothing for a local app and are deferred to `020`. Config comes from defaults in `easymcf/config.py`, overridable by environment variable — no `.env` file is required for the app to run:
 
-| variable              | default                  | purpose                                        |
-| --------------------- | ------------------------ | ---------------------------------------------- |
-| `DB_PATH`             | `data/easymcf.db`        | SQLite file (tests point this at a temp file)  |
-| `PORT`                | `5000`                   | HTTP port                                      |
-| `SECRETS_DIR`         | `.secrets`               | where the MCF session file lives (ARCH-BOT-03) |
-| `MCF_MODE`            | `fixture`                | `fixture` \| `live` — browser target (ARCH-BOT-04) |
-| `HEADLESS`            | `1`                      | headless browser                               |
-| `APPLY_POLL_RETRIES`  | `5`                | apply-button poll attempts before failing (REQ-APPLY-07)       |
-| `APPLY_POLL_DELAY_S`  | `5`                | seconds between apply-button poll attempts (REQ-APPLY-07)      |
-| `SCHEDULER_ENABLED`   | `1`                | run ARCH-SCHED-01's tick thread — `0` disables it              |
-| `SCHEDULER_TICK_S`    | `60`               | seconds between scheduler ticks (ARCH-SCHED-06)                |
+| variable                | default               | purpose                                               |
+| ----------------------- | --------------------- | ----------------------------------------------------- |
+| `DB_PATH`               | `data/easymcf.db`     | SQLite file, tests point this at a temp file          |
+| `PORT`                  | `5000`                | HTTP port                                             |
+| `SECRETS_DIR`           | `.secrets`            | credential directory, ARCH-BOT-03 and ARCH-AUTH-06    |
+| `MCF_MODE`              | `fixture`             | `fixture` \| `live`, browser target, ARCH-BOT-04      |
+| `HEADLESS`              | `1`                   | headless browser                                      |
+| `APPLY_POLL_RETRIES`    | `5`                   | apply-button poll attempts, REQ-APPLY-07              |
+| `APPLY_POLL_DELAY_S`    | `5`                   | seconds between poll attempts, REQ-APPLY-07           |
+| `SCHEDULER_ENABLED`     | `1`                   | run ARCH-SCHED-01's tick thread, `0` disables it      |
+| `SCHEDULER_TICK_S`      | `60`                  | seconds between scheduler ticks, ARCH-SCHED-06        |
+| `SECRET_KEY`            | file in `SECRETS_DIR` | signs cookies, generated on first start, ARCH-AUTH-02 |
+| `SESSION_LIFETIME_H`    | `336`                 | absolute sign-in session lifetime in hours            |
+| `COOKIE_SECURE`         | `0`                   | set `1` only when served over https                   |
+| `SIGNIN_MAX_FAILURES`   | `5`                   | failed sign-ins per email before `429`                |
+| `SIGNIN_WINDOW_S`       | `900`                 | failure counting window in seconds                    |
+| `PASSWORD_MIN_LENGTH`   | `12`                  | minimum password length, maximum fixed at 128         |
+| `PHOTO_DIR`             | `data/photos`         | profile photo store, ARCH-AUTH-07                     |
+| `PHOTO_MAX_BYTES`       | `2097152`             | profile photo upload size limit                       |
+| `GCP_OAUTH_CLIENT_ID`   | empty                 | Google OAuth client id, from `.env`                   |
+| `GCP_OAUTH_SECRET_FILE` | file in `SECRETS_DIR` | Google client secret file, ARCH-AUTH-06               |
+| `GOOGLE_DISCOVERY_URL`  | Google discovery URL  | swapped to the stub provider in tests                 |
+| `GOOGLE_REDIRECT_URI`   | derived from `PORT`   | must equal the console registration                   |
+| `GCP_OAUTH_TEST_EMAIL`  | empty                 | test account address, read only by the live tier      |
 
 **implementation decision** — no project-specific prefix, previously \`\`, on these names. With only two venvs and no other project sharing this shell, per the **project instructions**' two-venv rule, the collision risk a prefix would guard against, another tool on the same machine also reading `PORT`/`DB_PATH`/`HEADLESS`, is accepted as a known and deliberate tradeoff. If it bites in practice, reintroducing a prefix is a contained rename rather than a re-architecture.
 
@@ -163,11 +177,11 @@ One origin, one process, zero CORS is worth more than hot reload here. A browser
 
 **ARCH-RUN-10** Because the frontend is served from `/`, the generic CRUD API (REQ-PLAT-01) is mounted under an **`/api/v1` prefix**: `GET/PUT/DELETE /api/v1/{table}/{id}`, `POST /api/v1/{table}`, `POST /api/v1/{table}/batch`, `GET /api/v1/{table}/search`, `POST /api/v1/{table}/delete`. The endpoint *shapes* documented in REQ-PLAT-01 and the **backend-api skill** are unchanged. Only the prefix is added, so static asset paths can never shadow a table name. The `v1` segment costs nothing at this stage: it is a path literal rather than a versioning framework or content-negotiation scheme, so it violates nothing in the guiding constraint above. It also avoids a breaking change to every client, frontend, tests, or any future integration, the day `020` needs to add or retire a shape. It is not itself a commitment to ever ship a `v2`. The **API reference** is the single source of truth for the classification: which entities get this generic shape unmediated, which entities get the same shape backed by a per-table write/read hook enforcing an invariant, and which operations fall outside all seven shapes entirely as named endpoints.
 
-01. promote-to-lead.
-02. queue/dequeue-for-apply.
-03. run-trigger.
-04. session-upload.
-05. manual post entry.
+01. run-trigger.
+02. MCF session upload.
+03. manual post entry.
+04. account and sign-in actions.
+05. profile photo upload, removal, and read.
 
 An endpoint that is neither a generic shape nor in that catalog is a drift back toward per-feature endpoints. It is never a deliberate exception.
 
@@ -179,6 +193,8 @@ easymcf/
     __main__.py             # entry point (ARCH-RUN-07)
     config.py               # env-var config (ARCH-RUN-07)
     api/                    # generic CRUD blueprint + schema validation + named endpoints (010-api.md)
+    auth/                   # accounts, sessions, Google flow, photo pipeline (ARCH-AUTH-01..10)
+    tenancy.py              # per-table ownership predicates (ARCH-AUTH-04)
     db/
       schema.sql            # full DDL, single file (ARCH-STO-02)
       connection.py         # WAL/pragma setup, per-thread connections
@@ -192,7 +208,7 @@ easymcf/
     index.html
     app/                    # modules, controllers, services, templates
     vendor/                 # angular.min.js et al, vendored
-  data/                     # gitignored; dev scratch database lives here
+  data/                     # gitignored; dev scratch database and profile photos live here
   seed/                     # seed dataset as SQL text (ARCH-STO-04)
   scripts/
     initdb.py               # create schema
@@ -202,17 +218,18 @@ easymcf/
     frontend/               # tier 1b, frontend silo against mocked /api (ARCH-TEST-09)
     e2e/                    # tier 2 (ARCH-TEST-03)
     live/                   # tier 3, deselected by default (ARCH-TEST-06)
+    support/                # stub identity provider, seeded account list, photo fixtures (ARCH-AUTH-10)
     fixtures/
       mcf/                  # canned MCF HTML + routes manifest (ARCH-TEST-04)
       api/                  # canned /api/** JSON responses (ARCH-TEST-09)
     conftest.py
-  .secrets/                 # gitignored; MCF session file (ARCH-BOT-03)
+  .secrets/                 # gitignored; MCF session files, Google client secret, cookie key (ARCH-AUTH-06)
   pytest.ini
 ```
 
 ## 2. Storage
 
-**ARCH-STO-01** One SQLite file holds every table in the **data model**: `user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `session`. The dev database is **`data/easymcf.db`**. `data/` is gitignored in its entirety, so no database binary is ever committed. Path is overridable via `DB_PATH`, which is how tests get their own.
+**ARCH-STO-01** One SQLite file holds every table in the **data model**: `user`, `auth_session`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `mcf_session`. The dev database is **`data/easymcf.db`**. `data/` is gitignored in its entirety, so no database binary is ever committed. Path is overridable via `DB_PATH`, which is how tests get their own.
 
 **ARCH-STO-02** Schema is a **single hand-maintained `easymcf/db/schema.sql`** applied by `scripts/initdb.py`. No Alembic, no migration chain. During `010` a schema change is: edit `schema.sql`, run `scripts/resetdb.py --seed`, done — the database holds nothing a developer can't regenerate, and a migration framework's whole value (preserving production data) does not exist yet.
 
@@ -227,6 +244,7 @@ easymcf/
 05. leads at every stage including `CLOSED` with several close reasons.
 06. applications covering every one of REQ-APPLY-04's eight outcome codes.
 07. `run_log` rows in each status.
+08. two accounts with distinct data, posts matched to tracks of both, and a lead on a shared post for each account.
 
 **ARCH-STO-05** **Time-relative seed data.** Auto-expiry (REQ-CRM-05, 28 days of inactivity) and post-age screening (REQ-SRCH-09) make absolute dates in a seed file rot: a fixture written today asserts differently next month. Two rules apply.
 
@@ -249,13 +267,35 @@ Without rule 02, REQ-CRM-05 is not deterministically testable.
 
 ## 3. Networking
 
-**ARCH-NET-01** The Flask process binds **`127.0.0.1:5000` only**, loopback rather than `0.0.0.0`. `010` has no authentication and no multi-user model (REQ-PLAT-04, out-of-scope list). Staying off a routable interface is what makes that acceptable.
+**ARCH-NET-01** The Flask process binds **`127.0.0.1:5000` only**, loopback rather than `0.0.0.0`. Every account lives on this one machine, and every API route except the sign-in flow requires a signed-in user (ARCH-AUTH-03). `010` serves plain http and terminates no TLS, so staying off a routable interface is what keeps passwords and the session cookie off the network.
 
 **ARCH-NET-02** Frontend and API share the single origin `http://127.0.0.1:5000` (ARCH-RUN-09), so **no CORS configuration, no preflight handling, and no `flask-cors` dependency exist**. If a future change splits the frontend onto its own origin, CORS becomes a required part of that change — it is not pre-provisioned here.
 
-**ARCH-NET-03** The system makes **no outbound network calls except browser automation to `mycareersfuture.gov.sg`**. The Singpass login step is explicitly not part of that automation: the "Log in to MCF" action opens the login URL in an ordinary, un-automated browser tab/window (equivalent to a plain hyperlink) — never a Playwright-controlled `MCFBrowser` context (ARCH-BOT-02) — and the user completes login/MFA manually in their own browser, per REQ-APPLY-06. No telemetry, no CDN for frontend assets (hence vendored `angular.min.js`), no package downloads at runtime. A developer can run the full app and the whole default test suite offline.
+**ARCH-NET-03** The system makes **no outbound network calls except two**. The first is browser automation to `mycareersfuture.gov.sg`. The second is the Google sign-in flow, and only while a user signs in with Google: the configured identity provider's discovery, token, and key endpoints, and the profile picture URL named in the verified token (ARCH-AUTH-05). The Singpass login step is explicitly not part of the MCF automation: the "Log in to MCF" action opens the login URL in an ordinary, un-automated browser tab/window (equivalent to a plain hyperlink) — never a Playwright-controlled `MCFBrowser` context (ARCH-BOT-02) — and the user completes login/MFA manually in their own browser, per REQ-APPLY-06. No telemetry, no CDN for frontend assets (hence vendored `angular.min.js`), no package downloads at runtime. A developer can run the full app and the whole default test suite offline, since the tests use MCF fixtures and the stub identity provider (ARCH-TEST-04).
 
 **ARCH-NET-04** Those MCF calls happen only when `MCF_MODE=live` (ARCH-RUN-08). In `fixture` mode the browser never resolves an MCF hostname — requests are intercepted before dispatch (ARCH-TEST-04). Setting `live` is a deliberate human action in that session, consistent with the **project instructions**' boundary. Nothing in the default run path, the seeded app, or the default test suite sets it.
+
+## 7. Accounts and authentication
+
+**ARCH-AUTH-01** **Every mechanism is a maintained standard.** Password hashing is Werkzeug's scrypt implementation, which ships with Flask. The signed session cookie uses `itsdangerous`, also shipped with Flask. The Google flow uses Authlib's Flask client. Profile photos are validated and re-encoded with Pillow. `authlib` and `pillow` are the two additions to the ops manifest (ARCH-RUN-05), and no hand-written cryptography, token parsing, or image parsing exists in the codebase.
+
+**ARCH-AUTH-02** **Sign-in sessions are server-side rows, referenced by a signed cookie.** The `auth_session` table holds the SHA-256 digest of a random 32 byte token, the user id, and an absolute `expires_at`. The cookie `easymcf_session` carries that token signed with `itsdangerous.URLSafeSerializer` and the salt `easymcf-session`. It is HttpOnly, `SameSite=Lax`, `Path=/`, and `Secure` only when `COOKIE_SECURE=1`. A database read yields no usable cookie, sign-out deletes the row so the cookie stops working at once, and a tampered or expired cookie is treated as no cookie. The signing key is `SECRET_KEY` when set, otherwise 32 random bytes generated on first start into `<SECRETS_DIR>/session_key` with mode `0600`, so a restart keeps users signed in.
+
+**ARCH-AUTH-03** **One request pipeline guards every route.** A `before_request` hook runs three steps in order. It rejects an unsafe method whose `Origin` header names another host with `403`. It resolves the cookie to `g.user_id`. It answers `401` for any `/api/v1` route outside the public set, which is `health`, sign-up, sign-in, sign-out, the auth config read, and the two Google flow routes. The SPA static route is public since it serves code only. Together with `SameSite=Lax` the origin check is the whole cross-site request forgery defense, which suits a single-origin app.
+
+**ARCH-AUTH-04** **Ownership is declared once and applied by the framework.** `easymcf/tenancy.py` holds one SQL predicate per table, bound to `:uid`. The generic CRUD blueprint appends the predicate to every read, update, and delete, checks declared parent references on create, and sets ownership columns on the server after validation. `register()` raises at import time for a resource with no declaration, so an unscoped resource cannot ship. A row outside the caller's predicate answers `404`, the same as a missing row. Services take the user id explicitly and call the same helpers, since background threads have no request context. The `post` table is shared and read-only to every user, and a lead holds its own copy of the display fields it needs (see the **data model**).
+
+**ARCH-AUTH-05** **Google sign-in is the standard authorization code flow with PKCE and OpenID Connect.** Authlib performs discovery, state, nonce, and PKCE handling, and validates the id token signature, issuer, audience, and expiry. The transient state travels in a signed ten minute cookie `easymcf_oauth`. Every callback outcome is a redirect, to the requested page on success and to `/signin?error=<code>` on any failure, and no failure creates a user or a session. An identity links to an existing account only when Google reports the email verified, which closes the account takeover path through an unverified address. The redirect URI is `http://127.0.0.1:{PORT}/api/v1/auth/google/callback` unless `GOOGLE_REDIRECT_URI` overrides it, and it must equal the URI registered on the OAuth client.
+
+**ARCH-AUTH-06** **Credentials live in three places, none tracked.** The Google client id is not secret and lives in `.env` as `GCP_OAUTH_CLIENT_ID`. The Google client secret lives only in `<SECRETS_DIR>/gcp_oauth_client_secret`, mode `0600`, located by `GCP_OAUTH_SECRET_FILE`, and is never an environment variable, so it cannot leak through a process listing or an environment dump. The cookie signing key lives in `<SECRETS_DIR>/session_key`. With the client id or the secret file absent, Google sign-in reports itself unavailable and the sign-in page hides the button. No secret, token, code, cookie, password, or email address appears in a log line, and auth log lines carry the user id and the event name only.
+
+**ARCH-AUTH-07** **Profile photos are files outside the web root.** The upload pipeline decodes the image with Pillow, refuses anything that is not JPEG, PNG, or WebP, center-crops to a square, resizes to 256 by 256, and re-encodes as PNG, which discards metadata and any embedded payload. The file is written to `<PHOTO_DIR>/<user_id>/avatar-<sha8>.png` with mode `0600` in a `0700` directory through a temp file and an atomic rename, and `user.photo_ref` records it. The API serves a photo only to its owner. `PHOTO_DIR` defaults to `data/photos`, which `.gitignore` already covers through `data/`.
+
+**ARCH-AUTH-08** **Runs execute for one user.** `start_run` takes the user id and writes it to `run_log.user_id`. A search run scores against the run user's active tracks and details only posts visible to that user. An apply run reads that user's queue, MCF session row, and session file. The scheduler resolves the user from `track.user_id`. Startup reconciliation marks every user's orphaned `running` row `failed`.
+
+**ARCH-AUTH-09** **Sign-in attempts are rate limited in process.** A table keyed by lowercased email holds failure timestamps read through `clock.py::now()`. With `SIGNIN_MAX_FAILURES=5` and `SIGNIN_WINDOW_S=900`, failures one to five answer `401` and the next attempt answers `429` with `Retry-After`, even with the correct password, until the oldest failure ages out. A success clears the key. One process holds one table, so no shared store is needed.
+
+**ARCH-AUTH-10** **Tests stub the provider and sign in for real.** `tests/support/stub_oidc.py` is a small OpenID Connect provider that signs tokens with a key it generates at startup and selects a failure scenario from the email's local part prefix. Fixtures sign in through the real sign-in endpoint as seeded accounts. The stub covers valid, unverified email, expired, wrong audience, wrong issuer, bad signature, wrong nonce, and wrong state cases. The live tier (ARCH-TEST-06) is the only place the real Google endpoints are called. Authlib validates token expiry against the wall clock, the one place `clock.py::now()` does not apply, so the stub sets explicit timestamps relative to the real clock.
 
 ## 4. Browser automation infrastructure
 
@@ -271,13 +311,13 @@ The **playwright skill** covers the substance that carries over from the prototy
 
 **ARCH-BOT-02** All MCF interaction goes through **one `MCFBrowser` interface** in `easymcf/automation/browser.py`, with implementations selected by `MCF_MODE`: `live.py` (real navigation) and `fixture.py` (identical code path, requests route-intercepted to the fixture corpus). Services never instantiate a browser directly. This is the seam that makes the entire automation layer testable unattended. The Singpass login step (ARCH-NET-03) is deliberately outside this seam — it is never routed through `MCFBrowser`, live or fixture, since automating it is explicitly out of scope (REQ-APPLY-06).
 
-**ARCH-BOT-03** **MCF session credential storage, resolving open question #1 in the requirements.** The cookie bundle uploaded via Workflow 8 is written to **`.secrets/mcf_session.json`**, in a directory from `SECRETS_DIR`, created `0700`, with the file itself `0600`. `.secrets` is already in `.gitignore`. The `session` table stores `cookie_ref` as the **filename only**. The payload never enters SQLite, so the database file stays safe to share, copy, or attach to a bug report.
+**ARCH-BOT-03** **MCF session credential storage, resolving open question #1 in the requirements.** The cookie bundle a user uploads via Workflow 8 is written to **`.secrets/mcf_session_<user_id>.json`**, one file per user, in a directory from `SECRETS_DIR`, created `0700`, with each file `0600`. `.secrets` is already in `.gitignore`. The `mcf_session` table stores `cookie_ref` as the **filename only**. The payload never enters SQLite, so the database file stays safe to share, copy, or attach to a bug report.
 
 Rejected alternatives:
 
 01. storing the cookie JSON in an env var or committed `.env`. A multi-kilobyte JSON blob is a poor fit for the environment, and `.env` files get committed by accident.
-02. storing the payload in the `session` row. It would spread credential material into every database dump and seed export.
-03. an OS keyring. This is a real dependency and platform-specific behavior for a single-user POC whose threat model is "don't commit it".
+02. storing the payload in the `mcf_session` row. It would spread credential material into every database dump and seed export.
+03. an OS keyring. This is a real dependency and platform-specific behavior for a local POC whose threat model is "don't commit it".
 
 Test tiers never read this file: the fixture-mode browser uses a synthetic cookie fixture, so a missing or expired real session cannot break the autonomous loop.
 
@@ -332,6 +372,8 @@ Service-layer tests drive the search/apply orchestration with a stubbed `MCFBrow
 
 The stubbing mechanism is **Playwright `page.route()` interception**: requests matching `**mycareersfuture.gov.sg**` are fulfilled from a fixture corpus instead of dispatched. This is the load-bearing choice — the real scraper code runs, with its real selectors, waits, retries, pagination-termination and dedup logic. Only the bytes come from disk. A stub that replaces the whole automation module would make this tier assert nothing about the automation it is supposed to cover.
 
+Google sign-in is replaced the same way, at the network boundary. A stub OpenID Connect provider under `tests/support/` serves the discovery document, the signing keys, and the authorize and token endpoints, and `GOOGLE_DISCOVERY_URL` points the app at it. The real Authlib flow, cookie handling, linking rules, and photo import run against tokens the stub signs (ARCH-AUTH-10). Every test that needs a signed-in user signs in through the real sign-in endpoint as a seeded account, and the app has no authentication bypass switch.
+
 Corpus layout under `tests/fixtures/mcf/`:
 
 - `search/{keyword}_p{n}.html` — job-card list pages, including a final empty page so pagination termination (REQ-SRCH-03) is exercised, and overlapping cards across keywords so dedup (REQ-SRCH-05) is exercised.
@@ -345,14 +387,14 @@ Fixture HTML is captured from real MCF pages once, by hand, in a live session (t
 
 01. a run's status badge reaching `success`.
 02. an error banner appearing after a failed run, per REQ-FE-02.
-03. a promoted post's row switching to `already promoted`.
+03. a post that became a lead showing `already a lead`.
 04. a lead card moving tabs on stage change.
 
 The tradeoff is stated plainly: a JS unit tier would give faster isolated feedback on controllers, at the cost of introducing node/npm/karma to a build-free frontend (ARCH-RUN-06). For roughly eight screens, DOM assertions in a tier that already exists give better signal per unit of infrastructure. On failure, Playwright writes a screenshot and the page HTML to `.dev/test-artifacts/` — **diagnostic aids for a human afterward, never a substitute for a pass/fail assertion.** No test may require a person to look at a browser to determine whether it passed.
 
-### Tier 3 — live MCF (REQ-DEV-05)
+### Tier 3 — live MCF and Google sign-in (REQ-DEV-05, REQ-DEV-06)
 
-**ARCH-TEST-06** Explicitly **outside the autonomous loop, by design.** Running it requires three independent conditions, none of which occurs by default: the `live` marker is deselected by `pytest.ini` and must be re-selected (`pytest -m live --run-live`), `MCF_MODE=live` must be set (ARCH-RUN-08 defaults it to `fixture`), and a valid `.secrets/mcf_session.json` must exist (ARCH-BOT-03) — which only a human can produce, since login/MFA is manual and out of scope. An agent cannot satisfy the third condition at all, which is the point: this is the **project instructions**' boundary against unattended live-site access made structural rather than advisory. **No agent may run this tier on its own initiative, and no automated loop invokes it.**
+**ARCH-TEST-06** Explicitly **outside the autonomous loop, by design.** Running it requires three independent conditions, none of which occurs by default: the `live` marker is deselected by `pytest.ini` and must be re-selected (`pytest -m live --run-live`), `MCF_MODE=live` must be set (ARCH-RUN-08 defaults it to `fixture`), and a valid `.secrets/mcf_session.json` must exist (ARCH-BOT-03) — which only a human can produce, since login/MFA is manual and out of scope. An agent cannot satisfy the third condition at all, which is the point: this is the **project instructions**' boundary against unattended live-site access made structural rather than advisory. **No agent may run this tier on its own initiative, and no automated loop invokes it.** The Google sign-in live case (REQ-DEV-06) belongs to the same tier under the same rule. It needs `GCP_OAUTH_CLIENT_ID`, the client secret file, and `GCP_OAUTH_TEST_EMAIL`, plus a Google consent that only the account's owner can give, so an agent cannot satisfy it either.
 
 Content is the local successor to `jobsearch`'s `recommission.py`: a short sequential smoke protocol (browser loads → search page loads → cards found and parsed → detail page parsed → apply page selectors resolve) whose purpose is detecting MCF markup drift and refreshing the tier-2 fixture corpus when it is found. Apply-submission steps are excluded by default — they mutate real MCF-side application state — and gated behind a further explicit flag when genuinely needed.
 

@@ -19,8 +19,8 @@
     </div>
   </header>
 
-  <label>Title <input ng-model="detail.lead.title_override" data-testid="lead-detail-field-title_override"></label>
-  <label>Company <input ng-model="detail.lead.company_override" data-testid="lead-detail-field-company_override"></label>
+  <label>Title <input ng-model="detail.lead.title_override" placeholder="{{detail.lead.position_title}}" data-testid="lead-detail-field-title_override"></label>
+  <label>Company <input ng-model="detail.lead.company_override" placeholder="{{detail.lead.company_name}}" data-testid="lead-detail-field-company_override"></label>
   <label>Deadline <input type="text" ng-model="detail.lead.deadline" data-testid="lead-detail-field-deadline"></label>
   <label>Applied <input ng-model="detail.lead.applied_date" data-testid="lead-detail-field-applied_date"></label>
   <label>First attempt <input ng-model="detail.lead.first_attempt_date" data-testid="lead-detail-field-first_attempt_date"></label>
@@ -32,5 +32,7 @@
   <ul><li ng-repeat="n in detail.notes" data-testid="lead-detail-note">{{n.created_at}} {{n.note}}</li></ul>
 
   <h3>Activity</h3>
-  <ul><li ng-repeat="a in detail.activity" data-testid="lead-detail-activity">{{a.at}} {{a.kind}} {{a.text}}</li></ul>
+  <ul><li ng-repeat="a in detail.activity" data-testid="lead-detail-activity">{{a.at}} {{a.kind}}
+    <span ng-if="a.stageTo" data-testid="lead-detail-activity-stage">{{detail.stageLabel(a)}}</span>
+    {{a.text}}</li></ul>
 </section>

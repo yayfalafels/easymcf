@@ -8,12 +8,12 @@ visibility, or attribute value — never a JS-internals check.
 Two modes:
 
     # (a) ad hoc — open one route, print one selector's text + visibility
-    python scripts/ui_tester.py / '[data-testid="env-status-heading"]'
+    python scripts/ui_tester.py /leads '[data-testid="leads-tab-pipeline"]'
 
     # (b) case-replay — run every check in a file (or one named check)
     python scripts/ui_tester.py --case tests/frontend/checks/selftest_ui_tester.json
     python scripts/ui_tester.py --case tests/frontend/checks/selftest_ui_tester.json \\
-        --name "selftest — env-status heading renders" --api-mode mocked
+        --name "selftest — leads column heading renders" --api-mode mocked
 """
 
 from __future__ import annotations

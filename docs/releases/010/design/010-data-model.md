@@ -7,6 +7,7 @@
 - [Entity-relationship overview](#entity-relationship-overview)
 - [Entities](#entities)
   - [`user`](#user)
+  - [`auth_session`](#auth_session)
   - [`role`](#role)
   - [`track`](#track)
   - [`search_profile`](#search_profile)
@@ -18,9 +19,10 @@
   - [`lead`](#lead)
   - [`lead_note`](#lead_note)
   - [`lead_event`](#lead_event)
+  - [`offer`](#offer)
   - [`application`](#application)
   - [`run_log`](#run_log)
-  - [`session`](#session)
+  - [`mcf_session`](#mcf_session)
 - [Design notes](#design-notes)
   - [Schema versions](#schema-versions)
 
@@ -40,7 +42,10 @@ Entities and relationships for the SQLite database (REQ-PLAT-02), derived from t
 erDiagram
     USER ||--o{ TRACK : "owns"
     USER ||--o{ CV : "owns"
-    USER ||--|| SESSION : "owns"
+    USER ||--o{ AUTH_SESSION : "signed in through"
+    USER ||--o{ LEAD : "owns"
+    USER ||--o{ RUN_LOG : "runs for"
+    USER ||--|| MCF_SESSION : "owns"
     ROLE ||--o{ TRACK : "generic role"
     TRACK ||--|| SEARCH_PROFILE : "one profile"
     TRACK ||--|| SEARCH_SCHEDULE : "one schedule"
@@ -49,30 +54,51 @@ erDiagram
     TRACK }o--|| CV : "default cv"
     CV ||--o{ APPLICATION : "override cv"
     POST ||--o{ POST_TRACK : "matched against"
-    POST ||--o| LEAD : "promoted into"
+    POST ||--o{ LEAD : "promoted into, once per user"
     POST }o--|| RUN_LOG : "discovered by"
     POST_TRACK ||--|| MATCH_SCORE : "scored by"
     LEAD ||--o{ APPLICATION : "attempts"
     LEAD ||--o{ LEAD_EVENT : "activity log"
     LEAD ||--o{ LEAD_NOTE : "note history"
+    LEAD ||--o{ OFFER : "offers"
     APPLICATION }o--|| RUN_LOG : "executed within"
     RUN_LOG ||--o{ RUN_LOG : "search / apply"
 ```
 
-`SESSION`, the MCF credential store, is intentionally not in this diagram. It has no FK relationship to domain data. It's a singleton the apply run checks (Workflow 8).
+`MCF_SESSION`, the MCF credential store, has no FK relationship to domain data beyond its owner. It is one row per user that the apply run checks (Workflow 8). `AUTH_SESSION` is the sign-in session store and is unrelated to `MCF_SESSION`.
 
 ## Entities
 
 ### `user`
 
-The person the app runs for. 010 remains single-user in every functional sense, no auth, no multi-tenancy, no per-request identity resolution, but the schema names the ownership boundary explicitly rather than leaving it implicit. Seed data initializes exactly one row.
+A person with an account. Every `track`, `cv`, `lead`, `run_log`, and `mcf_session` row belongs to exactly one user, and a user sees only their own rows (REQ-AUTH-06). A user signs in with an email and password, with a linked Google identity, or with both (REQ-AUTH-01..04).
 
-| field    | notes                        |
-| -------- | ----------------------------- |
-| `id`     | PK                            |
-| `name`   | display name                  |
-| `email`  | contact address                |
-| `status` | e.g. `active`                  |
+| field           | notes                                                                             |
+| --------------- | --------------------------------------------------------------------------------- |
+| `id`            | PK                                                                                |
+| `name`          | display name, 1 to 80 characters                                                  |
+| `email`         | unique, stored lowercase, REQ-AUTH-01                                             |
+| `status`        | `active` \| `disabled`, a disabled user cannot sign in                            |
+| `password_hash` | nullable scrypt hash, null for a Google-only account, REQ-AUTH-09                 |
+| `google_sub`    | nullable unique Google subject identifier, REQ-AUTH-04                            |
+| `photo_ref`     | nullable path of the stored profile photo relative to the photo store, REQ-AUTH-08 |
+| `created_at`    | creation timestamp                                                                |
+
+A table constraint requires at least one of `password_hash` and `google_sub`, so every account has a way to sign in. The hash and the subject are never serialized by the API. The photo bytes live on disk outside the database, and the row holds the reference only.
+
+### `auth_session`
+
+A signed-in browser session (REQ-AUTH-05). One row per sign-in, deleted at sign-out and purged after expiry.
+
+| field        | notes                                                        |
+| ------------ | ------------------------------------------------------------ |
+| `id`         | PK                                                           |
+| `user_id`    | FK → `user`, cascades on delete                              |
+| `token_hash` | unique SHA-256 digest of the random session token            |
+| `created_at` | sign-in timestamp                                            |
+| `expires_at` | absolute expiry, the session is valid while now is before it |
+
+The database stores the digest and never the token, so reading the file yields no usable cookie. The token travels only in the signed `easymcf_session` cookie (`ARCH-AUTH-02`).
 
 ### `role`
 
@@ -86,7 +112,7 @@ Generic job title/domain, not user-specific (glossary, REQ-SRCH-01 implicitly).
 
 ### `track`
 
-A user's role at a seniority level (glossary), owned by the single `user` row. Naming the ownership column explicitly is what this milestone adds. 010's functional behavior stays single-user regardless.
+A user's role at a seniority level (glossary), owned by one `user` through `user_id`. Search profiles, schedules, post matches, and leads reach their owner through the track.
 
 | field           | notes                                     |
 | --------------- | ----------------------------------------- |
@@ -97,7 +123,7 @@ A user's role at a seniority level (glossary), owned by the single `user` row. N
 | `default_cv_id` | FK → `cv`, nullable — REQ-APPLY-02        |
 | `is_active`     | bool, default true — false ⇒ archived (REQ-SRCH-10), hidden from active track selectors |
 
-An archived (`is_active = false`) track is not physically deleted, mirroring the `post.is_open` pattern below. Its historical `post_track`, `lead`, and `application` rows stay readable. Only its availability in active selectors, such as search run, promote-to-lead, or apply default CV, changes.
+An archived (`is_active = false`) track is not physically deleted, mirroring the `post.is_open` pattern below. Its historical `post_track`, `lead`, and `application` rows stay readable. Only its availability in active selectors, such as search run, manual lead add, or apply default CV, changes.
 
 ### `search_profile`
 
@@ -127,17 +153,17 @@ These three fields are the complete definition of a schedule. `schedule_enabled 
 
 ### `cv`
 
-A named CV/resume version the user can assign as a track default or an application override (REQ-APPLY-02). The actual file lives on MCF's own profile. 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring, per the **prototype extraction**'s `cv_select()`. This table is a small label catalog.
+A named CV/resume version, unique by label within its owner, that the user can assign as a track default or an application override (REQ-APPLY-02). The actual file lives on MCF's own profile. 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring, per the **prototype extraction**'s `cv_select()`. This table is a small label catalog.
 
 | field     | notes                                                               |
 | --------- | ------------------------------------------------------------------- |
 | `id`      | PK                                                                  |
 | `user_id` | FK → `user`                                                        |
-| `label`   | matched by substring against MCF's resume card titles at apply time |
+| `label`   | unique per user, matched by substring against MCF's resume card titles at apply time |
 
 ### `post`
 
-Source-of-truth listing, not user-specific (glossary, REQ-SRCH-03/06/07). One row per posting regardless of how many tracks match it or how many leads it spawns.
+Source-of-truth listing shared by every user (glossary, REQ-SRCH-03/06/07). One row per posting regardless of how many tracks match it or how many leads it spawns. A post is read-only to every user. Only the search run, the detail pass, and the manual entry endpoints write it, always on the server. A user sees a post through a `post_track` row on one of their tracks or through one of their leads.
 
 | field                     | notes                                                                          |
 | ------------------------- | ------------------------------------------------------------------------------ |
@@ -169,7 +195,7 @@ Many-to-many: a post can match more than one track (REQ-SRCH-08/09).
 | `track_id`     | PK part, FK → `track`                                                              |
 | `search_match` | bool — true if found by this track's search, false if auto-assigned (manual entry) |
 
-No "assigned"/primary flag lives here. Which track a resulting lead belongs to is chosen by the user at promotion time (Decision 2), never pre-computed on the post. Each pairing's score lives in `match_score` below rather than on this row, so a rescoring pass can replace a score without touching the association itself.
+No "assigned"/primary flag lives here. Which track a resulting lead belongs to is the track of the search run that promotes the post (Decision 2), and no track flag lives on the post. Each pairing's score lives in `match_score` below rather than on this row, so a rescoring pass can replace a score without touching the association itself.
 
 ### `match_score`
 
@@ -186,26 +212,29 @@ Exactly one row per `post_track` pairing, each scored independently (REQ-SRCH-09
 
 ### `lead`
 
-The user's personal, trackable instance of a post for one track (glossary, REQ-CRM-01..06).
+One user's personal, trackable instance of a post for one track (glossary, REQ-CRM-01..06). The lead holds its own copies of the post's display fields, so the user edits the lead and never the post.
 
-| field                | notes                                                   |
-| -------------------- | ------------------------------------------------------- |
-| `id`                 | PK                                                      |
-| `post_id`            | FK → `post`                                             |
-| `track_id`           | FK → `track`, chosen at promotion (Workflow 4)          |
-| `status`             | `OPEN` \| `CLOSED`, REQ-CRM-02                          |
-| `stage`              | enum, see Workflow 5 stage diagram                      |
-| `close_reason`       | enum, set when `status = CLOSED` — see Workflow 5       |
-| `title_override`     | nullable, REQ-CRM-04                                    |
-| `company_override`   | nullable, REQ-CRM-04                                    |
-| `deadline`           | REQ-CRM-03; system-maintained across the lifecycle, REQ-CRM-05 — see `lead_event` below |
-| `applied_date`       | REQ-CRM-03                                              |
-| `first_attempt_date` | REQ-CRM-03                                              |
-| `last_contact_date`  | REQ-CRM-03                                              |
-| `created_at`         | promotion timestamp                                     |
-| `updated_at`         | refreshed by each new `lead_event` written for this lead, drives auto-expiry, REQ-CRM-05 |
+| field                 | notes                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| `id`                  | PK, the lead's own unique identifier                                                 |
+| `user_id`             | FK → `user`, the owner, always equal to the owner of `track_id`                      |
+| `post_id`             | FK → `post`, the promoted post                                                       |
+| `track_id`            | FK → `track`, the promoting run's track, editable (REQ-CRM-12)                       |
+| `status`              | `OPEN` \| `CLOSED`, REQ-CRM-02                                                       |
+| `stage`               | enum, see Workflow 5 stage diagram                                                   |
+| `close_reason`        | enum, set when `status = CLOSED` — see Workflow 5                                    |
+| `position_title`      | copied from the post at creation, user-editable, REQ-CRM-03/04                       |
+| `company_name`        | copied from the post at creation, user-editable, REQ-CRM-03/04                       |
+| `url_ref`             | nullable, copied from the post at creation, user-editable, `http` or `https`         |
+| `deadline`            | REQ-CRM-03, system-maintained (REQ-CRM-05), see `lead_event`                         |
+| `applied_date`        | REQ-CRM-03                                                                           |
+| `first_attempt_date`  | REQ-CRM-03                                                                           |
+| `last_contact_date`   | REQ-CRM-03                                                                           |
+| `expected_salary_sgd` | nullable integer `>= 0`, REQ-CRM-09, copied from profile `min_salary` at creation    |
+| `created_at`          | creation timestamp (promotion or manual add)                                         |
+| `updated_at`          | refreshed by each `lead_event` written for the lead, drives auto-expiry (REQ-CRM-05) |
 
-Uniqueness: `post_id`. A post can be promoted into at most one lead. Once promoted, it is excluded from further promotion under any track (Workflow 4). Free-text notes are not a field on this row. They live in `lead_note` below, so a lead can carry a history of multiple notes rather than one that overwrites the last.
+Uniqueness: `(user_id, post_id)`. A post can be promoted into at most one lead per user, and two users can each hold a lead on the same post. Once a user has promoted a post, it is excluded from that user's further promotion under any track (Workflow 4). A trigger rejects a lead whose `user_id` differs from the owner of its `track_id`, so the ownership shortcut on the lead cannot drift from the track. The four display fields `position_title`, `company_name`, `url_ref`, and `deadline` are the only values the Leads screens show, and the post row is never read for display after promotion. A later change to the post, such as a detail pass filling its `closing_date`, never rewrites a lead. Free-text notes are not a field on this row. They live in `lead_note` below, so a lead can carry a history of multiple notes rather than one that overwrites the last.
 
 ### `lead_note`
 
@@ -227,8 +256,42 @@ An append-only activity log entry for a lead (REQ-CRM-08). One-to-many from `lea
 | `id`          | PK                                                                       |
 | `lead_id`     | FK → `lead`                                                              |
 | `event_type`  | `stage_change` \| `contact_logged` \| `note_edited` \| `deadline_changed` \| `field_edited` |
-| `detail`      | free text, e.g. old/new stage, or a note excerpt                        |
+| `detail`      | free text: the changed fields other than `stage` with old and new values, or a note excerpt |
+| `stage_from`  | stage before the update, `NULL` only on the creation event              |
+| `stage_to`    | stage after the update                                                  |
 | `occurred_at` | timestamp — the value that refreshes `lead.updated_at`                  |
+
+**Stage context.** Every event states the stage the lead held before the update in `stage_from` and after it in `stage_to`, so the history reads as a chain and shows the stage at which each update happened. The values follow the event's source:
+
+| id | event source                                | stage_from        | stage_to          |
+| -- | ------------------------------------------- | ----------------- | ----------------- |
+| 01 | system promotion                            | `NULL`            | `TOAPPLY`         |
+| 02 | manual lead add                             | `NULL`            | `APPLIED`         |
+| 03 | stage transition or close (user, apply)     | stage before      | stage after       |
+| 04 | offer attached                              | `INTERVIEW`       | `OFFER`           |
+| 05 | offer final status, or auto-expiry close    | stage at close    | `CLOSED`          |
+| 06 | re-open of a lead closed from `OFFER`       | `CLOSED`          | `INTERVIEW`       |
+| 07 | contact, field edit, deadline edit, note    | current stage     | current stage     |
+| 08 | automatic deadline refresh                  | stage after write | stage after write |
+
+Two constraints in `schema.sql` enforce the shape. Both columns hold only the six stage values (`stage_from` also allows `NULL`), and a `stage_change` event always changes the stage while every other event type holds it, with `NULL` allowed only in a `stage_change` from the creation. Across a lead's events ordered by `id`, each `stage_from` equals the previous `stage_to`, the first `stage_from` is `NULL` with `stage_to` `TOAPPLY` (system promotion) or `APPLIED` (manual add), and the last `stage_to` equals `lead.stage`. The re-open of a lead closed from `OFFER` is a `stage_change` from `CLOSED` to `INTERVIEW`, and the chain continues from there.
+
+### `offer`
+
+A job offer made on a lead (REQ-CRM-10). One-to-many from `lead`: a lead can carry several offers over its life, since a lead closed from an offer can be re-opened and given a new one, and every offer stays as history.
+
+| field        | notes                                                                       |
+| ------------ | --------------------------------------------------------------------------- |
+| `id`         | PK                                                                          |
+| `lead_id`    | FK → `lead`                                                                 |
+| `offer_date` | ISO date the offer was made                                                 |
+| `deadline`   | ISO date, defaults to the lead's `deadline` when the offer is created       |
+| `amount_sgd` | integer, `> 0`                                                              |
+| `status`     | `open` \| `accepted` \| `rejected` \| `withdrawn` \| `expired`, default `open` |
+| `created_at` | creation timestamp                                                          |
+| `updated_at` | refreshed on each write to the offer                                        |
+
+An index on `lead_id` serves the history reads, and a partial unique index (`UNIQUE (lead_id) WHERE status = 'open'`) allows one open offer per lead. A lead at stage `OFFER` has exactly one open offer, because attaching the offer and moving the lead happen in one transaction (`POST /api/v1/offer`). Its final status maps to the lead's close reason: `accepted` to `offer_accepted`, `rejected` to `rejected`, `withdrawn` to `withdrawn`, and `expired` to `expired`. While `open`, `amount_sgd` and `deadline` are editable, and `lead.deadline` follows the offer deadline. A final status makes the offer read-only, and the `offer` resource has no delete.
 
 ### `application`
 
@@ -253,6 +316,7 @@ Every automated run: search or apply (REQ-PLAT-03). Scoring is not a separate ru
 | `id`             | PK                                                             |
 | `run_type`       | `search` \| `apply`                                            |
 | `track_id`       | FK → `track`, nullable — null for apply runs (may span tracks) |
+| `user_id`        | FK → `user`, the run's owner                                   |
 | `trigger_source` | `manual` \| `scheduled`, default `manual` — ARCH-SCHED-05      |
 | `started_at`     | REQ-PLAT-03                                                    |
 | `ended_at`       | nullable while running                                         |
@@ -260,19 +324,19 @@ Every automated run: search or apply (REQ-PLAT-03). Scoring is not a separate ru
 | `outcome_counts` | e.g. `{new_posts: 12, updated: 3}` — REQ-PLAT-03               |
 | `error_detail`   | nullable, REQ-PLAT-03                                          |
 
-A search run is always track-scoped. An apply run can span leads queued across multiple tracks, so `track_id` may be null there. `trigger_source` distinguishes a run the user started (REQ-SRCH-02) from one the scheduler fired (REQ-SRCH-11); apply runs are always `manual` in `010`, since nothing schedules them. `status` gains no `skipped` value: a scheduled trigger that collided with an in-flight run never started a run, so it writes no row here at all (`ARCH-SCHED-05`).
+Each run belongs to one user, and at most one run of each type per user is `running` at a time (`ARCH-RUN-03`). A search run is always track-scoped. An apply run can span leads queued across multiple tracks, so `track_id` may be null there. `trigger_source` distinguishes a run the user started (REQ-SRCH-02) from one the scheduler fired (REQ-SRCH-11); apply runs are always `manual` in `010`, since nothing schedules them. `status` gains no `skipped` value: a scheduled trigger that collided with an in-flight run never started a run, so it writes no row here at all (`ARCH-SCHED-05`).
 
-### `session`
+### `mcf_session`
 
-Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPLY-06). The cookie payload itself is treated as sensitive material handled like `jobsearch`'s `cookies_mcf.json`. It is stored as a local file/blob the backend reads, referenced rather than embedded from this row, consistent with the project boundary against committing real session exports.
+One row per user tracking that user's uploaded MCF session credential (Workflow 8, REQ-APPLY-06). The cookie payload itself is treated as sensitive material handled like `jobsearch`'s `cookies_mcf.json`. It is stored as a local file the backend reads, one per user, referenced rather than embedded from this row, consistent with the project boundary against committing real session exports.
 
 | field         | notes                                                                      |
 | ------------- | -------------------------------------------------------------------------- |
-| `id`          | singleton                                                                  |
-| `user_id`     | FK → `user`                                                                |
-| `status`      | `valid` \| `expired` \| `missing`                                          |
+| `id`          | PK                                                                         |
+| `user_id`     | unique FK → `user`, one row per user, created at sign-up                   |
+| `status`      | `valid` \| `expired` \| `missing`, `missing` until the first upload        |
 | `uploaded_at` | when the user last uploaded a cookie                                       |
-| `cookie_ref`  | opaque reference to where the payload is stored (not the raw cookie value) |
+| `cookie_ref`  | filename of the stored payload, never the raw cookie value                 |
 
 ## Design notes
 
@@ -280,7 +344,9 @@ Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPL
 - `run_log` unifies search and apply run logging into one table (`run_type` discriminator) rather than two, since both need the same start/end/outcome/error shape (REQ-PLAT-03).
 - `track.is_active` follows the same soft-delete shape as `post.is_open` — a bool flip rather than a row deletion, so archived tracks keep every dependent row (`post_track`, `lead`, `application`) intact.
 - `lead_event` makes lead activity an append-only log rather than a single mutable `updated_at` column, mirroring why `application` is one-to-many from `lead` rather than a single overwritten row (REQ-APPLY-08). Both exist so retry/activity history survives rather than being clobbered by the next update.
-- `user` exists so `track`, `cv`, and `session` can carry an explicit `user_id` rather than an implicit single-user assumption baked into application code. 010 still seeds exactly one row and adds no auth or per-request identity resolution. The column names the boundary. It does not activate multi-tenancy.
+- ownership is a `user_id` column on `track`, `cv`, `lead`, `run_log`, and `mcf_session`. Every other table reaches its owner through one of those, `search_profile`, `search_schedule`, `post_track`, and `match_score` through the track, and `lead_note`, `lead_event`, `offer`, and `application` through the lead. `lead` carries its own `user_id` so the one-lead-per-user-per-post rule is a plain unique constraint. The `post` table has no owner, and `role` is a shared catalog.
+- `lead` holds copies of the post's display fields rather than reading them through a join, so a user edits the lead and the shared post stays read-only. The copy happens once at creation.
+- `auth_session` stores a token digest rather than the token, and `mcf_session` is a separate table because the two sessions serve unrelated purposes.
 - `match_score` is split out of `post_track` as its own 1:1 extension, the same shape `search_profile` already uses against `track`. This keeps the association and the scoring result independently replaceable, so a rescoring pass can update `match_score`/`score_method` without touching `post_track`'s `search_match` provenance flag.
 - `lead_note` replaces the single `lead.notes` field with an append-only history table, the same shape as `lead_event`, so a lead can carry more than one note over its lifetime instead of the latest edit overwriting every earlier one. Adding a `lead_note` still writes a paired `lead_event(event_type='note_edited')` row, so the unified activity timeline is unaffected.
 - scheduled runs (REQ-SRCH-11) are modeled as `search_schedule`, a 1:1 extension of `track` the same shape as `search_profile`, plus one discriminator on `run_log`. A schedule has no lifecycle independent of the track it belongs to, exactly as `search_profile` has none, so it gets the same 1:1-extension treatment. The consequence that matters downstream: REQ-SRCH-11 adds no write hook and no named endpoint — `search_schedule` is `API-CAT-01` pure generic, the same shape `search_profile` already uses. `ARCH-SCHED-01..06` cover the runtime side.
@@ -289,12 +355,15 @@ Singleton row tracking the uploaded MCF session credential (Workflow 8, REQ-APPL
 
 `schema.sql` is hand-maintained with no migration chain (`ARCH-STO-02`), so each change to this document that reaches the database is recorded as a `meta.schema_version` bump rather than as a migration file. The table is the changelog.
 
-| id | version | milestone | change                                                               |
-| -- | ------- | --------- | --------------------------------------------------------------------- |
-| 01 | 1       | 07        | `meta` only — milestone-07 placeholder                                 |
-| 02 | 2       | 08        | the 13-table release-010 data model                                    |
-| 03 | 3       | 08        | adds `user`, `match_score`, `lead_note`, `user_id` ownership columns   |
-| 04 | 4       | 09        | adds `search_schedule` table, `field_edited` in `lead_event.event_type` |
-| 05 | 5       | 10        | adds `run_log.trigger_source`                                          |
+| id | version | milestone | change                                                                        |
+| -- | ------- | --------- | ----------------------------------------------------------------------------- |
+| 01 | 1       | 07        | `meta` only — milestone-07 placeholder                                        |
+| 02 | 2       | 08        | the 13-table release-010 data model                                           |
+| 03 | 3       | 08        | adds `user`, `match_score`, `lead_note`, `user_id` ownership columns          |
+| 04 | 4       | 09        | adds `search_schedule` table, `field_edited` in `lead_event.event_type`       |
+| 05 | 5       | 09        | adds `lead_event.stage_from` and `lead_event.stage_to`                        |
+| 06 | 6       | 09        | `lead.expected_salary_sgd`, `offer`, six stage values, `dropped` close reason |
+| 07 | 7       | 13        | accounts, `auth_session`, `mcf_session`, `lead.user_id`, `run_log.user_id`    |
+| 08 | 8       | 10        | adds `run_log.trigger_source`                                                 |
 
-Version 4 is implemented by milestone 09 and version 5 is specified here for milestone 10 to implement. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).
+Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, and version 8 is specified for milestone 10 to implement. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).

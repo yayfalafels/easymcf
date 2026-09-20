@@ -6,14 +6,15 @@
 - [Out of scope](#out-of-scope)
 - [References](#references)
 - [Guiding principle](#guiding-principle)
-- [Component silos](#component-silos) — `STRAT-SILO-01..07`
+- [Component silos](#component-silos) — `STRAT-SILO-01..08`
   - [Data model / db silo](#data-model--db-silo)
   - [Backend API silo](#backend-api-silo)
   - [Automation silo (scraping + apply)](#automation-silo-scraping--apply)
   - [Frontend silo](#frontend-silo)
+  - [Authentication and ownership silo](#authentication-and-ownership-silo)
 - [Strategic decisions: what test cases get written](#strategic-decisions-what-test-cases-get-written) — `STRAT-CASE-*`
 - [The agent's silo-aware build→test→debug loop](#the-agents-silo-aware-buildtestdebug-loop) — `STRAT-LOOP`
-- [Standalone validation utilities](#standalone-validation-utilities) — `STRAT-TOOL-01..04`
+- [Standalone validation utilities](#standalone-validation-utilities) — `STRAT-TOOL-01..05`
 - [Human validation (secondary confirmation)](#human-validation-secondary-confirmation) — `STRAT-HUMAN-01/02`
 
 ## Purpose
@@ -33,13 +34,13 @@ Decisions carry a `STRAT-*` id, grouped as `SILO`, `CASE`, or `LOOP`, mirroring 
 - Restating `ARCH-TEST-01..08`'s tier mechanics, isolation strategy, pytest configuration, or fixture corpus layout. Read the **architecture** doc directly. This document only adds the silo layer and the case-selection reasoning on top.
 - The concrete enumeration of test cases per requirement. That is milestone 03, the test-cases milestone, which this document is the direct input to.
 - A JS unit-test tier such as Karma or Jasmine. `ARCH-TEST-05` already rejects this for `010`. The frontend silo proposed above, `STRAT-SILO-07`, is Playwright-based specifically so no node or npm build toolchain is introduced, per `ARCH-RUN-06`.
-- Performance and load testing. `010` is a single local user, so this is not a meaningful category of risk for this release.
+- Performance and load testing. `010` is a local app with a handful of accounts, so this is not a meaningful category of risk for this release.
 
 ## References
 
-- **requirements** [010-01-requirements.md](010-01-requirements.md): REQ-DEV-03..05 define the three test protocols this strategy operationalizes, backend-only, mock e2e, and live. Every `REQ-*` in the functional sections is what test cases, milestone 03, trace back to.
+- **requirements** [010-01-requirements.md](010-01-requirements.md): REQ-DEV-03..06 define the test protocols this strategy operationalizes, backend-only, mock e2e, live MCF, and live Google sign-in. Every `REQ-*` in the functional sections is what test cases, milestone 03, trace back to.
 - **architecture** [010-architecture.md](010-architecture.md): `ARCH-TEST-01..08` already fix the tiering across backend, mock e2e, and live tiers, pytest as the single test runner, state isolation via a temp SQLite database per session, the fixture corpus layout, and the agent build→test→debug command table. This document does not re-decide any of that.
-- **data model** [010-data-model.md](010-data-model.md): the entities the data-model silo below operates on: `user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `session`.
+- **data model** [010-data-model.md](010-data-model.md): the entities the data-model silo below operates on: `user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `mcf_session`, and `auth_session`.
 - **prototype extraction** [010-prototype.md](010-prototype.md): the named `jobsearch` defect this strategy requires a regression test against, `updateOpenExpired()`'s unconditional status overwrite.
 - **deploy-and-validation-cycle skill** `.claude/skills/deploy-and-validation-cycle/SKILL.md`: the manual golden-path checklist this strategy's automated silos are meant to make redundant, tier by tier, as milestone 07 lands.
 - **playwright skill** [playwright](../../../.claude/skills/playwright/SKILL.md): explicit-wait guidance for automation-silo and frontend-silo test cases.
@@ -52,7 +53,7 @@ This is what makes the loop closed for an AI agent. A component-silo test gives 
 
 **STRAT-01** Every component below has a dedicated silo: a way to exercise and validate its behavior directly, with no other component's correctness as a dependency, and no live network call. Where `ARCH-TEST-01..08` already fully specifies a silo's mechanics, this document points to it rather than re-deciding it. Where a gap exists, such as a frontend silo isolated from the real backend, this document proposes the addition.
 
-**STRAT-02** Full end-to-end testing, mock e2e per `ARCH-TEST-04`, is the **final confirmation step**, run after the relevant silos pass. It is not the primary tool for discovering a functional defect. The live tier, `ARCH-TEST-06`, is narrower still: a human-gated markup-drift smoke check, never a functional-correctness tool and never part of an agent's autonomous loop.
+**STRAT-02** Full end-to-end testing, mock e2e per `ARCH-TEST-04`, is the **final confirmation step**, run after the relevant silos pass. It is not the primary tool for discovering a functional defect. The live tier, `ARCH-TEST-06`, is narrower still: a human-gated markup-drift smoke check for MCF and a human-gated Google sign-in check, never a functional-correctness tool and never part of an agent's autonomous loop.
 
 ## Component silos
 
@@ -68,7 +69,7 @@ This lets a schema or data-model change be validated **before** any service, API
 
 **STRAT-SILO-03** Endpoint test cases are expressed as data: `tests/backend/cases/*.json`, one file per table or feature area, each entry carrying `name`, `req_id` for traceability back to the **requirements** doc, `method`, `path`, `params`, `body`, `headers`, and an `expect` block with `status` and either a `body_contains` or a JSON-path value check. A single harness, `tests/backend/test_api_cases.py`, parametrizes pytest over every case in the directory. Adding a test case means editing JSON rather than writing a new Python function, which keeps the case count that milestone 03 produces from becoming a maintenance burden.
 
-The harness executes cases against Flask's **test client**, per `ARCH-TEST-03`'s decision. This avoids a spawned process or a port, and gives tracebacks straight from the failing line, and it is what the automated tier-1 loop runs. The same case format is also replayable by `scripts/api_tester.py`, a thin swap of the test client for the `requests` library against an already-running `python -m easymcf` instance. This is useful when a developer or agent has the dev server up and wants to poke a single endpoint interactively, and it is the `requests`-based tool the CRM/apply/platform skills' "hit the affected endpoint directly" guidance in `deploy-and-validation-cycle` refers to. This interactive mode is a convenience rather than part of the automated closed loop. `pytest -m backend` via the test client is the automated closed loop.
+The harness executes cases against Flask's **test client**, per `ARCH-TEST-03`'s decision, signed in as seeded user 1 unless a case names another user with `as_user` (`STRAT-SILO-08`). This avoids a spawned process or a port, and gives tracebacks straight from the failing line, and it is what the automated tier-1 loop runs. The same case format is also replayable by `scripts/api_tester.py`, a thin swap of the test client for the `requests` library against an already-running `python -m easymcf` instance. This is useful when a developer or agent has the dev server up and wants to poke a single endpoint interactively, and it is the `requests`-based tool the CRM/apply/platform skills' "hit the affected endpoint directly" guidance in `deploy-and-validation-cycle` refers to. This interactive mode is a convenience rather than part of the automated closed loop. `pytest -m backend` via the test client is the automated closed loop.
 
 **STRAT-SILO-04** Case coverage per endpoint shape follows `easymcf-backend-api`'s checklist.
 
@@ -77,6 +78,8 @@ The harness executes cases against Flask's **test client**, per `ARCH-TEST-03`'s
 03. a `404` for a missing record id
 04. a `404` for an unknown table name
 05. a happy-path `200` or `201` with the expected body shape
+06. a `401` with no sign-in session
+07. a `404` for a record owned by another user
 
 This is written once as a template of cases and instantiated per table. REQ-PLAT-01 calls for generic CRUD over bespoke endpoints, and this silo mirrors that with generic test cases instantiated per table instead of bespoke assertions written separately for each one.
 
@@ -92,11 +95,20 @@ This is written once as a template of cases and instantiated per table. REQ-PLAT
 
 This isolates controller, template, and rendering logic, such as a run's status badge reflecting `run_log.status`, an error banner appearing on a failed-run response, or a lead card's tab following its stage, from whether the real backend and database produced that response correctly. A frontend rendering bug and a backend logic bug now fail in different tiers instead of the same one. `ARCH-TEST-05`'s full-stack tier remains the integration confirmation once both silos pass.
 
+### Authentication and ownership silo
+
+**STRAT-SILO-08** Authentication and per-user ownership have their own silo, since a leak there is invisible to every other silo. Four rules define it.
+
+01. every test that needs a user signs in through the real sign-in endpoint as a seeded account listed in `tests/support/users.json`. The app has no authentication bypass switch, so the path under test is the path every test uses.
+02. two seeded users with distinct data exist in every database, so an ownership defect always has a second user to leak to. `db_util.py` seeds and asserts directly, bypassing the API, for the same independence `STRAT-SILO-02` gives any other API assertion.
+03. Google sign-in is replaced at the network boundary by a stub identity provider under `tests/support/`, following `ARCH-TEST-04`'s pattern for MCF. The real Authlib flow, cookie handling, and account linking run against tokens the stub signs, and one scenario per failure kind is selectable from the email address entered at the stub's consent page.
+04. the ownership matrix is generated from the resource registry, so a resource added later without an ownership declaration fails the matrix.
+
 ## Strategic decisions: what test cases get written
 
 **STRAT-CASE-01 Traceability.** Every `REQ-*` line item in `010-01-requirements.md` has at least one test case somewhere in the case config, whether `tests/backend/cases/*.json`, an automation fixture scenario, or a frontend fixture scenario, tagged with that requirement's id. Milestone 04, the test-cases milestone, is the enumeration of this mapping. A requirement with no `req_id` appearing anywhere in the case configs counts as an untested requirement rather than an implicit pass.
 
-**STRAT-CASE-02 State machines get full transition tables.** The lead status/stage machine, REQ-CRM-02 and the glossary, and the apply-status vocabulary, REQ-APPLY-04, are the two places `010` has the most behavioral surface area. Test cases enumerate every valid transition reachable from every open stage to `CLOSED` with each close reason, per the REQ-CRM section's close-reason table. They also cover REQ-CRM-05's auto-expiry, the correction to the **prototype extraction**'s `updateOpenExpired()`: a lead with `status='OPEN'` at any stage from `PROSPECT` through `OFFER` closes as `expired` once the injectable clock, `ARCH-STO-05`, passes its system-maintained `deadline`, and a lead with `status='CLOSED'` keeps its recorded state.
+**STRAT-CASE-02 State machines get full transition tables.** The lead status/stage machine, REQ-CRM-02 and the glossary, and the apply-status vocabulary, REQ-APPLY-04, are the two places `010` has the most behavioral surface area. Test cases enumerate every valid transition reachable from every open stage to `CLOSED` with each close reason, per the REQ-CRM section's close-reason table. They also cover REQ-CRM-05's auto-expiry, the correction to the **prototype extraction**'s `updateOpenExpired()`: a lead with `status='OPEN'` at any stage from `TOAPPLY` through `OFFER` closes as `expired` once the injectable clock, `ARCH-STO-05`, passes its system-maintained `deadline`, and a lead with `status='CLOSED'` keeps its recorded state. They also cover the offer status machine (REQ-CRM-10): an `open` offer moves to `accepted`, `rejected`, `withdrawn`, or `expired` and closes its lead with the mapped reason, and a lead closed from an offer re-opens at `INTERVIEW`.
 
 **STRAT-CASE-03 Every threshold gets boundary-value cases.** Every numeric or time threshold in the requirements gets a case on both sides of the boundary. Examples include REQ-CRM-05's 28-day expiry, where a lead at `CALLBACK` or later with its last activity 27 days ago stays open and one at 29 days closes, a pair `ARCH-STO-05`'s seed-data guidance already names. REQ-SRCH-01's `max_age_weeks` and `min_match_score` screening cutoffs, and REQ-SRCH-03's pagination termination, where a search's last page returns zero cards, follow the same pattern.
 
@@ -107,6 +119,8 @@ This isolates controller, template, and rendering logic, such as a run's status 
 **STRAT-CASE-06 Determinism over realism where they conflict.** No test case may depend on wall-clock time, a live network call, or a `sleep()`-based wait. `ARCH-STO-05`'s `clock.py::now()` indirection is mandatory for anything expiry- or age-related, and the **playwright skill**'s explicit-wait guidance applies to every automation-silo and frontend-silo case. A test that passes only "usually" is a defect in the test, per `ARCH-TEST-08`.
 
 **STRAT-CASE-07 Silo-first authoring order for new work.** When a functional milestone from 09 to 11 implements a requirement, its test cases are written in silo order, cheapest and most logic-proximate first: a data-model case for schema or constraints, then a backend-API or automation-silo case for service logic, then a frontend-silo case for rendering, and finally a mock e2e case, added only if the requirement has cross-component wiring worth confirming beyond what the silos already proved. REQ-FE-02's run-status polling is one such case, since it genuinely spans the backend run thread and the frontend poll loop. Not every requirement needs a mock e2e case. One is added only where silo coverage alone would leave a real integration risk unverified.
+
+**STRAT-CASE-08 Ownership leaks are a named regression class.** Every registered resource is exercised as the second user against the first user's row for each verb, and every result must be a `404` or an empty list. The case is generated from the registry, so it needs no edit when a resource is added and fails one that is unscoped. Every named endpoint that takes an id, a run trigger, or a queue also gets a case as the second user. The password policy, the session lifetime, the sign-in rate limit, and the photo size limit each get a case on both sides of the boundary per `STRAT-CASE-03`, and a Google identity with an unverified email gets a case that proves it neither creates nor links an account.
 
 ## The agent's silo-aware build→test→debug loop
 
@@ -137,6 +151,8 @@ _why narrowest first_
 **STRAT-TOOL-03** `api_tester.py`'s exact-equality matching (`expected_status`/`expected_body`) proves what the HTTP response contains. What a write persisted, for example that a `PUT /api/v1/lead/{id}` transition wrote the right `lead_event.event_type`, belongs to `STRAT-SILO-02`'s direct-inspection layer: `scripts/db_util.py` queried against the same database the request just wrote to.
 
 **STRAT-TOOL-04** Each layer checks independently of the layers before it, per the tracker-pattern skill, so a utility's own `PASS`/`FAIL`/`ERROR` claim gets a second, independent confirmation. A functional milestone's Test cases section pairs every `api_tester.py`/`ui_tester.py` case with at least one independent layer, direct `db_util.py` inspection or a hard-coded-expectation pytest oracle extending an existing module (`010.08`'s `tests/backend/test_seed_data.py` precedent), for every check beyond a request/response shape: state-machine legality, an auto-expiry boundary, an enum's full coverage.
+
+**STRAT-TOOL-05** Both utilities can act as a named seeded user. A case or check carries an optional `as_user`, and the tool holds one cookie jar per name and signs in on first use. Cases without it share one anonymous session across the file, so a sign-up, sign-in, and sign-out sequence keeps its cookie between cases. `api_tester.py` also accepts `follow_redirects`, `expected_headers`, `expected_cookie`, and `files` fields for redirect, header, cookie, and upload assertions. `ui_tester.py` gains an `upload` op and a `url_path_equals` expect op. A failed sign-in classifies the case `ERROR`, since its assertions never ran.
 
 ## Human validation (secondary confirmation)
 

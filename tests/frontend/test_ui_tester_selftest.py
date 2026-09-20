@@ -45,7 +45,7 @@ def _run_ui_tester(api_mode: str, label: str, name: str | None = None) -> tuple[
 def test_real_mode_outcomes_and_screenshots():
     exit_code, records = _run_ui_tester("real", "12.TC.real")
     by_name = {r["case"]: r for r in records}
-    assert by_name["selftest — env-status heading renders"]["outcome"] == "PASS"
+    assert by_name["selftest — leads column heading renders"]["outcome"] == "PASS"
 
     fail_record = by_name["selftest — deliberately wrong expected heading text"]
     assert fail_record["outcome"] == "FAIL"
@@ -60,13 +60,13 @@ def test_real_mode_outcomes_and_screenshots():
 
 @pytest.mark.frontend
 def test_mocked_mode_wiring_smoke():
-    """Known limitation (010.12 Design section): env-status makes no /api
-    call, so this only proves --api-mode mocked doesn't error out wiring
-    page.route() — not that a mocked response diverges from a real one.
-    Closes once milestone 09 adds the first API-backed screen. Runs only the
+    """Known limitation (010.12 Design section): no fixtures file exists, so the
+    Leads page's /api calls fall through to the real backend, and this only proves
+    --api-mode mocked doesn't error out wiring page.route() — not that a mocked
+    response diverges from a real one. Runs only the
     PASS check by name — the FAIL/ERROR checks are already covered in real
     mode above, and this test's job is only to prove the mocked-mode flag
     doesn't itself break wiring, not to re-run the full batch a second time."""
-    exit_code, records = _run_ui_tester("mocked", "12.TC.mocked", name="selftest — env-status heading renders")
+    exit_code, records = _run_ui_tester("mocked", "12.TC.mocked", name="selftest — leads column heading renders")
     assert records[0]["outcome"] == "PASS"
     assert exit_code == 0

@@ -18,7 +18,7 @@ Every spreadsheet tab and menu action the `jobsearch` prototype relied on (see [
 - **Track / search-profile configuration** — create/edit tracks, each with its search profile (keywords, salary, age, employment type). See [easymcf-jobs-pipeline](../easymcf-jobs-pipeline/SKILL.md).
 - **Posting / results browsing** — postings with per-track match scores, for prioritization.
 - **Pipeline / lead management by status** — the CRM board/list driven by lead status. See [easymcf-crm](../easymcf-crm/SKILL.md).
-- **Apply-queue review and results** — queue leads for an apply run, and review recorded outcomes. See [easymcf-apply](../easymcf-apply/SKILL.md).
+- **Apply-queue review and results** — prune the apply queue (the `TOAPPLY` leads) with batch `Apply` and `Drop`, and review recorded outcomes. See [easymcf-apply](../easymcf-apply/SKILL.md).
 
 ## Run status surfacing (REQ-FE-02)
 

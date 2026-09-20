@@ -1,31 +1,31 @@
 [
   {
-    "name": "selftest — env-status heading renders",
-    "route": "/",
-    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"env-status-heading\"]" }],
+    "name": "selftest — leads column heading renders",
+    "route": "/leads",
+    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"leads-column-TOAPPLY\"] h2" }],
     "expect": [
       {
         "op": "text_equals",
-        "selector": "[data-testid=\"env-status-heading\"]",
-        "value": "Easy MCF — local dev environment ready"
+        "selector": "[data-testid=\"leads-column-TOAPPLY\"] h2",
+        "value": "TOAPPLY"
       }
     ]
   },
   {
     "name": "selftest — deliberately wrong expected heading text",
-    "route": "/",
-    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"env-status-heading\"]" }],
+    "route": "/leads",
+    "actions": [{ "op": "wait_for", "selector": "[data-testid=\"leads-column-TOAPPLY\"] h2" }],
     "expect": [
       {
         "op": "text_equals",
-        "selector": "[data-testid=\"env-status-heading\"]",
+        "selector": "[data-testid=\"leads-column-TOAPPLY\"] h2",
         "value": "this text will never render"
       }
     ]
   },
   {
     "name": "selftest — nonexistent selector times out",
-    "route": "/",
+    "route": "/leads",
     "actions": [{ "op": "wait_for", "selector": "[data-testid=\"this-does-not-exist\"]", "timeout_ms": 2000 }],
     "expect": []
   }

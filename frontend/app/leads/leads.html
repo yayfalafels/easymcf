@@ -34,7 +34,8 @@
   <div ng-repeat="stage in vm.tab.stages" data-testid="leads-column-{{stage}}">
     <h2>{{stage}}</h2>
     <div ng-repeat="l in vm.inStages([stage])" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
-      <strong>{{vm.title(l)}}</strong><span>{{vm.company(l)}}</span>
+      <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
+      <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong><span>{{vm.company(l)}}</span>
       <span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span>
     </div>
   </div>

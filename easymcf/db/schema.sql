@@ -4,12 +4,15 @@
 -- ownership columns on `track`/`cv`/`session` (see docs/releases/010/design/010-data-model.md).
 -- schema_version 4 adds `search_schedule` and `field_edited` in lead_event.event_type
 -- (see docs/releases/010/design/010-data-model.md, Schema versions).
+-- schema_version 5 adds `stage_from` and `stage_to` to lead_event (REQ-CRM-08).
+-- schema_version 6 (task 09.13) drops PROSPECT from the stage values, adds `dropped` to
+-- lead.close_reason, adds lead.expected_salary_sgd (REQ-CRM-09), and adds `offer` (REQ-CRM-10).
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (4);
+INSERT INTO meta (schema_version) VALUES (6);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -110,14 +113,15 @@ CREATE TABLE lead (
     post_id TEXT NOT NULL UNIQUE REFERENCES post(id),
     track_id INTEGER NOT NULL REFERENCES track(id),
     status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
-    stage TEXT NOT NULL CHECK (stage IN ('PROSPECT', 'TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
-    close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed')),
+    stage TEXT NOT NULL CHECK (stage IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
+    close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped')),
     title_override TEXT,
     company_override TEXT,
     deadline TEXT,
     applied_date TEXT,
     first_attempt_date TEXT,
     last_contact_date TEXT,
+    expected_salary_sgd INTEGER CHECK (expected_salary_sgd IS NULL OR expected_salary_sgd >= 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -137,9 +141,26 @@ CREATE TABLE lead_event (
     lead_id INTEGER NOT NULL REFERENCES lead(id),
     event_type TEXT NOT NULL CHECK (event_type IN ('stage_change', 'contact_logged', 'note_edited', 'deadline_changed', 'field_edited')),
     detail TEXT,
-    occurred_at TEXT NOT NULL
+    stage_from TEXT CHECK (stage_from IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
+    stage_to TEXT NOT NULL CHECK (stage_to IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
+    occurred_at TEXT NOT NULL,
+    CHECK ((event_type = 'stage_change' AND stage_from IS NOT stage_to)
+        OR (event_type <> 'stage_change' AND stage_from IS stage_to))
 );
 CREATE INDEX idx_lead_event_lead_id ON lead_event(lead_id);
+
+CREATE TABLE offer (
+    id INTEGER PRIMARY KEY,
+    lead_id INTEGER NOT NULL REFERENCES lead(id),
+    offer_date TEXT NOT NULL,
+    deadline TEXT,
+    amount_sgd INTEGER NOT NULL CHECK (amount_sgd > 0),
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'accepted', 'rejected', 'withdrawn', 'expired')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_offer_lead_id ON offer(lead_id);
+CREATE UNIQUE INDEX ux_offer_open ON offer(lead_id) WHERE status = 'open';
 
 CREATE TABLE application (
     id INTEGER PRIMARY KEY,

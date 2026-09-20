@@ -7,10 +7,9 @@ from datetime import date, timedelta
 from .. import clock
 from ..errors import Conflict, RecordNotFound, ValidationFailed
 
-STAGES = ("PROSPECT", "TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED")
-CLOSE_REASONS = ("offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed")
+STAGES = ("TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED")
+CLOSE_REASONS = ("offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed", "dropped")
 TRANSITIONS = {
-    "PROSPECT": {"TOAPPLY", "CLOSED"},
     "TOAPPLY": {"APPLIED", "CLOSED"},
     "APPLIED": {"CALLBACK", "CLOSED"},
     "CALLBACK": {"INTERVIEW", "CLOSED"},
@@ -45,10 +44,12 @@ def _load(db, lead_id: int):
     return row
 
 
-def _event(db, lead_id: int, event_type: str, detail: str, at: str) -> None:
+def _event(db, lead_id: int, event_type: str, detail: str | None, at: str,
+           stage_from: str | None, stage_to: str) -> None:
     db.execute(
-        "INSERT INTO lead_event (lead_id, event_type, detail, occurred_at) VALUES (?, ?, ?, ?)",
-        (lead_id, event_type, detail, at),
+        "INSERT INTO lead_event (lead_id, event_type, detail, stage_from, stage_to, occurred_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (lead_id, event_type, detail, stage_from, stage_to, at),
     )
     db.execute("UPDATE lead SET updated_at = ? WHERE id = ?", (at, lead_id))
 
@@ -65,7 +66,8 @@ def _refresh_deadline(db, lead_id: int, at: str) -> None:
     target = (clock.today() + timedelta(days=ROLLING_DAYS)).isoformat()
     if lead["deadline"] != target:
         _write(db, lead_id, {"deadline": target})
-        _event(db, lead_id, "deadline_changed", f"deadline: {lead['deadline']} -> {target}", at)
+        _event(db, lead_id, "deadline_changed", f"deadline: {lead['deadline']} -> {target}", at,
+               lead["stage"], lead["stage"])
 
 
 def promote(db, body: dict) -> int:
@@ -81,10 +83,10 @@ def promote(db, body: dict) -> int:
     deadline = initial_deadline(post, clock.today()).isoformat()
     lead_id = db.execute(
         "INSERT INTO lead (post_id, track_id, status, stage, deadline, created_at, updated_at) "
-        "VALUES (?, ?, 'OPEN', 'PROSPECT', ?, ?, ?)",
+        "VALUES (?, ?, 'OPEN', 'TOAPPLY', ?, ?, ?)",
         (body["post_id"], body["track_id"], deadline, at, at),
     ).lastrowid
-    _event(db, lead_id, "stage_change", "promoted to PROSPECT", at)
+    _event(db, lead_id, "stage_change", "promoted to TOAPPLY", at, None, "TOAPPLY")
     return lead_id
 
 
@@ -113,8 +115,8 @@ def update_lead(db, lead_id: int, body: dict) -> None:
     values = {**changed, **({"status": "CLOSED"} if closing else {})}
     at = clock.stamp()
     _write(db, lead_id, values)
-    detail = "; ".join(f"{k}: {lead[k]} -> {v}" for k, v in changed.items())
-    _event(db, lead_id, _event_type(changed), detail, at)
+    detail = "; ".join(f"{k}: {lead[k]} -> {v}" for k, v in changed.items() if k != "stage") or None
+    _event(db, lead_id, _event_type(changed), detail, at, lead["stage"], changed.get("stage", lead["stage"]))
     if "deadline" not in changed:
         _refresh_deadline(db, lead_id, at)
 
@@ -125,15 +127,15 @@ def add_note(db, body: dict) -> int:
     note_id = db.execute(
         "INSERT INTO lead_note (lead_id, note, created_at) VALUES (?, ?, ?)", (lead["id"], body["note"], at)
     ).lastrowid
-    _event(db, lead["id"], "note_edited", body["note"][:80], at)
+    _event(db, lead["id"], "note_edited", body["note"][:80], at, lead["stage"], lead["stage"])
     _refresh_deadline(db, lead["id"], at)
     return note_id
 
 
 def expire_due(db) -> None:
     today = clock.today().isoformat()
-    for row in db.execute("SELECT id FROM lead WHERE status = 'OPEN' AND deadline < ?", (today,)).fetchall():
+    for row in db.execute("SELECT id, stage FROM lead WHERE status = 'OPEN' AND deadline < ?", (today,)).fetchall():
         with db:
             at = clock.stamp()
             _write(db, row["id"], {"stage": "CLOSED", "status": "CLOSED", "close_reason": "expired"})
-            _event(db, row["id"], "stage_change", "auto-closed: deadline passed", at)
+            _event(db, row["id"], "stage_change", "auto-closed: deadline passed", at, row["stage"], "CLOSED")

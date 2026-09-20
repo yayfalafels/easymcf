@@ -1,7 +1,7 @@
 angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiClient', 'ConfirmDialog', 'ErrorService',
   function ($scope, $q, ApiClient, ConfirmDialog, ErrorService) {
     var d = this;
-    var NEXT = { PROSPECT: 'TOAPPLY', TOAPPLY: 'APPLIED', APPLIED: 'CALLBACK', CALLBACK: 'INTERVIEW', INTERVIEW: 'OFFER' };
+    var NEXT = { TOAPPLY: 'APPLIED', APPLIED: 'CALLBACK', CALLBACK: 'INTERVIEW', INTERVIEW: 'OFFER' };
     var EDITABLE = ['title_override', 'company_override', 'deadline', 'applied_date', 'first_attempt_date'];
     d.lead = angular.copy($scope.vm.selected);
     d.loaded = angular.copy(d.lead);
@@ -22,17 +22,27 @@ angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiC
       ApiClient.list('lead_note', { lead_id: d.lead.id }).then(function (rows) { d.notes = rows.reverse(); });
       $q.all([ApiClient.list('lead_event', { lead_id: d.lead.id }),
               ApiClient.list('application', { lead_id: d.lead.id })]).then(function (r) {
-        var events = r[0].map(function (e) { return { at: e.occurred_at, kind: e.event_type, text: e.detail }; });
+        var events = r[0].map(function (e) {
+          return { at: e.occurred_at, kind: e.event_type, text: e.detail, stageFrom: e.stage_from, stageTo: e.stage_to };
+        });
         var attempts = r[1].map(function (a) { return { at: a.attempted_at, kind: 'application', text: a.status }; });
         d.activity = events.concat(attempts).sort(function (a, b) { return a.at < b.at ? 1 : -1; });
       });
     }
+    function changed() {
+      reload();
+      $scope.vm.load();
+    }
+    d.stageLabel = function (a) {
+      if (a.stageFrom === a.stageTo) { return 'at ' + a.stageTo; }
+      return (a.stageFrom || 'new') + ' → ' + a.stageTo;
+    };
     function save(body) {
       return ApiClient.update('lead', d.lead.id, body).then(
         function (server) {
           d.fieldError = null;
           if (server.status === 'CLOSED') { $scope.vm.closeDetail(); return; }
-          reload();
+          changed();
         },
         function (r) { d.fieldError = ErrorService.fieldMessage(r); });
     }
@@ -46,7 +56,7 @@ angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiC
     d.hasPostUrl = function () { return /^https?:\/\/\S+$/i.test(d.lead.url_ref || ''); };
     d.savePostUrl = function () {
       ApiClient.update('post', d.lead.post_id, { url_ref: d.lead.url_ref || null }).then(
-        function () { d.fieldError = null; reload(); },
+        function () { d.fieldError = null; changed(); },
         function (response) { d.fieldError = ErrorService.fieldMessage(response); });
     };
 
@@ -63,7 +73,7 @@ angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiC
              first_attempt_date: d.lead.first_attempt_date || null });
     };
     d.addNote = function () {
-      ApiClient.create('lead_note', { lead_id: d.lead.id, note: d.noteText }).then(function () { d.noteText = ''; reload(); });
+      ApiClient.create('lead_note', { lead_id: d.lead.id, note: d.noteText }).then(function () { d.noteText = ''; changed(); });
     };
 
     reload();

@@ -74,6 +74,8 @@ This document follows the lowest-ceremony principle `ARCH-RUN`'s preamble states
 | 09 | python-dotenv   | keep   | optional personal `.env` overrides (`ENV-CFG-02`/`03`), not required |
 | 10 | pandas          | keep   | scoring/matching (`010-prototype.md`'s `match.py`)     |
 | 11 | numpy           | keep   | scoring/matching — unaffected                                       |
+| 12 | authlib         | add    | `ARCH-AUTH-01` — Google OpenID Connect authorization code flow      |
+| 13 | pillow          | add    | `ARCH-AUTH-07` — profile photo validation and re-encoding           |
 
 Applying this table is a `python-envs/ops-env/pyproject.toml` edit plus the sync command below. It is implementation work for milestone 07. `python-envs/dev-env/pyproject.toml` needs no change: `pytest`, `ipython`, `faker`, and `requests` already match what throwaway diagnostic/mock-data work needs.
 
@@ -115,7 +117,7 @@ This document fixes it as a shell rather than a full screen. Four files, hand-au
 01. `frontend/index.html` — the `ng-app` root from `FE-APP-01`'s tree. It loads `vendor/angular.min.js`, `vendor/angular-route.min.js`, `app/app.module.js`, `app/app.routes.js`, in that order, per `FE-APP-03`'s load-order rule, with a single `<div ng-view>` body.
 02. `frontend/app/app.module.js` — `angular.module('easymcfApp', ['ngRoute'])` per `FE-APP-02`, nothing else.
 03. `frontend/app/app.routes.js` — **one** route, `/` → `env-status`. `FE-RTE-01`'s route table gets its first real entry here, a placeholder default that milestones 09-11 repoint at whichever real screen becomes the app's landing page. There is no `/tracks`, `/leads`, and so on yet. Each of milestones 09-11 adds its own route entry as it builds that screen.
-04. `frontend/app/env-status/env-status.controller.js` + `env-status.html` — the one screen this milestone renders: static text confirming the shell is alive, for example `<h1 data-testid="env-status-heading">Easy MCF — local dev environment ready</h1>`, following `FE-TEST-01`'s `data-testid` convention, so the assertion below has a deliberate contract instead of reverse-engineering one from markup.
+04. `frontend/app/env-status/env-status.controller.js` + `env-status.html` — the one screen this milestone renders (milestone 09 removed it and repointed `/` at `/leads`, so the app opens on the Leads page): static text confirming the shell is alive, for example `<h1 data-testid="env-status-heading">Easy MCF — local dev environment ready</h1>`, following `FE-TEST-01`'s `data-testid` convention, so the assertion below has a deliberate contract instead of reverse-engineering one from markup.
 
 **Two independent health checks.**
 
@@ -168,12 +170,12 @@ The env variables toggled routinely during development:
 | 03 | `PORT`        | default `5000`      | only if `5000` is already bound (`ENV-TRBL-01`)        |
 | 04 | `HEADLESS`    | `1` (default)       | `0` only for a human visually debugging a selector     |
 
-**ENV-CFG-02** No `.env` file is required to run anything in this document. Every default in `ARCH-RUN-07`'s table is sufficient. A personal `.env`, already gitignored, may hold machine-local overrides a developer doesn't want to type repeatedly. It is never read for anything security-sensitive, since `.secrets/mcf_session.json` (`ARCH-BOT-03`) is the only credential material this project has, and `CLAUDE.md`'s boundary against reading/committing it in an automated context applies regardless of `.env`.
+**ENV-CFG-02** No `.env` file is required to run anything in this document. Every default in `ARCH-RUN-07`'s table is sufficient. A personal `.env`, already gitignored, may hold machine-local overrides a developer doesn't want to type repeatedly. It holds no secret material. The Google client id is not secret, and the credential files, the per-user MCF session files (`ARCH-BOT-03`), the Google client secret, and the cookie signing key (`ARCH-AUTH-06`), live in `.secrets/`. `CLAUDE.md`'s boundary against reading or committing them in an automated context applies regardless of `.env`.
 
 **ENV-CFG-03 Making `.env` actually do something, and what's tracked about it.** `ENV-CFG-02` says a personal `.env` *may* hold overrides. That's necessary but not sufficient. `python-dotenv` being an installed dependency (`ENV-SETUP-02` row 10) does not by itself make anything read `.env`, and nothing in this codebase calls it yet. Two things fix that.
 
 01. **Loading.** `easymcf/__main__.py` calls `dotenv.load_dotenv()` as its first statement, before `Config()` is instantiated. `load_dotenv()` populates `os.environ`, and `Config`'s `default_factory` fields (`ARCH-RUN-07`) already re-read `os.environ` on every call, so no change to `config.py` itself is needed, only the one call before the app starts. Every `scripts/*.py` CLI entry point (`ENV-SCRIPT-01..05`) that reads a config-relevant env var does the same at its own top. A script run directly never goes through `__main__.py`'s load, so it needs its own. Test entry points (`tests/conftest.py`, `pytest` itself) deliberately do **not** call `load_dotenv()`. `ARCH-TEST-01`'s state isolation already sets `DB_PATH`, and any other test-relevant var, explicitly per session. Loading a developer's personal `.env` into a test run would let a machine-local override silently change test behavior, exactly what that isolation exists to prevent.
-02. **The template.** A git-tracked `.env.example` at the repo root, `.env` itself stays gitignored per `ENV-CFG-02`, is the only reviewable record of what's actually available to override, since nobody can `git show` another developer's `.env`. One line per `ARCH-RUN-07` variable, set to its own default and annotated with its purpose. Copying the file verbatim to `.env` is a no-op, since every line already matches the built-in default, so a developer edits only the lines whose value they actually want to change, and can delete the rest:
+02. **The template.** A git-tracked `.env.example` at the repo root, `.env` itself stays gitignored per `ENV-CFG-02`, is the only reviewable record of what's actually available to override, since nobody can `git show` another developer's `.env`. One line per `ARCH-RUN-07` variable, set to its own default and annotated with its purpose. Copying the file verbatim to `.env` is a no-op for every default line, so a developer edits only the lines whose value they actually want to change, and can delete the rest. The Google lines hold placeholders that the developer replaces to enable Google sign-in:
 
 ```bash
 # .env.example — copy to .env, then edit only the values you want to override.
@@ -187,6 +189,11 @@ MCF_MODE=fixture          # fixture | live — never set live except on explicit
 HEADLESS=1                # 0 only for a human visually debugging a selector
 APPLY_POLL_RETRIES=5      # apply-button poll attempts before unable_to_apply 
 APPLY_POLL_DELAY_S=5      # seconds between apply-button poll attempts 
+
+GOOGLE_REDIRECT_URI=http://127.0.0.1:5000/api/v1/auth/google/callback   # must equal the OAuth client's registered URI
+GCP_OAUTH_CLIENT_ID=%%GCP_OAUTH_CLIENT_ID%%       # Google OAuth client id, not secret
+GCP_OAUTH_TEST_EMAIL=%%test_user%%@gmail.com      # test account for the live sign-in tier only
+# The client secret is never an environment variable. It lives in .secrets/gcp_oauth_client_secret (ARCH-AUTH-06).
 ```
 
 ## 3. Reusable, re-runnable scripts
@@ -215,8 +222,7 @@ For a human, or an agent doing a manual golden-path check per the **deploy-cycle
 ```bash
 env/bin/python -m easymcf &                        # background, per ARCH-RUN-01/07
 curl -sf http://127.0.0.1:5000/api/v1/health || echo "not ready"       # backend liveness, independent check
-# open http://127.0.0.1:5000 in an ordinary browser — the env-status page (ENV-SETUP-06)
-# is what's there once milestone 07 lands; a real screen once milestones 09-11 replace it
+# open http://127.0.0.1:5000 in an ordinary browser — it lands on the Leads page (/leads)
 # ... exercise the UI / hit endpoints via scripts/api_tester.py ...
 kill %1                                               # stop it when done
 ```

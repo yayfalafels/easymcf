@@ -22,7 +22,8 @@
   - [`lead_event`](#lead_event)
   - [`application`](#application)
   - [`run_log`](#run_log)
-  - [`session`](#session)
+  - [Second user fixtures](#second-user-fixtures)
+  - [`mcf_session`](#mcf_session)
 - [5. Two output modes, one generator](#5-two-output-modes-one-generator) — `TESTDATA-GEN-*`
 - [6. Open questions for milestone 08](#6-open-questions-for-milestone-08)
 
@@ -40,7 +41,7 @@ Decisions carry a `TESTDATA-*` id grouped `SRC`/`GAP`/`MAP`/`GEN`, mirroring the
 
 ## References
 
-- **data model**: [010-data-model.md](010-data-model.md) — the target entities (`user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `session`) every mapping below produces rows for.
+- **data model**: [010-data-model.md](010-data-model.md) — the target entities (`user`, `role`, `track`, `search_profile`, `cv`, `post`, `post_track`, `match_score`, `lead`, `lead_note`, `lead_event`, `application`, `run_log`, `mcf_session`) every mapping below produces rows for. `auth_session` seeds empty, since a sign-in session exists only after a real sign-in.
 - **workflows doc**: [010-workflows.md](010-workflows.md) — the process logic the **data model** was itself derived to support, referenced here only to explain this document's own relationship to the **data model**.
 - **architecture doc**: [010-architecture.md](010-architecture.md) `ARCH-STO-04..06` — seed is text SQL, dates are relative-to-load-time via a shift, and the minimum enumeration the seed set must cover.
 - **test-strategy doc**: [010-test-strategy.md](010-test-strategy.md) `STRAT-CASE-05` — closed vocabularies (apply-status codes, close reasons, `src_method`) each need at least one seeded row.
@@ -88,7 +89,7 @@ Each CSV corresponds to a stage or a view carved out of one:
 
 **TESTDATA-GAP-02 Apply attempts.** `apply-results.csv`, `apply-failed.csv`, and `apply-in-process.csv` are headers with zero data rows. The prototype's apply automation ran, but its output was apparently never committed back to the sheet, or the sheet was cleared before this export. The `010` `application` table therefore has **no real source data whatsoever**. What can be inferred: `applied-leads.csv`'s `applied` date column is a reliable signal that *a* successful apply happened, whether by the prototype's automation or manually. The generator derives one `application(status='applied')` row per such lead (`TESTDATA-MAP-06`). Every other one of REQ-APPLY-04's eight status codes (`questionnaire_required`, `cv_selector_error`, `unable_to_apply`, `post_unavailable`, `cv_not_found`, `post_closed`, `invalid_input`) has **zero real examples** and must be fabricated from scratch, clearly flagged as synthetic in the generator's own output/comments (`TESTDATA-GEN-04`).
 
-**TESTDATA-GAP-03 Pre-apply lead stages.** Every row in `applied-leads.csv` already has an `applied` date populated. By construction, the export only contains leads that were *already applied to*. There is consequently **no real example of a lead at stage `PROSPECT` or `TOAPPLY`**, REQ-CRM-02's first two stages, before an apply attempt exists. These must be synthesized: a handful of `post`/`post_track` rows promoted into `lead` rows with no `applied_date`, some left at `PROSPECT`, at least one moved to `TOAPPLY` with a queued, not-yet-run, `application` row so REQ-APPLY-11 (removing a queued application) has something to act on.
+**TESTDATA-GAP-03 Pre-apply lead stages.** Every row in `applied-leads.csv` already has an `applied` date populated. By construction, the export only contains leads that were *already applied to*. There is consequently **no real example of a lead at stage `TOAPPLY`**, REQ-CRM-02's first stage, before an apply attempt exists. These must be synthesized: a handful of `post`/`post_track` rows promoted into `lead` rows with no `applied_date`, left at `TOAPPLY` as the apply queue, at least one with a failed `application` attempt and its error, so REQ-APPLY-11 (dropping a lead from the queue) has something to act on.
 
 **TESTDATA-GAP-04 `post` detail-pass fields.** `industry_classification` and `mcf_ref`, REQ-SRCH-06's detail-pass fields, appear in no CSV at all. `screened.csv`'s `description` column is populated for only a minority of rows. These stay `NULL` in generated seed rows rather than being fabricated. They are optional detail fields, and a `NULL` is itself a legitimate, testable state: a post that hasn't had its detail pass completed yet.
 
@@ -107,7 +108,14 @@ For each target table: source file(s), field mapping, and the transform/inferenc
 
 ### `user`
 
-No source file. The prototype predates any user concept, one installation, one person. The generator emits exactly one fabricated `user` row, flagged synthetic, `id=1`, a placeholder `name`/`email`, and `status='active'`. Every `track`/`cv`/`session` row generated below carries `user_id=1`.
+No source file. The prototype predates any user concept, one installation, one person. The generator emits two fabricated `user` rows, both flagged synthetic and both `status='active'`.
+
+| id | `id` | `name`         | `email`                    | password                | holds                             |
+| -- | ---- | -------------- | -------------------------- | ----------------------- | --------------------------------- |
+| 01 | 1    | Taylor Hickem  | yayfalafels@gmail.com      | `Seed-Password-1!`      | every migrated row below          |
+| 02 | 2    | Sam Second     | second.user@example.test   | `Seed-Password-2!`      | the synthetic ownership fixtures  |
+
+`password_hash` is written in Werkzeug's scrypt format by calling `hashlib.scrypt` with a fixed per-user salt, so two generations are byte-identical and `check_password_hash` verifies the fake passwords above. Both passwords satisfy the password policy and are fake local test credentials, and a seeded database is never a production store. `google_sub` and `photo_ref` are `NULL`, so Google cases create their own linked identities through the stub provider. `created_at` is set relative to load time. Every migrated `track`, `cv`, `lead`, `run_log`, and `mcf_session` row below carries `user_id=1`, and the second user's synthetic rows carry `user_id=2` (`TESTDATA-MAP-09`).
 
 ### `role`
 
@@ -120,7 +128,7 @@ Source: `track-cv.csv` (`track_id`, `track`, `cv_version`).
 | target field | source | notes |
 | --- | --- | --- |
 | `id` | `track_id` | direct |
-| `user_id` | — | constant `1`, the sole generated `user` row |
+| `user_id` | — | constant `1` for every migrated track |
 | `role_id` | `track` (name) | FK lookup into generated `role` |
 | `seniority` | — | no source signal; set to a constant placeholder (`"mid"`) for every row — flagged as synthetic since the prototype never modeled seniority independently of role name |
 | `default_cv_id` | `cv_version` | FK lookup into generated `cv` (`TESTDATA-MAP` below) |
@@ -132,7 +140,7 @@ Source: `config.csv`, a single global row (`salary_min=10000`, `keywords="Data S
 
 ### `cv`
 
-Source: distinct `cv_version` values across `track-cv.csv` (`13.2`, `11.4`, `14.0`). `cv.label` is the version string verbatim. `cv.user_id` is a constant `1`, the sole generated `user` row. Three rows.
+Source: distinct `cv_version` values across `track-cv.csv` (`13.2`, `11.4`, `14.0`). `cv.label` is the version string verbatim. `cv.user_id` is a constant `1`. Three rows. The second user's synthetic CV is described in `TESTDATA-MAP-09`.
 
 ### `post`
 
@@ -212,13 +220,13 @@ Primary source: `applied-leads.csv`, enriched by `open.csv.stage` for currently-
 
 Note on `offer rejected`: `010`'s close-reason enum, REQ-CRM section, has no dedicated "candidate declined an offer" code. `withdrawn`, "user withdrew from consideration," is the closest fit and is used consistently for both this and explicit `withdrawal` rows. `cancelled` and `apply_failed` have **no real-data source at all**. Like `TESTDATA-GAP-02`/`03`, at least one of each must be synthesized to satisfy `STRAT-CASE-05`.
 
-**Multi-signal precedence.** A lead may have signals from more than one source, for example both an `open.stage` code and a `response-stages.csv` history. Since these are cumulative, reaching `INTERVIEW` implies `CALLBACK` already happened, the generator takes the **highest-progress** mapped stage across all available sources, ranked `PROSPECT < TOAPPLY < APPLIED < CALLBACK < INTERVIEW < OFFER < CLOSED`. For the terminal `close_reason` specifically, `applied-leads.status`, the archived CRM tab's own recorded reason, takes precedence over a `response-stages.csv` terminal event when both exist, since it's the field the user actually treated as authoritative in the prototype.
+**Multi-signal precedence.** A lead may have signals from more than one source, for example both an `open.stage` code and a `response-stages.csv` history. Since these are cumulative, reaching `INTERVIEW` implies `CALLBACK` already happened, the generator takes the **highest-progress** mapped stage across all available sources, ranked `TOAPPLY < APPLIED < CALLBACK < INTERVIEW < OFFER < CLOSED`. For the terminal `close_reason` specifically, `applied-leads.status`, the archived CRM tab's own recorded reason, takes precedence over a `response-stages.csv` terminal event when both exist, since it's the field the user actually treated as authoritative in the prototype.
 
-**TESTDATA-MAP-05 duplicate jobid → retry, not discard.** The 47 jobids appearing twice in `applied-leads.csv` (`TESTDATA-SRC-03`) are genuine re-application history, not export noise. Rather than fabricating a synthetic apply retry for `STRAT-SILO-06`'s "each apply outcome reachable" goal, the generator uses these directly: one `lead` row, taking the later/more-advanced of the two source rows as canonical since `lead.post_id` must be unique, with **two** `application` rows attached (`TESTDATA-MAP-06`). This is a real, naturally-occurring example of REQ-APPLY-08's "a retried attempt is a new row, not an overwrite," at no synthesis cost.
+**TESTDATA-MAP-05 duplicate jobid → retry, not discard.** The 47 jobids appearing twice in `applied-leads.csv` (`TESTDATA-SRC-03`) are genuine re-application history, not export noise. Rather than fabricating a synthetic apply retry for `STRAT-SILO-06`'s "each apply outcome reachable" goal, the generator uses these directly: one `lead` row, taking the later/more-advanced of the two source rows as canonical since `(user_id, post_id)` must be unique, with **two** `application` rows attached (`TESTDATA-MAP-06`). This is a real, naturally-occurring example of REQ-APPLY-08's "a retried attempt is a new row, not an overwrite," at no synthesis cost.
 
 Other field mappings, five groups.
 
-01. `title_override`/`company_override` map to `NULL` for every migrated row, since the prototype has no equivalent concept, so nothing was ever overridden.
+01. `user_id` is the constant `1`. `position_title`, `company_name`, and `url_ref` copy from the lead's generated `post` row, since the prototype has no lead-level edits, so no migrated lead differs from its post at generation time.
 02. `deadline`/`applied_date`/`first_attempt_date`/`last_contact_date` copy directly from `applied-leads.deadline`/`applied`/`1st attempt`/`last contact` (shifted where a date). `notes` no longer copies onto `lead` directly. See `lead_note` below.
 03. `track_id` comes from the `track` column, a direct numeric FK into `track-cv.csv`'s `track_id`.
 04. `created_at` comes from the earliest known activity date, `applied_date`, falling back to `posted_date` minus a small offset if even that's missing.
@@ -232,7 +240,7 @@ Source: `applied-leads.csv`'s `notes` column, one `lead_note` row per non-blank 
 
 Primary source: `response-stages.csv` (jobid, date, stage, notes), a literal activity log covering 210 jobids directly. `callbacks.csv`/`interviews.csv`/`offers.csv` are 100%-redundant filtered views of the same 210 jobids (`TESTDATA-SRC` inventory) and are not read separately.
 
-For the roughly 3268 leads with no `response-stages.csv` entry, the large majority, since most of the prototype's real activity logging was informal, living only in free-text `notes`/date columns, not the structured log, the generator synthesizes minimal `lead_event` rows from the lead's own populated date columns: `applied_date` produces one `stage_change` event (old→new: `PROSPECT`→`APPLIED`), `first_attempt_date`/`last_contact_date` produce `contact_logged` events, any terminal `close_reason` produces a final `stage_change` event to `CLOSED`. This is necessary, not optional. Without it, `lead.updated_at`, which REQ-CRM-05's 28-day auto-expiry keys off, per `ARCH-STO-05`, has no event backing it, and the UI's activity-history view would be empty for the majority of seeded leads.
+For the roughly 3268 leads with no `response-stages.csv` entry, the large majority, since most of the prototype's real activity logging was informal, living only in free-text `notes`/date columns, not the structured log, the generator synthesizes minimal `lead_event` rows from the lead's own populated date columns: `applied_date` produces one `stage_change` event (old→new: `TOAPPLY`→`APPLIED`), `first_attempt_date`/`last_contact_date` produce `contact_logged` events, any terminal `close_reason` produces a final `stage_change` event to `CLOSED`. This is necessary, not optional. Without it, `lead.updated_at`, which REQ-CRM-05's 28-day auto-expiry keys off, per `ARCH-STO-05`, has no event backing it, and the UI's activity-history view would be empty for the majority of seeded leads.
 
 `event_type` mapping: a `response-stages.stage` transition maps to `stage_change`, with `detail` set to the mapped target stage plus the source `notes` text, subject to the anonymization rule (`TESTDATA-GEN-05`). `occurred_at` is the source `date`, shifted.
 
@@ -254,9 +262,21 @@ No source data (`TESTDATA-GAP-01`). Entirely synthesized, two `run_type`s:
 
 `ARCH-STO-04` requires seed `run_log` rows in each status (`running`/`success`/`partial`/`failed`). Since no real run is ever mid-flight or fully failed in historical data, the generator adds one purely synthetic `run_log(status='running', ended_at=NULL)` and one `run_log(status='failed', error_detail=<placeholder>)`, both clearly synthetic and not linked to any real post/application.
 
-### `session`
+### Second user fixtures
 
-No source data. Real MCF session cookies are explicitly out of scope to ever hold, per CLAUDE.md's boundary. Seed emits a single singleton row with `status='missing'`, the safe default, since nothing in the seeded state implies apply automation can reach the live site, and `user_id` set to the constant `1`. Any test needing `status='valid'` inserts its own row directly via `db_util.py` (`STRAT-SILO-01`) rather than relying on seed data implying a working session exists.
+**TESTDATA-MAP-09 The second user's rows are synthetic and small.** Nothing in the prototype export belongs to a second person, so every row of user 2 is fabricated, flagged synthetic, and sized to exercise ownership rather than volume.
+
+01. one `cv` labeled `S-1`.
+02. two active `track` rows with `search_profile` rows and `search_schedule` rows that are disabled.
+03. four `lead` rows at `TOAPPLY`, `APPLIED`, `CALLBACK`, and `CLOSED`, each with `position_title`, `company_name`, and `url_ref` copied from its post, two `lead_note` rows, the `lead_event` chain each lead requires, and one `application` row.
+04. one `run_log` row with `user_id=2`, and one `mcf_session` row with `status='missing'`.
+05. shared posts, so visibility and per-user uniqueness are testable. One existing post is matched to a track of each user. One post is matched only to a track of user 2. User 2 holds a lead on a post that user 1 also holds a lead on.
+
+User 1's counts are those the migration produces, and user 2's counts are fixed at two tracks, four leads, two notes, and one CV, so a test can hard-code them.
+
+### `mcf_session`
+
+No source data. Real MCF session cookies are explicitly out of scope to ever hold, per CLAUDE.md's boundary. Seed emits one row per user, both with `status='missing'`, the safe default, since nothing in the seeded state implies apply automation can reach the live site, and with `user_id` set to `1` and `2`. Any test needing `status='valid'` inserts its own row directly via `db_util.py` (`STRAT-SILO-01`) rather than relying on seed data implying a working session exists.
 
 **TESTDATA-MAP-08 The global date-shift anchor.** `ARCH-STO-05` requires seed dates to be relative-to-load-time, not absolute. The source data's date columns already encode meaningful **day-count deltas** that later become test assertions. `callbacks.csv`'s `callback_days`, `interviews.csv`'s `call_int_days`/`app_int_days`, `offers.csv`'s `*_days` columns, and `open.csv`'s precomputed `age_days` are all differences between two dates in the same row. Shifting each date column independently, for example "make every `applied_date` 10 days ago" without correspondingly shifting `last_contact_date`, would destroy those deltas and could produce nonsensical rows, such as a callback dated before its lead was applied to. Instead, the generator computes **one** shift delta at generation time, `anchor = (today) - (latest date appearing anywhere in the source data)`, and applies that single delta to every date/timestamp field, in every table, uniformly. Relative gaps between dates are exactly preserved. Only the whole timeline's position relative to "now" moves. This is also what makes REQ-CRM-05's 28-day-expiry boundary cases (`STRAT-CASE-03`) land where the generator intends: a lead's real day-count gap since last activity is preserved by the shift, so picking source rows with the right historical gap is sufficient to seed both sides of the boundary without hand-computing dates.
 

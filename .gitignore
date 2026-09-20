@@ -12,6 +12,7 @@ easymcf.code-workspace
 
 # credentials
 .secrets
+*client-secret.json
 
 # dev scratch SQLite database (ARCH-STO-01) — never committed, regenerated via scripts/resetdb.py
 data/

@@ -13,6 +13,7 @@
 - [6. Error and validation surfacing (REQ-FE-02)](#6-error-and-validation-surfacing-req-fe-02) — `FE-ERR-01..03`
 - [7. Per-screen controller/service map](#7-per-screen-controllerservice-map) — `FE-SCR-01`
 - [8. Testing hooks (supports `ARCH-TEST-05`, `ARCH-TEST-09`)](#8-testing-hooks-supports-arch-test-05-arch-test-09) — `FE-TEST-01..02`
+- [9. Authentication and the user section](#9-authentication-and-the-user-section) — `FE-AUTH-01..05`
 
 ## Purpose
 
@@ -63,17 +64,24 @@ frontend/
       api-client.service.js  # FE-SVC-01/02/03
       run-poller.service.js   # FE-RUN-01/02/03
       session-status.service.js # FE-SVC-04
+      auth.service.js          # FE-AUTH-01
+      auth.interceptor.js       # FE-AUTH-03
       error.service.js         # FE-ERR-01
       confirm-dialog.service.js # FE-ERR-03
+      offer-dialog.service.js   # OfferDialog, the offer form modal (page 9, Lead Detail)
     shared/
-      nav-bar/                # sidebar + session badge, FE-SCR row "shell"
+      nav-bar/                # sidebar + session badge + user section, FE-SCR row "shell"
+      user-menu/               # <user-menu> photo circle, upload, remove, log out (FE-AUTH-04)
       confirm-modal/           # <confirm-modal> directive backing confirm-dialog.service.js
+      offer-modal/             # <offer-modal> directive backing offer-dialog.service.js
       empty-state/              # <empty-state> directive (010-user-interface's empty-state pattern)
+    auth/                # screens 10–11 — auth.controller.js, signin.html, signup.html (FE-AUTH-05)
     tracks/           # screen 1 — tracks.controller.js, tracks.html
     search-profiles/    # screen 1b — search-profiles.controller.js, search-profiles.html (opened as a modal from Tracks, FE-RTE-02)
     cvs/               # screen 2 — cvs.controller.js, cvs.html (also opened as a modal, FE-RTE-02)
     posts/              # screens 3–4 — posts.controller.js, posts.html, manual-post-entry.controller.js, manual-post-entry.html
     leads/                # screens 5–6 — leads.controller.js, leads.html, lead-detail.controller.js, lead-detail.html
+    offers/                # screen 9 — offers.controller.js, offers.html
     applications/          # screen 7 — applications.controller.js, applications.html
     automation/              # screen 8 — automation.controller.js, automation.html, session-panel/ (shared with the badge)
 ```
@@ -84,38 +92,45 @@ frontend/
 
 ## 2. Routing
 
-**FE-RTE-01** `ngRoute`, vendored `angular-route.min.js`, the one dependency `ARCH-RUN-06` doesn't already name, runs in **HTML5 mode**, `$locationProvider.html5Mode(true)`: plain paths such as `/tracks`, `/posts`, rather than `#!/tracks` hashbang URLs. This is possible without a rewrite proxy specifically because `ARCH-RUN-09` already has Flask return `index.html` for any unmatched non-`/api` path. A hashbang fallback would be solving a problem `010`'s backend doesn't have. Route table, one entry per nav destination, per the **user-interface doc**'s Navigation structure:
+**FE-RTE-01** `ngRoute`, vendored `angular-route.min.js`, the one dependency `ARCH-RUN-06` doesn't already name, runs in **HTML5 mode**, `$locationProvider.html5Mode(true)`: plain paths such as `/tracks`, `/posts`, rather than `#!/tracks` hashbang URLs. This is possible without a rewrite proxy specifically because `ARCH-RUN-09` already has Flask return `index.html` for any unmatched non-`/api` path. A hashbang fallback would be solving a problem `010`'s backend doesn't have. `/` and any unmatched path redirect to `/leads`, so the app opens on the Leads page for a signed-in user. Route table, one entry per nav destination plus the two public sign-in pages, per the **user-interface doc**'s Navigation structure:
 
-| path            | controller           | template                          | nav destination |
-| --------------- | --------------------- | ----------------------------------- | ------------------ |
-| `/tracks`       | `TracksCtrl`           | `tracks/tracks.html`               | Tracks              |
-| `/posts`        | `PostsCtrl`            | `posts/posts.html`                 | Posts               |
-| `/leads`        | `LeadsCtrl`            | `leads/leads.html`                 | Leads               |
-| `/applications` | `ApplicationsCtrl`     | `applications/applications.html`   | Applications        |
-| `/automation`   | `AutomationCtrl`       | `automation/automation.html`       | Automation          |
-| (unmatched)     | redirect to `/tracks`  | —                                  | —                   |
+| path            | controller           | template                         | nav destination |
+| --------------- | -------------------- | -------------------------------- | --------------- |
+| `/tracks`       | `TracksCtrl`         | `tracks/tracks.html`             | Tracks          |
+| `/posts`        | `PostsCtrl`          | `posts/posts.html`               | Posts           |
+| `/leads`        | `LeadsCtrl`          | `leads/leads.html`               | Leads           |
+| `/offers`       | `OffersCtrl`         | `offers/offers.html`             | Offers          |
+| `/applications` | `ApplicationsCtrl`   | `applications/applications.html` | Applications    |
+| `/automation`   | `AutomationCtrl`     | `automation/automation.html`     | Automation      |
+| `/signin`       | `AuthCtrl`           | `auth/signin.html`               | — (public)      |
+| `/signup`       | `AuthCtrl`           | `auth/signup.html`               | — (public)      |
+| (unmatched)     | redirect to `/leads` | —                                | —               |
 
-**FE-RTE-02** **CVs, Search Profiles, Manual Post Entry, and Lead Detail are not routes.** The **user-interface doc** is explicit that these four are dialogs/panels reached from a page, not nav destinations. Giving each its own URL would let a bookmark or browser-back land on a dialog with no parent list underneath it, and the **user-interface doc** never specifies a standalone rendering for that state. Each is a controller instantiated by its parent, `PostsCtrl` opens `ManualPostEntryCtrl` in an `ng-if`-gated modal, `LeadsCtrl` opens `LeadDetailCtrl` the same way, and `TracksCtrl` opens `SearchProfilesCtrl` the same way from its "Configure search" row action, per the **user-interface doc**'s page 1b description, dismissed back to the parent's existing route rather than a route transition. `CvsCtrl` is the one exception with two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
+**FE-RTE-02** **CVs, Search Profiles, Manual Post Entry, Lead Detail, and the offer dialog are not routes.** The **user-interface doc** is explicit that these are dialogs/panels reached from a page, not nav destinations. Giving each its own URL would let a bookmark or browser-back land on a dialog with no parent list underneath it, and the **user-interface doc** never specifies a standalone rendering for that state. Each is a controller instantiated by its parent, `PostsCtrl` opens `ManualPostEntryCtrl` in an `ng-if`-gated modal, `LeadsCtrl` opens `LeadDetailCtrl` the same way, and `TracksCtrl` opens `SearchProfilesCtrl` the same way from its "Configure search" row action, per the **user-interface doc**'s page 1b description, dismissed back to the parent's existing route rather than a route transition. `CvsCtrl` is the one exception with two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
+
+**FE-RTE-03** **Every route except `/signin` and `/signup` is guarded.** Each guarded route carries `resolve: { auth: ['AuthService', function (a) { return a.require(); }] }`, which rejects with `'unauthenticated'` when nobody is signed in. One `$routeChangeError` handler turns that rejection into `$location.path('/signin').search({next: <requested path>})`. The public routes resolve `AuthService.redirectIfSignedIn()`, which sends an already signed-in user to `/leads`. The guard is a convenience for navigation. The `401` from the API remains the actual enforcement (`FE-AUTH-03`).
 
 ## 3. API client service
 
 **FE-SVC-01** **One `ApiClient` service is the only code that issues an `/api/**` request.** No controller constructs a raw `$http` call. This is the seam `ARCH-TEST-09`'s frontend-silo tier (`page.route()` intercepting `/api/**`) and `ARCH-TEST-05`'s mock-e2e tier both rely on. Since every request funnels through one service, mocking at the network boundary requires no test-only branch in application code, and a future change to the **api doc**'s surface touches one file, not eight controllers.
 
-**FE-SVC-02** **Table-generic methods**, parameterized by table name, thin promise-returning wrappers over the **api doc**'s seven generic shapes: `get(table, id)`, `list(table, params)` (→ `GET /api/v1/{table}/search`), `create(table, body)`, `update(table, id, body)`, `remove(table, id)`, `batch(table, ops)`. These are used directly for every `API-CAT-01` pure-generic table, `role`, `track`, `search_profile`, `cv`, `post_track`, and every `API-CAT-02` hook-backed table's non-restricted verbs, for example `ApiClient.update('lead', id, {stage: 'TOAPPLY'})`. The hook is transparent to the client per the **api doc**'s `lead` resource entry, so the call shape does not differ from a pure-generic table. The backend enforces the invariant. The frontend does not need to know one exists beyond surfacing whatever `400`/`409` comes back (`FE-ERR-01`).
+**FE-SVC-02** **Table-generic methods**, parameterized by table name, thin promise-returning wrappers over the **api doc**'s seven generic shapes: `get(table, id)`, `list(table, params)` (→ `GET /api/v1/{table}/search`), `create(table, body)`, `update(table, id, body)`, `remove(table, id)`, `batch(table, rows)`. These are used directly for every `API-CAT-01` pure-generic table, `role`, `track`, `search_profile`, `cv`, `post_track`, and every `API-CAT-02` hook-backed table's non-restricted verbs, for example `ApiClient.update('lead', id, {stage: 'APPLIED'})`. `LeadsCtrl` uses `ApiClient.batch('lead', rows)` (`POST /api/v1/lead/batch`) for the Apply and Drop actions on the `TOAPPLY` column, and reads a `409` naming the failing `lead_id` through `ErrorService`. The hook is transparent to the client per the **api doc**'s `lead` resource entry, so the call shape does not differ from a pure-generic table. The backend enforces the invariant. The frontend does not need to know one exists beyond surfacing whatever `400`/`409` comes back (`FE-ERR-01`).
 
 **FE-SVC-03** **Named-endpoint methods, one per `API-EP-*`, spelled by name rather than as a generic POST.**
 
 01. `promoteManualPost(body)` — `API-EP-01`.
-02. `queueApplications(leadIds)` — `API-EP-02`.
-03. `dequeueApplication(id)` — `API-EP-03`.
-04. `triggerSearchRun(trackId)` — `API-EP-04`.
-05. `triggerApplyRun()` — `API-EP-05`.
-06. `uploadSession(payload)` — `API-EP-06`.
-07. `health()` — `API-EP-07`, used only by `ARCH-TEST-04`'s readiness poll, never by application code.
+02. `triggerSearchRun(trackId)` — `API-EP-04`.
+03. `triggerApplyRun()` — `API-EP-05`.
+04. `uploadSession(payload)` — `API-EP-06`.
+05. `health()` — `API-EP-07`, used only by `ARCH-TEST-04`'s readiness poll, never by application code.
+06. `signup(body)`, `signin(body)`, `signout()`, `me()`, and `authConfig()` — `API-EP-08..12`, called only by `AuthService`.
+07. `uploadPhoto(userId, file)` and `removePhoto(userId)` — `API-EP-15/16`, called only by `AuthService`. The photo itself loads through an `<img src>` bound to the user's `photo_url` (`API-EP-17`), never through `ApiClient`.
+
+`API-EP-02` and `API-EP-03` are retired (the apply queue is the set of open `TOAPPLY` leads), so no `queueApplications` or `dequeueApplication` method exists.
 
 Naming them distinctly from the generic methods means a reader of a controller can tell, without cross-referencing the **api doc**, which calls are "special." This mirrors why the **api doc** itself keeps `API-EP-*` as a named catalog rather than folding them into the generic classification.
 
-**FE-SVC-03a** `lead_event`, the **data model**'s activity-log table, is read-only from the frontend: `ApiClient.list('lead_event', {lead_id})` backs Lead Detail's activity history, the **user-interface doc**'s page 6, used only for `GET`/`search`. Every write to it happens inside `API-HOOK-01`'s server-side path, the **api doc**'s `lead` resource entry, as a side effect of a `lead` write. No frontend code ever calls `create`/`update`/`remove` against it.
+**FE-SVC-03a** `lead_event`, the **data model**'s activity-log table, is read-only from the frontend: `ApiClient.list('lead_event', {lead_id})` backs Lead Detail's activity history, the **user-interface doc**'s page 6, used only for `GET`/`search`. Every write to it happens inside `API-HOOK-01`'s server-side path, the **api doc**'s `lead` resource entry, as a side effect of a `lead` write. No frontend code ever calls `create`/`update`/`remove` against it. The rows carry `stage_from` and `stage_to`, which `LeadDetailCtrl` maps into each activity entry so the panel shows the stage context of every event.
 
 ## 4. Async run handling (REQ-FE-02, 010-user-interface.md's "Async run handling")
 
@@ -127,11 +142,11 @@ Naming them distinctly from the generic methods means a reader of a controller c
 
 ## 5. Session status and the shared session panel
 
-**FE-SVC-04** `SessionStatus` service holds the current `valid`/`expired`/`missing` state, backed by `ApiClient.get('session', 1)`, the singleton row, refreshed after `uploadSession` resolves and on each route change, a cheap operation since it is one row read. The **user-interface doc** is explicit that the top-right badge and Automation's Session tab are one component reached two ways, not two implementations. This is implemented as a single `<session-panel>` directive bound to the one `SessionStatus` service instance, rendered inline inside `automation.html`'s Session tab and rendered inside an overlay when the badge is clicked. There is no second directive or second service instance for the badge.
+**FE-SVC-04** `SessionStatus` service holds the current `valid`/`expired`/`missing` state, backed by the first row of `ApiClient.list('mcf_session')`, the caller's single row, refreshed after `uploadSession` resolves and on each route change, a cheap operation since it is one row read. The **user-interface doc** is explicit that the top-right badge and Automation's Session tab are one component reached two ways, not two implementations. This is implemented as a single `<session-panel>` directive bound to the one `SessionStatus` service instance, rendered inline inside `automation.html`'s Session tab and rendered inside an overlay when the badge is clicked. There is no second directive or second service instance for the badge.
 
 ## 6. Error and validation surfacing (REQ-FE-02)
 
-**FE-ERR-01** **One `ErrorService`** wraps every `ApiClient` promise rejection, a single `.catch` point inside `ApiClient`'s methods, not one per controller, and converts it into a toast plus an entry the Automation Runs tab can also read. Run-level and general request errors surface this way, never only to the browser console, per the **user-interface doc**'s error-surfacing rules and REQ-FE-02.
+**FE-ERR-01** **One `ErrorService`** wraps every `ApiClient` promise rejection, a single `.catch` point inside `ApiClient`'s methods, not one per controller, and converts it into a toast plus an entry the Automation Runs tab can also read. A `401` produces no toast, because `FE-AUTH-03` redirects to sign in instead, and a `429` shows the server's wait message. Run-level and general request errors surface this way, never only to the browser console, per the **user-interface doc**'s error-surfacing rules and REQ-FE-02.
 
 **FE-ERR-02** **Field-level validation errors stay local to the form controller**, rendered inline at the point of entry, per the **user-interface doc**'s distinction between run/general errors and field validation. A required-field or format error from a `400` response is read from the rejection's body and shown next to the offending field, not routed through `ErrorService`'s toast.
 
@@ -153,18 +168,40 @@ No screen implements its own modal markup. `ConfirmDialog.ask({message, confirmL
 | 1 | Tracks                          | `TracksCtrl`                  | `ApiClient` (`track`, `cv` list for the CV picker, read-only `search_profile` for the row summary)                                     | archive toggle is `ApiClient.update('track', id, {is_active: false})` — `FE-SVC-02`, no named endpoint (010-api.md's classification); search-profile editing happens on Search Profiles (1b), not here |
 | 1b | Search Profiles                | `SearchProfilesCtrl`           | `ApiClient` (`search_profile`)                                                                                | opened from Tracks as a modal, `FE-RTE-02`; generic `PUT /api/v1/search_profile/{track_id}` |
 | 2 | CVs                               | `CvsCtrl`                       | `ApiClient` (`cv`)                                                                                            | opened from Tracks or Applications, `FE-RTE-02` |
-| 3 | Posts                              | `PostsCtrl`                       | `ApiClient` (`post`, `post_track`), `ApiClient.triggerSearchRun`, `RunPoller`, `ErrorService`                     | promote-to-lead is `ApiClient.create('lead', {post_id, track_id})` — a generic `POST /api/v1/lead`, not a named endpoint; see note below |
+| 3 | Posts                              | `PostsCtrl`                       | `ApiClient` (`post`, `post_track`), `ApiClient.triggerSearchRun`, `RunPoller`, `ErrorService`                     | the page offers no promote action, since promotion is a system action (Workflow 4); see note below |
 | 4 | Manual Post Entry                   | `ManualPostEntryCtrl`               | `ApiClient.promoteManualPost`                                                                                       | `API-EP-01`; opened as a modal from Posts, `FE-RTE-02` |
-| 5 | Leads                                 | `LeadsCtrl`                           | `ApiClient` (`lead`), `ConfirmDialog`                                                                                  | stage transitions and closes are generic `PUT /api/v1/lead/{id}` (`API-HOOK-01` is transparent, `FE-SVC-02`); tab filters are client-side on one `list('lead')` fetch, not one request per tab; the expiry-warning indicator is computed client-side from the fetched `deadline` field, not a separate API flag |
-| 6 | Lead Detail                            | `LeadDetailCtrl`                        | `ApiClient` (`lead`, read-only `lead_event` per `FE-SVC-03a`), `ConfirmDialog`                                           | opened as a panel from Leads, `FE-RTE-02` |
-| 7 | Applications                             | `ApplicationsCtrl`                        | `ApiClient` (`application`), `ApiClient.queueApplications`/`dequeueApplication`/`triggerApplyRun`, `RunPoller`, `ConfirmDialog` | `API-EP-02/03/05` |
+| 5 | Leads                                 | `LeadsCtrl`                           | `ApiClient` (`lead`, `batch`, `createManualLead`), `ConfirmDialog`                                                       | single-lead stage transitions are generic `PUT /api/v1/lead/{id}` (`API-HOOK-01` is transparent, `FE-SVC-02`) and the `TOAPPLY` column's Apply and Drop are `ApiClient.batch('lead', rows)`; tab filters, layouts, and sorts are client-side on one `list('lead')` fetch, not one request per tab; the expiry-warning indicator is computed client-side from the fetched `deadline` field, not a separate API flag |
+| 6 | Lead Detail                            | `LeadDetailCtrl`                        | `ApiClient` (`lead`, `offer`, read-only `lead_event` per `FE-SVC-03a`), `ConfirmDialog`, `OfferDialog`                   | opened as a panel from Leads, `FE-RTE-02`; the Track drop-down reads the active tracks from `LeadsCtrl`'s `list('track')` fetch; a stage move to `OFFER` opens the offer dialog, and every action ends in `changed()`, which reloads the panel and the list |
+| 7 | Applications                             | `ApplicationsCtrl`                        | `ApiClient` (`lead` for the apply queue, `application`), `ApiClient.triggerApplyRun`, `RunPoller`, `ConfirmDialog`     | `API-EP-05`; a per-row drop is `ApiClient.update('lead', id, {stage: 'CLOSED', close_reason: 'dropped'})` |
 | 8 | Automation (Runs / Session)                | `AutomationCtrl`                            | `ApiClient.list('run_log')`, `SessionStatus`, `<session-panel>`, `ApiClient.uploadSession`                                 | `API-EP-06`; Runs tab is generic `GET`/`search` per `API-HOOK-04` |
+| 9 | Offers | `OffersCtrl` | `ApiClient` (`offer`, `lead`), `OfferDialog` | history via `list('offer')` |
+| 10 | Sign in | `AuthCtrl` | `AuthService` | public route, `FE-RTE-03`; Google button is a plain link to `API-EP-13` |
+| 11 | Sign up | `AuthCtrl` | `AuthService` | public route; live password rule checklist, `FE-AUTH-05` |
 
-Promote-to-lead (row 3) is not in the **api doc**'s named-endpoint catalog as a distinct `API-EP-*`. Because `lead` is `API-CAT-02` hook-backed, `API-HOOK-01`'s invariant, a `post_id` already promoted is rejected, per the **data model**'s uniqueness rule, is enforced server-side on this same generic call, not by a named endpoint. `PostsCtrl` calls `ApiClient.create`, not a special "promote" method, and reads the resulting `409` through `ErrorService`/inline handling like any other constraint violation.
+Lead creation has no user-facing promote method. The search process calls `POST /api/v1/lead` (`API-HOOK-01`) as a system caller, and the manual add on the Leads page (row 5) posts to `POST /api/v1/lead/manual` through `ApiClient.createManualLead`. `API-HOOK-01`'s invariant, that a `post_id` already promoted is rejected per the **data model**'s uniqueness rule, is enforced server-side on the `POST /api/v1/lead` call.
 
 ## 8. Testing hooks (supports `ARCH-TEST-05`, `ARCH-TEST-09`)
 
-**FE-TEST-01** **Every interactive control carries a `data-testid` attribute**, kebab-case, scoped `{screen}-{element}[-{id}]`, for example `posts-run-search-btn`, `lead-card-{id}-close-btn`, `applications-run-apply-btn`. This is fixed here rather than left to whoever writes each template, so the two Playwright tiers' DOM assertions (`ARCH-TEST-05` full-stack, `ARCH-TEST-09` frontend-silo) have a stable, deliberate contract to assert against instead of reverse-engineering one from markup after the fact. This is the same rationale `ARCH-BOT-01`'s skill reference gives for MCF's own markup, applied to this app's own templates.
+**FE-TEST-01** **Every interactive control carries a `data-testid` attribute**, kebab-case, scoped `{screen}-{element}[-{id}]`, for example `posts-run-search-btn`, `lead-card-{id}-close-btn`, `applications-run-apply-btn`. The authentication controls use the ids `user-section`, `user-avatar`, `user-photo`, `user-initials`, `user-menu`, `user-name`, `user-menu-upload`, `user-menu-photo-input`, `user-menu-remove-photo`, `user-menu-logout`, `signin-email`, `signin-password`, `signin-submit`, `signin-google`, `signin-error`, `signup-name`, `signup-email`, `signup-password`, `signup-submit`, `signup-error`, and `signup-rule-<code>` for each password rule row. This is fixed here rather than left to whoever writes each template, so the two Playwright tiers' DOM assertions (`ARCH-TEST-05` full-stack, `ARCH-TEST-09` frontend-silo) have a stable, deliberate contract to assert against instead of reverse-engineering one from markup after the fact. This is the same rationale `ARCH-BOT-01`'s skill reference gives for MCF's own markup, applied to this app's own templates.
 
-**FE-TEST-02** Because `FE-SVC-01` makes `ApiClient` the sole `/api` call site, `ARCH-TEST-09`'s frontend-silo mocking, `page.route('**/api/**', ...)` fulfilled from `tests/fixtures/api/*.json`, requires no test-only conditional anywhere in `app/`. The same `ApiClient` code runs against the real backend, `ARCH-TEST-05`, tier 2, and the mocked one, tier 1b, with the interception happening entirely at the network layer Playwright already controls.
+**FE-TEST-02** Because `FE-SVC-01` makes `ApiClient` the sole `/api` call site, `ARCH-TEST-09`'s frontend-silo mocking, `page.route('**/api/**', ...)` fulfilled from `tests/fixtures/api/*.json`, requires no test-only conditional anywhere in `app/`. The same `ApiClient` code runs against the real backend, `ARCH-TEST-05`, tier 2, and the mocked one, tier 1b, with the interception happening entirely at the network layer Playwright already controls. The mocked tier answers `GET /api/v1/auth/me` with a canned user, and the full-stack tier signs in as a seeded account through the real sign-in endpoint.
 </content>
+
+## 9. Authentication and the user section
+
+**FE-AUTH-01** **One `AuthService` owns the signed-in user.** It holds `user`, a `ready` promise resolved by the first `ApiClient.me()` call at app start, and `config`, the result of `authConfig()`. Methods are `require()`, which resolves when signed in and otherwise rejects with `'unauthenticated'`, `redirectIfSignedIn()`, `signin(body)`, `signup(body)`, `signout()`, `uploadPhoto(file)`, `removePhoto()`, and `initials()`. `signin` and `signup` set `user` on success, and `signout` calls the API and then clears `user`. `initials()` returns the first letters of the first two words of the name, uppercased, or the first letter of the email when the name is empty.
+
+**FE-AUTH-02** **Sign-in state is never stored in the browser.** The session lives in the HttpOnly cookie, which script cannot read. `AuthService.user` is memory only and is rebuilt from `me()` on every full page load, so no token, password, or session value reaches `localStorage`, `sessionStorage`, or any JavaScript variable other than the user object.
+
+**FE-AUTH-03** **One `$http` interceptor ends the session client-side.** A `401` from any call other than `auth/signin` and `auth/signup` clears `AuthService.user` and redirects to `/signin?next=<current path>`, so a session that expired mid-use returns the user to sign in without an error toast. `AuthCtrl` accepts a `next` value only when it starts with a single `/`, which keeps the return path same-origin.
+
+**FE-AUTH-04** **The `<user-menu>` directive renders the user section inside `nav-bar`.** It shows only while `AuthService.user` is set, and the nav links show only then as well. The circle button is 32 pixels and shows an `<img>` bound to `user.photo_url`, cropped by `border-radius: 50%` and `object-fit: cover`, or the initials when `photo_url` is null. The menu holds the name and email, `Upload photo`, `Remove photo` when a photo exists, and `Log out`. Upload uses a hidden file input accepting `image/png,image/jpeg,image/webp`, refuses a file over 2 MB before sending, and posts through `uploadPhoto` with `Content-Type` left for the browser to set. `Log out` calls `signout()` and navigates to `/signin`, and each guarded route reloads its own state on the next visit.
+
+**FE-AUTH-05** **`AuthCtrl` serves both pages.** Sign in has email and password inputs, a submit button, a `Continue with Google` link to `/api/v1/auth/google/start?next=<next>` shown only when `config.google_enabled`, and a link to Sign up. Sign up has name, email, and password inputs, a live checklist of the password rules, and a link back. The checklist mirrors the server's rules for feedback only, and the server response stays authoritative. Field errors render through `ErrorService.fieldMessage` per `FE-ERR-02`, and the `rules` array of a rejected password marks the matching checklist rows. The `error` query parameter maps to a message.
+
+| id | error code                | message                                          |
+| -- | ------------------------- | ------------------------------------------------ |
+| 01 | `google_denied`           | Google sign-in was cancelled.                    |
+| 02 | `google_invalid`          | Google sign-in could not be verified. Try again. |
+| 03 | `google_unavailable`      | Google could not be reached. Try again later.    |
+| 04 | `google_email_unverified` | The Google account email is not verified.        |

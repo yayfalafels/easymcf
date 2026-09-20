@@ -7,11 +7,12 @@ INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-2', 
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-3', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-4', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-5', 1, 0);
-INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-6', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-closed', 1, 0);
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-close-10', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-close-11', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-close-12', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-close-13', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-promote-future', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-promote-nodate', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-promote-past', 1, 0);
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('manual-seed-1', 1, 0);

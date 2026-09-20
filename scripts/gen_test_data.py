@@ -19,14 +19,29 @@ SOURCE_DIR = os.path.join(ROOT, "test-data")
 SCHEMA_PATH = os.path.join(ROOT, "easymcf", "db", "schema.sql")
 TABLES = [
     "role", "user", "cv", "track", "search_profile", "search_schedule", "run_log", "post",
-    "post_track", "match_score", "lead", "lead_note", "lead_event", "application", "session",
+    "post_track", "match_score", "lead", "lead_note", "lead_event", "offer", "application", "session",
 ]
-STAGES = ["PROSPECT", "TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
-CLOSE_REASONS = ["offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed"]
+STAGES = ["TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
+CLOSE_REASONS = ["offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed", "dropped"]
 APPLICATION_STATUSES = [
     "applied", "questionnaire_required", "cv_selector_error", "unable_to_apply",
     "post_unavailable", "cv_not_found", "post_closed", "invalid_input",
 ]
+
+
+CLOSED_FROM = {"offer_accepted": "OFFER", "rejected": "APPLIED", "withdrawn": "APPLIED", "expired": "APPLIED",
+               "cancelled": "TOAPPLY", "duplicate": "TOAPPLY", "apply_failed": "TOAPPLY", "dropped": "TOAPPLY"}
+MANUAL_POST_ID = "manual-seed-1"
+
+
+def stage_path(stage: str, close_reason: str | None, manual: bool = False, reopened: bool = False) -> list[str]:
+    """Stages a lead passes through, creation first. A closed lead ends with CLOSED, and a re-opened OFFER lead
+    runs OFFER, CLOSED, INTERVIEW, OFFER (its first offer was rejected)."""
+    start = STAGES.index("APPLIED") if manual else 0
+    if stage == "CLOSED":
+        return STAGES[start: STAGES.index(CLOSED_FROM[close_reason]) + 1] + ["CLOSED"]
+    path = STAGES[start: STAGES.index(stage) + 1]
+    return path + ["CLOSED", "INTERVIEW", "OFFER"] if reopened else path
 
 
 def read_csv(name: str) -> list[list[str]]:
@@ -151,14 +166,15 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
         posts.append({"id": f"synthetic-close-{index}", "source": "Synthetic", "position_title": "Seed close reason role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-close-{index}", "posted_date": (anchor - timedelta(days=index)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.8})
     for name, closing in (("future", anchor + timedelta(days=14)), ("nodate", None), ("past", anchor - timedelta(days=2))):
         posts.append({"id": f"synthetic-promote-{name}", "source": "Synthetic", "position_title": f"Seed promote {name} role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-promote-{name}", "posted_date": (anchor - timedelta(days=3)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": closing.isoformat() if closing else None, "applicants": 0, "description": None, "score": 0.8})
+    posts.append({"id": MANUAL_POST_ID, "source": "Manual", "position_title": "Seed manual role", "company_name": "Manual Company", "url_ref": "https://www.mycareersfuture.gov.sg/job/manual-seed-1", "posted_date": (anchor - timedelta(days=2)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.8})
     for post in posts:
         fields = {key: post[key] for key in ("id", "source", "position_title", "company_name", "url_ref", "posted_date", "salary_high", "is_open", "closing_date", "applicants", "description")}
-        fields.update({"industry_classification": None, "mcf_ref": None, "src_method": "scraped" if post["source"] != "Synthetic" else "manual", "run_id": 1 if post["source"] != "Synthetic" else None})
+        fields.update({"industry_classification": None, "mcf_ref": None, "src_method": "manual" if post["source"] in ("Synthetic", "Manual") else "scraped", "run_id": None if post["source"] in ("Synthetic", "Manual") else 1})
         sql["post"] += insert("post", fields, "synthetic below-threshold or lifecycle fixture" if post["source"] == "Synthetic" else None)
 
     for index, post in enumerate(posts):
         track_id = 1 if index else 2
-        search_match = 0 if post["source"] == "Synthetic" else 1
+        search_match = 0 if post["source"] in ("Synthetic", "Manual") else 1
         sql["post_track"] += insert("post_track", {"post_id": post["id"], "track_id": track_id, "search_match": search_match})
         sql["match_score"] += insert("match_score", {"post_id": post["id"], "track_id": track_id, "match_score": post["score"], "score_method": "title_keyword_v1"})
         if index == 0:
@@ -167,34 +183,69 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
 
     leads = []
     for index, stage in enumerate(STAGES, start=1):
-        post_id = posts[index - 1]["id"]
+        post_id = MANUAL_POST_ID if stage == "APPLIED" else posts[index - 1]["id"]
         close_reason = None if stage != "CLOSED" else CLOSE_REASONS[0]
-        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(), "applied_date": anchor.isoformat() if stage not in ("PROSPECT", "TOAPPLY") else None, "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
-    for index, reason in enumerate(CLOSE_REASONS[1:], start=8):
+        leads.append({"id": index, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(), "applied_date": anchor.isoformat() if stage != "TOAPPLY" else None, "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+    for index, reason in enumerate(CLOSE_REASONS[1:], start=len(STAGES) + 1):
         post = posts[index - 1]
-        leads.append({"id": index, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, "title_override": None, "company_override": None, "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
     for row in leads:
         if row["stage"] == "CALLBACK":
             row["last_contact_date"] = anchor.isoformat()
     note_id = 1
+    event_id = 1
     for row in leads:
         sql["lead"] += insert("lead", row, "synthetic stage or close-reason coverage")
-        sql["lead_event"] += insert("lead_event", {"id": row["id"], "lead_id": row["id"], "event_type": "stage_change", "detail": "seed stage fixture", "occurred_at": f"{anchor} 07:00:00"}, "synthetic activity fixture")
+        previous = None
+        manual = row["post_id"] == MANUAL_POST_ID
+        for step, stage in enumerate(stage_path(row["stage"], row["close_reason"], manual, reopened=row["stage"] == "OFFER")):
+            if previous is None:
+                detail = f"added manually at {stage}" if manual else "promoted to TOAPPLY"
+            elif stage == "CLOSED":
+                detail = f"close_reason: None -> {'rejected' if row['stage'] == 'OFFER' else row['close_reason']}"
+            elif previous == "CLOSED":
+                detail = "re-opened from an offer"
+            else:
+                detail = None
+            sql["lead_event"] += insert("lead_event", {
+                "id": event_id, "lead_id": row["id"], "event_type": "stage_change", "detail": detail,
+                "stage_from": previous, "stage_to": stage, "occurred_at": f"{anchor} 07:{step:02d}:00"},
+                "synthetic stage history")
+            previous, event_id = stage, event_id + 1
         if row["stage"] == "INTERVIEW":
-            sql["lead_note"] += insert("lead_note", {"id": note_id, "lead_id": row["id"], "note": "Interview scheduled with hiring manager", "created_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
-            sql["lead_event"] += insert("lead_event", {"id": 100 + note_id, "lead_id": row["id"], "event_type": "note_edited", "detail": "note added", "occurred_at": f"{anchor} 07:00:00"}, "synthetic note-history coverage")
-            note_id += 1
+            sql["lead_note"] += insert("lead_note", {"id": note_id, "lead_id": row["id"], "note": "Interview scheduled with hiring manager", "created_at": f"{anchor} 07:30:00"}, "synthetic note-history coverage")
+            sql["lead_event"] += insert("lead_event", {"id": event_id, "lead_id": row["id"], "event_type": "note_edited", "detail": "note added", "stage_from": "INTERVIEW", "stage_to": "INTERVIEW", "occurred_at": f"{anchor} 07:30:00"}, "synthetic note-history coverage")
+            note_id, event_id = note_id + 1, event_id + 1
 
     callback_id = next(row["id"] for row in leads if row["stage"] == "CALLBACK")
-    sql["lead_event"] += insert("lead_event", {"id": 201, "lead_id": callback_id, "event_type": "contact_logged", "detail": f"last_contact_date: None -> {anchor}", "occurred_at": f"{anchor} 07:40:00"}, "synthetic contact-log coverage")
-    sql["lead_event"] += insert("lead_event", {"id": 202, "lead_id": callback_id, "event_type": "deadline_changed", "detail": f"deadline: {anchor} -> {anchor + timedelta(days=28)}", "occurred_at": f"{anchor} 07:41:00"}, "synthetic deadline-refresh coverage")
-    sql["lead_event"] += insert("lead_event", {"id": 200, "lead_id": 2, "event_type": "field_edited", "detail": "company_override: None -> Seed Co", "occurred_at": f"{anchor} 07:30:00"}, "synthetic field-edit coverage")
+    for lead_id, event_type, detail, stage, minute in (
+        (1, "field_edited", "company_override: None -> Seed Co", "TOAPPLY", 31),
+        (callback_id, "contact_logged", f"last_contact_date: None -> {anchor}", "CALLBACK", 40),
+        (callback_id, "deadline_changed", f"deadline: {anchor} -> {anchor + timedelta(days=28)}", "CALLBACK", 41),
+    ):
+        sql["lead_event"] += insert("lead_event", {"id": event_id, "lead_id": lead_id, "event_type": event_type, "detail": detail,
+                                                   "stage_from": stage, "stage_to": stage, "occurred_at": f"{anchor} 07:{minute}:00"},
+                                    "synthetic event coverage")
+        event_id += 1
 
+    lead_deadline = anchor + timedelta(days=28)
+    offer_rows = [
+        {"id": 1, "lead_id": 5, "offer_date": anchor.isoformat(), "deadline": (anchor + timedelta(days=14)).isoformat(),
+         "amount_sgd": 11000, "status": "rejected", "created_at": f"{anchor} 07:04:00", "updated_at": f"{anchor} 07:05:00"},
+        {"id": 2, "lead_id": 5, "offer_date": anchor.isoformat(), "deadline": lead_deadline.isoformat(),
+         "amount_sgd": 12000, "status": "open", "created_at": f"{anchor} 07:07:00", "updated_at": f"{anchor} 07:07:00"},
+        {"id": 3, "lead_id": 6, "offer_date": anchor.isoformat(), "deadline": anchor.isoformat(),
+         "amount_sgd": 11500, "status": "accepted", "created_at": f"{anchor} 07:04:00", "updated_at": f"{anchor} 07:05:00"},
+    ]
+    for row in offer_rows:
+        sql["offer"] += insert("offer", row, "synthetic offer history coverage")
+
+    apply_failed_lead = next(row["id"] for row in leads if row["close_reason"] == "apply_failed")
     app_id = 1
     for status in APPLICATION_STATUSES:
-        lead_id = 3 if status == "applied" else 2
+        lead_id = 3 if status == "applied" else 1
         if status in ("post_closed", "post_unavailable"):
-            lead_id = 13
+            lead_id = apply_failed_lead
         sql["application"] += insert("application", {"id": app_id, "lead_id": lead_id, "cv_id": 1, "status": status, "error_detail": None if status == "applied" else f"synthetic {status} fixture", "attempted_at": f"{anchor} 09:00:00", "run_id": 3 if status == "applied" else 4}, "synthetic apply outcome coverage")
         app_id += 1
     for attempt in range(2):

@@ -7,11 +7,12 @@ INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-3', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-4', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-5', 1, 0.8, 'title_keyword_v1');
-INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-6', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-closed', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-10', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-11', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-12', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-close-13', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-promote-future', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-promote-nodate', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-promote-past', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('manual-seed-1', 1, 0.8, 'title_keyword_v1');

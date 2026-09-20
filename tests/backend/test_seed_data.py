@@ -7,8 +7,8 @@ import pytest
 
 pytestmark = pytest.mark.backend
 
-LEAD_STAGES = {"PROSPECT", "TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"}
-CLOSE_REASONS = {"offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed"}
+LEAD_STAGES = {"TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"}
+CLOSE_REASONS = {"offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed", "dropped"}
 APPLICATION_STATUSES = {
     "applied", "questionnaire_required", "cv_selector_error", "unable_to_apply",
     "post_unavailable", "cv_not_found", "post_closed", "invalid_input",
@@ -163,8 +163,8 @@ def test_open_stages_expire_and_closed_leads_keep_state(isolated_client, isolate
     closed_before = conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' ORDER BY id").fetchall()
     fixed_clock("2026-09-15T07:00:00")
     leads = isolated_client.get("/api/v1/lead/search").get_json()
-    assert all(l["close_reason"] == "expired" for l in leads if l["id"] <= 6)
-    assert conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' AND id >= 7 ORDER BY id").fetchall() == closed_before
+    assert all(l["close_reason"] == "expired" for l in leads if l["id"] <= 5)
+    assert conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' AND id >= 6 ORDER BY id").fetchall() == closed_before
 
 
 def _pin_after_anchor(isolated_db, fixed_clock, days: int) -> date:
@@ -181,33 +181,78 @@ def _events(isolated_db, lead_id: int) -> list[str]:
 
 def test_callback_transition_moves_deadline_and_logs_it(isolated_client, isolated_db, fixed_clock):
     day = _pin_after_anchor(isolated_db, fixed_clock, 5)
-    response = isolated_client.put("/api/v1/lead/3", json={"stage": "CALLBACK"})
+    response = isolated_client.put("/api/v1/lead/2", json={"stage": "CALLBACK"})
     assert response.status_code == 200
     assert response.get_json()["deadline"] == (day + timedelta(days=28)).isoformat()
-    assert _events(isolated_db, 3)[-2:] == ["stage_change", "deadline_changed"]
+    assert _events(isolated_db, 2)[-2:] == ["stage_change", "deadline_changed"]
 
 
 def test_activity_at_callback_or_later_keeps_the_window_rolling(isolated_client, isolated_db, fixed_clock):
     day = _pin_after_anchor(isolated_db, fixed_clock, 5)
-    isolated_client.post("/api/v1/lead_note", json={"lead_id": 4, "note": "chased"})
-    assert isolated_client.get("/api/v1/lead/4").get_json()["deadline"] == (day + timedelta(days=28)).isoformat()
-    assert _events(isolated_db, 4)[-2:] == ["note_edited", "deadline_changed"]
+    isolated_client.post("/api/v1/lead_note", json={"lead_id": 3, "note": "chased"})
+    assert isolated_client.get("/api/v1/lead/3").get_json()["deadline"] == (day + timedelta(days=28)).isoformat()
+    assert _events(isolated_db, 3)[-2:] == ["note_edited", "deadline_changed"]
     later = _pin_after_anchor(isolated_db, fixed_clock, 12)
-    isolated_client.put("/api/v1/lead/4", json={"last_contact_date": later.isoformat()})
-    assert isolated_client.get("/api/v1/lead/4").get_json()["deadline"] == (later + timedelta(days=28)).isoformat()
-    assert _events(isolated_db, 4)[-2:] == ["contact_logged", "deadline_changed"]
+    isolated_client.put("/api/v1/lead/3", json={"last_contact_date": later.isoformat()})
+    assert isolated_client.get("/api/v1/lead/3").get_json()["deadline"] == (later + timedelta(days=28)).isoformat()
+    assert _events(isolated_db, 3)[-2:] == ["contact_logged", "deadline_changed"]
 
 
 def test_activity_before_callback_leaves_the_deadline(isolated_client, isolated_db, fixed_clock):
     _pin_after_anchor(isolated_db, fixed_clock, 5)
-    before = isolated_client.get("/api/v1/lead/2").get_json()["deadline"]
-    isolated_client.put("/api/v1/lead/2", json={"company_override": "Seed Co"})
-    assert isolated_client.get("/api/v1/lead/2").get_json()["deadline"] == before
-    assert "deadline_changed" not in _events(isolated_db, 2)[-2:]
+    before = isolated_client.get("/api/v1/lead/1").get_json()["deadline"]
+    isolated_client.put("/api/v1/lead/1", json={"company_override": "Seed Co"})
+    assert isolated_client.get("/api/v1/lead/1").get_json()["deadline"] == before
+    assert "deadline_changed" not in _events(isolated_db, 1)[-2:]
 
 
 def test_a_deadline_set_in_the_request_takes_precedence(isolated_client, isolated_db, fixed_clock):
     _pin_after_anchor(isolated_db, fixed_clock, 5)
-    response = isolated_client.put("/api/v1/lead/4", json={"stage": "INTERVIEW", "deadline": "2031-01-01"})
+    response = isolated_client.put("/api/v1/lead/3", json={"stage": "INTERVIEW", "deadline": "2031-01-01"})
     assert response.get_json()["deadline"] == "2031-01-01"
-    assert _events(isolated_db, 4)[-1] == "stage_change"
+    assert _events(isolated_db, 3)[-1] == "stage_change"
+
+
+TRANSITIONS = {
+    "TOAPPLY": {"APPLIED", "CLOSED"}, "APPLIED": {"CALLBACK", "CLOSED"}, "CALLBACK": {"INTERVIEW", "CLOSED"},
+    "INTERVIEW": {"OFFER", "CLOSED"}, "OFFER": {"CLOSED"}, "CLOSED": {"INTERVIEW"},
+}
+
+
+def test_every_lead_history_is_a_connected_stage_chain(conn):
+    for lead_id, stage, post_id in conn.execute("SELECT id, stage, post_id FROM lead ORDER BY id").fetchall():
+        rows = conn.execute("SELECT stage_from, stage_to FROM lead_event WHERE lead_id = ? ORDER BY id", (lead_id,)).fetchall()
+        first = (None, "APPLIED") if post_id.startswith("manual-") else (None, "TOAPPLY")
+        assert rows[0] == first, lead_id
+        assert all(rows[i][0] == rows[i - 1][1] for i in range(1, len(rows))), lead_id
+        assert rows[-1][1] == stage, lead_id
+
+
+def test_seeded_stage_changes_follow_the_transition_table(conn):
+    rows = conn.execute(
+        "SELECT stage_from, stage_to FROM lead_event WHERE event_type = 'stage_change' AND stage_from IS NOT NULL").fetchall()
+    assert rows and all(to in TRANSITIONS[frm] for frm, to in rows)
+
+
+def test_other_events_hold_the_stage(conn):
+    rows = conn.execute("SELECT stage_from, stage_to FROM lead_event WHERE event_type <> 'stage_change'").fetchall()
+    assert rows and all(frm is not None and frm == to for frm, to in rows)
+
+
+def test_no_seeded_row_holds_the_dropped_prospect_stage(conn):
+    for column in ("lead.stage", "lead_event.stage_from", "lead_event.stage_to"):
+        table = column.split(".")[0]
+        assert conn.execute(f"SELECT COUNT(*) FROM {table} WHERE {column.split('.')[1]} = 'PROSPECT'").fetchone()[0] == 0
+
+
+def test_manual_lead_and_salary_defaults(conn):
+    assert conn.execute("SELECT stage FROM lead WHERE post_id LIKE 'manual-%'").fetchall() == [("APPLIED",)]
+    assert conn.execute(
+        "SELECT COUNT(*) FROM lead l JOIN search_profile p ON p.track_id = l.track_id "
+        "WHERE l.expected_salary_sgd IS NOT p.min_salary").fetchone()[0] == 0
+
+
+def test_offer_history_and_the_one_open_offer_invariant(conn):
+    assert conn.execute("SELECT lead_id, status FROM offer ORDER BY id").fetchall() == [(5, "rejected"), (5, "open"), (6, "accepted")]
+    assert conn.execute("SELECT COUNT(*) FROM lead l WHERE l.stage = 'OFFER' AND "
+                        "(SELECT COUNT(*) FROM offer o WHERE o.lead_id = l.id AND o.status = 'open') != 1").fetchone()[0] == 0

@@ -2,7 +2,7 @@ angular.module('easymcfApp').controller('LeadsCtrl', ['$timeout', 'ApiClient', '
   var vm = this;
   var DAY_MS = 86400000;
   vm.tabs = [
-    { key: 'pipeline', label: 'Pipeline', stages: ['TOAPPLY', 'PROSPECT'] },
+    { key: 'toapply', label: 'TOAPPLY', stages: ['TOAPPLY'] },
     { key: 'applied', label: 'Applied', stages: ['APPLIED'] },
     { key: 'callbacks', label: 'Callbacks', stages: ['CALLBACK'] },
     { key: 'interviews', label: 'Interviews', stages: ['INTERVIEW'] },
@@ -25,6 +25,7 @@ angular.module('easymcfApp').controller('LeadsCtrl', ['$timeout', 'ApiClient', '
   };
   vm.count = function (tab) { return vm.inStages(tab.stages).length; };
   vm.title = function (l) { return l.title_override || l.position_title; };
+  vm.hasPostUrl = function (l) { return /^https?:\/\/\S+$/i.test(l.url_ref || ''); };
   vm.company = function (l) { return l.company_override || l.company_name; };
   vm.daysLeft = function (l) {
     return l.deadline ? Math.ceil((Date.parse(l.deadline) - Date.parse(new Date().toISOString().slice(0, 10))) / DAY_MS) : null;

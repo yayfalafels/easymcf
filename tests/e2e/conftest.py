@@ -5,8 +5,7 @@ both spawn the real `python -m easymcf` process the same way (ARCH-TEST-09)
 via the shared tests/_browser_support helper. They diverge once a real,
 data-backed screen exists: tier 1b intercepts `/api/**` from canned JSON,
 this tier lets every request reach the real Flask routes and SQLite. For
-`env-status` there is no `/api` call to diverge on yet (07.02.02), so both
-tiers currently assert the identical thing — see 010.07.TC.13's note.
+the root redirect both tiers assert the identical thing, since the redirect makes no `/api` call.
 """
 
 from __future__ import annotations

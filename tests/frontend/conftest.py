@@ -2,10 +2,8 @@
 
 Spawns the real `python -m easymcf` process the same way ARCH-TEST-04 does
 (real backend, real Flask static-file serving, so the JS/HTML has a real
-HTTP origin to load from). `env-status` (ENV-SETUP-06) makes no `/api` call
-at all (07.02.02's decision), so there is nothing to intercept via
-page.route() for this milestone's own smoke case — the interception hook
-belongs here once the first real, data-backed screen needs one.
+HTTP origin to load from). The landing page is the Leads page, which reads `/api`, so
+these tests run against the real backend and seeded database.
 """
 
 from __future__ import annotations

@@ -10,6 +10,7 @@ angular.module('easymcfApp').config(['$routeProvider', '$locationProvider',
       .when('/tracks/:trackId/search', { templateUrl: 'app/tracks/search-profile.html', controller: 'SearchProfileCtrl', controllerAs: 'vm' })
       .when('/cvs', { templateUrl: 'app/cvs/cvs.html', controller: 'CvsCtrl', controllerAs: 'vm' })
       .when('/leads', { templateUrl: 'app/leads/leads.html', controller: 'LeadsCtrl', controllerAs: 'vm' })
+      .when('/offers', { templateUrl: 'app/offers/offers.html', controller: 'OffersCtrl', controllerAs: 'vm' })
       .otherwise({ redirectTo: '/leads' });
   }
 ]);

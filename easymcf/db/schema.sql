@@ -7,12 +7,15 @@
 -- schema_version 5 adds `stage_from` and `stage_to` to lead_event (REQ-CRM-08).
 -- schema_version 6 (task 09.13) drops PROSPECT from the stage values, adds `dropped` to
 -- lead.close_reason, adds lead.expected_salary_sgd (REQ-CRM-09), and adds `offer` (REQ-CRM-10).
+-- schema_version 7 (feature 13) adds accounts and ownership: sign-in fields on `user`, `auth_session`,
+-- `mcf_session` (renamed from `session`, one row per user), `lead.user_id`, the lead's own
+-- `position_title`, `company_name`, and `url_ref`, and `run_log.user_id`.
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (6);
+INSERT INTO meta (schema_version) VALUES (7);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -23,14 +26,29 @@ CREATE TABLE role (
 CREATE TABLE user (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    status TEXT NOT NULL
+    email TEXT NOT NULL UNIQUE CHECK (email = lower(email)),
+    status TEXT NOT NULL CHECK (status IN ('active', 'disabled')),
+    password_hash TEXT,
+    google_sub TEXT UNIQUE,
+    photo_ref TEXT,
+    created_at TEXT NOT NULL,
+    CHECK (password_hash IS NOT NULL OR google_sub IS NOT NULL)
 );
+
+CREATE TABLE auth_session (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+CREATE INDEX idx_auth_session_user_id ON auth_session(user_id);
 
 CREATE TABLE cv (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES user(id),
-    label TEXT NOT NULL UNIQUE
+    label TEXT NOT NULL,
+    UNIQUE (user_id, label)
 );
 
 CREATE TABLE track (
@@ -61,6 +79,7 @@ CREATE TABLE search_schedule (
 CREATE TABLE run_log (
     id INTEGER PRIMARY KEY,
     run_type TEXT NOT NULL CHECK (run_type IN ('search', 'apply')),
+    user_id INTEGER NOT NULL REFERENCES user(id),
     track_id INTEGER REFERENCES track(id),
     started_at TEXT NOT NULL,
     ended_at TEXT,
@@ -69,7 +88,8 @@ CREATE TABLE run_log (
     error_detail TEXT
 );
 CREATE INDEX idx_run_log_type_status ON run_log(run_type, status);
-CREATE UNIQUE INDEX ux_run_log_running ON run_log(run_type) WHERE status = 'running';
+CREATE INDEX idx_run_log_user_id ON run_log(user_id);
+CREATE UNIQUE INDEX ux_run_log_running ON run_log(user_id, run_type) WHERE status = 'running';
 
 CREATE TABLE post (
     id TEXT PRIMARY KEY,
@@ -110,23 +130,35 @@ CREATE TABLE match_score (
 
 CREATE TABLE lead (
     id INTEGER PRIMARY KEY,
-    post_id TEXT NOT NULL UNIQUE REFERENCES post(id),
+    user_id INTEGER NOT NULL REFERENCES user(id),
+    post_id TEXT NOT NULL REFERENCES post(id),
     track_id INTEGER NOT NULL REFERENCES track(id),
     status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
     stage TEXT NOT NULL CHECK (stage IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
     close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped')),
-    title_override TEXT,
-    company_override TEXT,
+    position_title TEXT NOT NULL,
+    company_name TEXT NOT NULL,
+    url_ref TEXT CHECK (url_ref IS NULL OR url_ref GLOB 'http://*' OR url_ref GLOB 'https://*'),
     deadline TEXT,
     applied_date TEXT,
     first_attempt_date TEXT,
     last_contact_date TEXT,
     expected_salary_sgd INTEGER CHECK (expected_salary_sgd IS NULL OR expected_salary_sgd >= 0),
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, post_id)
 );
+CREATE INDEX idx_lead_user_id ON lead(user_id);
 CREATE INDEX idx_lead_track_id ON lead(track_id);
 CREATE INDEX idx_lead_status_stage ON lead(status, stage);
+
+CREATE TRIGGER lead_owner_matches_track_insert BEFORE INSERT ON lead
+WHEN NEW.user_id != (SELECT user_id FROM track WHERE id = NEW.track_id)
+BEGIN SELECT RAISE(ABORT, 'lead.user_id must equal its track owner'); END;
+
+CREATE TRIGGER lead_owner_matches_track_update BEFORE UPDATE OF user_id, track_id ON lead
+WHEN NEW.user_id != (SELECT user_id FROM track WHERE id = NEW.track_id)
+BEGIN SELECT RAISE(ABORT, 'lead.user_id must equal its track owner'); END;
 
 CREATE TABLE lead_note (
     id INTEGER PRIMARY KEY,
@@ -174,9 +206,9 @@ CREATE TABLE application (
 CREATE INDEX idx_application_lead_id ON application(lead_id);
 CREATE INDEX idx_application_run_id ON application(run_id);
 
-CREATE TABLE session (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    user_id INTEGER NOT NULL REFERENCES user(id),
+CREATE TABLE mcf_session (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES user(id),
     status TEXT NOT NULL CHECK (status IN ('valid', 'expired', 'missing')),
     uploaded_at TEXT,
     cookie_ref TEXT

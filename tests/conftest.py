@@ -9,6 +9,7 @@ No test run ever touches `data/easymcf.db`.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -70,6 +71,48 @@ def app(db_path):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+_USERS = json.load(open(os.path.join(_TESTS_DIR, "support", "users.json"), encoding="utf-8"))
+
+
+def signed_in(app, name: str):
+    """A test client signed in through the real sign-in endpoint as a seeded account (STRAT-SILO-08)."""
+    test_client = app.test_client()
+    response = test_client.post("/api/v1/auth/signin", json=_USERS[name])
+    assert response.status_code == 200, response.get_json()
+    return test_client
+
+
+@pytest.fixture()
+def anon_client(app):
+    return app.test_client()
+
+
+@pytest.fixture(scope="session")
+def stub_provider():
+    """The stub OpenID Connect provider on an ephemeral port, for the whole session."""
+    from tests.support import stub_oidc
+
+    server, base_url = stub_oidc.serve()
+    yield base_url
+    server.shutdown()
+
+
+@pytest.fixture()
+def google_app(db_path, stub_provider, tmp_path, monkeypatch):
+    """An app configured for Google sign-in against the stub provider and a temp photo store."""
+    secret = tmp_path / "gcp_oauth_client_secret"
+    secret.write_text("stub-client-secret\n")
+    secret.chmod(0o600)
+    monkeypatch.setenv("GOOGLE_DISCOVERY_URL", stub_provider + "/.well-known/openid-configuration")
+    monkeypatch.setenv("GCP_OAUTH_CLIENT_ID", "stub-client-id")
+    monkeypatch.setenv("GCP_OAUTH_SECRET_FILE", str(secret))
+    monkeypatch.setenv("PHOTO_DIR", str(tmp_path / "photos"))
+    from easymcf import create_app
+    from easymcf.config import Config
+
+    return create_app(Config(db_path=db_path))
 
 
 from datetime import datetime

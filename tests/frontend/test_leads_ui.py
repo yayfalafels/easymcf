@@ -56,29 +56,29 @@ def test_tracks_create_edit_archive_unarchive(page, ui_app):
     base_url, db_path = ui_app
     page.goto(base_url + "/tracks")
     _visible(page, "track-row-1")
-    assert page.locator('[data-testid^="track-row-"]').count() == 5
+    assert page.locator('[data-testid^="track-row-"]').count() == 7
 
     page.select_option('[data-testid="track-role-select"]', label="Data Engineer")
     page.fill('[data-testid="track-seniority-input"]', "senior")
     page.click('[data-testid="track-save"]')
-    _visible(page, "track-row-7")
-    assert _rows(db_path, "SELECT user_id, role_id, seniority, default_cv_id, is_active FROM track WHERE id = 7") == [(1, 3, "senior", None, 1)]
+    _visible(page, "track-row-9")
+    assert _rows(db_path, "SELECT user_id, role_id, seniority, default_cv_id, is_active FROM track WHERE id = 9") == [(1, 3, "senior", None, 1)]
 
-    page.click('[data-testid="track-edit-7"]')
+    page.click('[data-testid="track-edit-9"]')
     page.fill('[data-testid="track-seniority-input"]', "lead")
     page.click('[data-testid="track-save"]')
-    page.wait_for_function("document.querySelector('[data-testid=\"track-row-7\"]').innerText.includes('lead')")
-    assert _rows(db_path, "SELECT seniority FROM track WHERE id = 7") == [("lead",)]
+    page.wait_for_function("document.querySelector('[data-testid=\"track-row-9\"]').innerText.includes('lead')")
+    assert _rows(db_path, "SELECT seniority FROM track WHERE id = 9") == [("lead",)]
 
-    page.click('[data-testid="track-archive-7"]')
-    page.locator('[data-testid="track-row-7"]').wait_for(state="detached", timeout=10_000)
-    assert _rows(db_path, "SELECT is_active FROM track WHERE id = 7") == [(0,)]
+    page.click('[data-testid="track-archive-9"]')
+    page.locator('[data-testid="track-row-9"]').wait_for(state="detached", timeout=10_000)
+    assert _rows(db_path, "SELECT is_active FROM track WHERE id = 9") == [(0,)]
 
     page.check('[data-testid="tracks-show-archived"]')
-    _visible(page, "track-row-7")
-    page.click('[data-testid="track-unarchive-7"]')
-    _visible(page, "track-archive-7")
-    assert _rows(db_path, "SELECT is_active FROM track WHERE id = 7") == [(1,)]
+    _visible(page, "track-row-9")
+    page.click('[data-testid="track-unarchive-9"]')
+    _visible(page, "track-archive-9")
+    assert _rows(db_path, "SELECT is_active FROM track WHERE id = 9") == [(1,)]
 
 
 def test_tracks_form_shows_track_fields_only(page, ui_app):
@@ -88,7 +88,8 @@ def test_tracks_form_shows_track_fields_only(page, ui_app):
     assert page.locator('[data-testid="track-form"] [data-testid^="search-profile-"]').count() == 0
 
 
-TAB_COUNTS = {"toapply": 1, "applied": 1, "callbacks": 1, "interviews": 1, "offers": 1, "closed": 8}
+# The seed holds two users (feature 13 data) and the list is not yet scoped to the signed-in user.
+TAB_COUNTS = {"toapply": 2, "applied": 2, "callbacks": 2, "interviews": 1, "offers": 1, "closed": 9}
 
 
 def test_leads_tabs_follow_the_seeded_stages(page, ui_app):
@@ -121,7 +122,7 @@ def test_leads_search_and_pipeline_order(page, ui_app):
     columns = page.locator('[data-testid^="leads-column-"]')
     assert columns.nth(0).get_attribute("data-testid") == "leads-column-TOAPPLY"
     page.fill('[data-testid="leads-search"]', "gen ai engineer")
-    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 1")
+    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 2")
     assert page.locator('[data-testid="lead-row-1"]').count() == 1
 
 
@@ -153,7 +154,7 @@ def _open_lead(page, base_url: str, lead_id: int, tab: str = "toapply"):
 def test_lead_detail_shows_the_lead_fields(page, ui_app):
     base_url, _ = ui_app
     _open_lead(page, base_url, 2, tab="applied")
-    for field in ("title_override", "company_override", "deadline", "applied_date", "first_attempt_date", "last_contact_date"):
+    for field in ("position_title", "company_name", "url_ref", "deadline", "applied_date", "first_attempt_date", "last_contact_date"):
         _visible(page, f"lead-detail-field-{field}")
     assert page.locator('[data-testid="lead-detail-activity"]').count() >= 1
     assert page.locator('[data-testid="lead-detail-post-link"]').get_attribute("href").startswith("https://")
@@ -171,12 +172,13 @@ def test_activity_history_shows_stage_context(page, ui_app):
 def test_switching_leads_discards_unsaved_detail_edits(page, ui_app):
     base_url, db_path = ui_app
     _open_lead(page, base_url, 1)
-    page.fill('[data-testid="lead-detail-field-title_override"]', "Do not save")
+    original = _rows(db_path, "SELECT position_title FROM lead WHERE id = 1")
+    page.fill('[data-testid="lead-detail-field-position_title"]', "Do not save")
     page.click('[data-testid="leads-tab-applied"]')
     page.click('[data-testid="lead-row-2"]')
     detail = _visible(page, "lead-detail")
     assert "seed manual role" in detail.inner_text().lower()
-    assert _rows(db_path, "SELECT title_override FROM lead WHERE id = 1") == [(None,)]
+    assert _rows(db_path, "SELECT position_title FROM lead WHERE id = 1") == original
 
 
 def _poll(db_path: str, sql: str, expected, timeout_s: float = 8.0, *args):
@@ -208,9 +210,9 @@ def test_log_contact_and_edit_fields_write_events(page, ui_app):
     page.fill('[data-testid="lead-detail-contact-date"]', "2026-09-18")
     page.click('[data-testid="lead-detail-contact"]')
     assert _poll(db_path, "SELECT last_contact_date FROM lead WHERE id = 4", [("2026-09-18",)]) == [("2026-09-18",)]
-    page.fill('[data-testid="lead-detail-field-title_override"]', "Renamed by UI")
+    page.fill('[data-testid="lead-detail-field-position_title"]', "Renamed by UI")
     page.click('[data-testid="lead-detail-save"]')
-    assert _poll(db_path, "SELECT title_override FROM lead WHERE id = 4", [("Renamed by UI",)]) == [("Renamed by UI",)]
+    assert _poll(db_path, "SELECT position_title FROM lead WHERE id = 4", [("Renamed by UI",)]) == [("Renamed by UI",)]
     events = [r[0] for r in _rows(db_path, "SELECT event_type FROM lead_event WHERE lead_id = 4 ORDER BY id")]
     assert "contact_logged" in events and "field_edited" in events
 
@@ -262,7 +264,7 @@ def test_a_rejected_write_shows_a_toast(page, ui_app):
     conn.close()
     page.click('[data-testid="lead-detail-advance"]')
     toast = _visible(page, "error-toast")
-    assert "illegal transition" in toast.inner_text()
+    assert "re-opened" in toast.inner_text()
 
 
 def test_manual_lead_creation_promotes_a_manual_post(page, ui_app):
@@ -279,10 +281,10 @@ def test_manual_lead_creation_promotes_a_manual_post(page, ui_app):
     assert _poll(
         db_path,
         "SELECT l.stage, l.status FROM lead l JOIN post p ON p.id = l.post_id WHERE p.position_title = ?",
-        [("TOAPPLY", "OPEN")],
+        [("APPLIED", "OPEN")],
         8.0,
         "Manual product analyst",
-    ) == [("TOAPPLY", "OPEN")]
+    ) == [("APPLIED", "OPEN")]
     lead_id, url_ref = _rows(
         db_path,
         "SELECT l.id, p.url_ref FROM lead l JOIN post p ON p.id = l.post_id WHERE p.position_title = ?",
@@ -291,16 +293,17 @@ def test_manual_lead_creation_promotes_a_manual_post(page, ui_app):
     assert str(uuid.UUID(url_ref)) == url_ref
 
     page.goto(base_url + "/leads")
+    page.click('[data-testid="leads-tab-applied"]')
     _visible(page, f"lead-row-{lead_id}")
     page.click(f'[data-testid="lead-row-{lead_id}"]')
     _visible(page, "lead-detail")
     _visible(page, "lead-detail-post-unavailable")
     assert page.locator('[data-testid="lead-detail-post-link"]').count() == 0
-    page.fill('[data-testid="lead-detail-post-url"]', "https://example.com/manual-post")
-    page.click('[data-testid="lead-detail-post-url-save"]')
+    page.fill('[data-testid="lead-detail-field-url_ref"]', "https://example.com/manual-post")
+    page.click('[data-testid="lead-detail-save"]')
     assert _poll(
         db_path,
-        "SELECT url_ref FROM post WHERE id = (SELECT post_id FROM lead WHERE id = ?)",
+        "SELECT url_ref FROM lead WHERE id = ?",
         [("https://example.com/manual-post",)],
         8.0,
         lead_id,
@@ -341,25 +344,34 @@ def test_cv_catalog_create_rename_and_remove(page, ui_app):
 def _add_leads(db_path: str, stage: str, count: int, prefix: str, contacts=None, updated=None) -> list[int]:
     """Insert leads (with their posts) straight into SQLite, so a test owns the leads it drives."""
     conn = sqlite3.connect(db_path)
-    ids = []
-    for n in range(count):
-        post_id = f"{prefix}-{uuid.uuid4()}"
-        conn.execute(
-            "INSERT INTO post (id, source, position_title, company_name, is_open, src_method) "
-            "VALUES (?, 'UI', ?, 'Batch Co', 1, 'manual')", (post_id, f"{prefix} role {n}"))
-        closed = stage == "CLOSED"
-        ids.append(conn.execute(
-            "INSERT INTO lead (post_id, track_id, status, stage, close_reason, deadline, last_contact_date, expected_salary_sgd, "
-            "created_at, updated_at) VALUES (?, 1, ?, ?, ?, date('now', ?), ?, 10000, '2026-09-19 07:00:00', ?)",
-            (post_id, "CLOSED" if closed else "OPEN", stage, "cancelled" if closed else None, f"+{20 + n} days",
-             contacts[n] if contacts else None, updated[n] if updated else "2026-09-19 07:00:00")).lastrowid)
-    conn.commit()
-    conn.close()
-    return ids
+    try:
+        ids = []
+        for n in range(count):
+            post_id = f"{prefix}-{uuid.uuid4()}"
+            conn.execute(
+                "INSERT INTO post (id, source, position_title, company_name, is_open, src_method) "
+                "VALUES (?, 'UI', ?, 'Batch Co', 1, 'manual')", (post_id, f"{prefix} role {n}"))
+            closed = stage == "CLOSED"
+            ids.append(conn.execute(
+                "INSERT INTO lead (user_id, post_id, track_id, status, stage, close_reason, position_title, company_name, deadline, "
+                "last_contact_date, expected_salary_sgd, created_at, updated_at) "
+                "VALUES (1, ?, 1, ?, ?, ?, ?, 'Batch Co', date('now', ?), ?, 10000, '2026-09-19 07:00:00', ?)",
+                (post_id, "CLOSED" if closed else "OPEN", stage, "cancelled" if closed else None, f"{prefix} role {n}",
+                 f"+{20 + n} days", contacts[n] if contacts else None,
+                 updated[n] if updated else "2026-09-19 07:00:00")).lastrowid)
+        conn.commit()
+        return ids
+    finally:
+        conn.close()
 
 
 def _add_toapply_leads(db_path: str, count: int, prefix: str = "batch") -> list[int]:
     return _add_leads(db_path, "TOAPPLY", count, prefix)
+
+
+def _row_order(page, prefix: str) -> list[int]:
+    return page.evaluate(
+        "() => [...document.querySelectorAll('[data-testid^=\"lead-row-\"]')].map(e => Number(e.dataset.testid.slice(9)))")
 
 
 def test_saved_change_refreshes_the_list_and_the_detail(page, ui_app):
@@ -374,3 +386,159 @@ def test_saved_change_refreshes_the_list_and_the_detail(page, ui_app):
     assert "APPLIED / OPEN" in page.locator("[data-testid=lead-detail] .detail-header p").inner_text()
     page.click('[data-testid="leads-tab-applied"]')
     _visible(page, f"lead-row-{lead_id}")
+
+
+def test_batch_apply_moves_the_checked_leads_in_one_request(page, ui_app):
+    base_url, db_path = ui_app
+    ids = _add_toapply_leads(db_path, 2, "apply")
+    posts = []
+    page.on("request", lambda r: posts.append(r.url) if r.method == "POST" and r.url.endswith("/api/v1/lead/batch") else None)
+    page.goto(base_url + "/leads")
+    for lead_id in ids:
+        page.check(f'[data-testid="lead-select-{lead_id}"]')
+    assert page.locator('[data-testid="lead-batch-apply"]').text_content().strip() == "Apply (2)"
+    page.click('[data-testid="lead-batch-apply"]')
+    page.wait_for_function(f"document.querySelectorAll('[data-testid=\"lead-row-{ids[0]}\"]').length === 0")
+    assert len(posts) == 1
+    assert _rows(db_path, f"SELECT stage FROM lead WHERE id IN ({ids[0]}, {ids[1]})") == [("APPLIED",), ("APPLIED",)]
+    assert _rows(db_path, "SELECT stage_from, stage_to FROM lead_event WHERE lead_id = ?", ids[0]) == [("TOAPPLY", "APPLIED")]
+    page.click('[data-testid="leads-tab-applied"]')
+    _visible(page, f"lead-row-{ids[0]}")
+
+
+def test_batch_drop_asks_with_the_count_then_closes_the_leads_as_dropped(page, ui_app):
+    base_url, db_path = ui_app
+    ids = _add_toapply_leads(db_path, 2, "drop")
+    page.goto(base_url + "/leads")
+    for lead_id in ids:
+        page.check(f'[data-testid="lead-select-{lead_id}"]')
+    page.click('[data-testid="lead-batch-drop"]')
+    assert page.locator('[data-testid="confirm-message"]').inner_text() == "Drop 2 leads?"
+    page.click('[data-testid="confirm-no"]')
+    assert _rows(db_path, f"SELECT stage FROM lead WHERE id IN ({ids[0]}, {ids[1]})") == [("TOAPPLY",), ("TOAPPLY",)]
+    page.click('[data-testid="lead-batch-drop"]')
+    page.click('[data-testid="confirm-yes"]')
+    assert _poll(db_path, f"SELECT status, close_reason FROM lead WHERE id IN ({ids[0]}, {ids[1]})",
+                 [("CLOSED", "dropped")] * 2) == [("CLOSED", "dropped")] * 2
+    page.click('[data-testid="leads-tab-closed"]')
+    _visible(page, f"lead-row-{ids[0]}")
+
+
+def test_the_header_checkbox_selects_every_row_and_the_buttons_follow_the_count(page, ui_app):
+    base_url, db_path = ui_app
+    ids = _add_toapply_leads(db_path, 3, "selectall")
+    page.goto(base_url + "/leads")
+    _visible(page, f"lead-row-{ids[0]}")
+    assert page.locator('[data-testid="lead-batch-apply"]').is_disabled()
+    page.check('[data-testid="lead-select-all"]')
+    total = page.locator('[data-testid^="lead-select-"][type="checkbox"]').count() - 1
+    assert page.locator('[data-testid="lead-batch-apply"]').text_content().strip() == f"Apply ({total})" and total >= 3
+    page.uncheck('[data-testid="lead-select-all"]')
+    assert page.locator('[data-testid="lead-batch-apply"]').is_disabled()
+
+
+def test_a_rejected_batch_changes_nothing_names_the_lead_and_keeps_the_rows_checked(page, ui_app):
+    base_url, db_path = ui_app
+    ids = _add_toapply_leads(db_path, 2, "reject")
+    page.goto(base_url + "/leads")
+    for lead_id in ids:
+        page.check(f'[data-testid="lead-select-{lead_id}"]')
+    conn = sqlite3.connect(db_path)
+    conn.execute("UPDATE lead SET stage = 'CLOSED', status = 'CLOSED', close_reason = 'cancelled' WHERE id = ?", (ids[1],))
+    conn.commit()
+    conn.close()
+    page.click('[data-testid="lead-batch-apply"]')
+    toast = _visible(page, "error-toast").inner_text()
+    assert "reject role 1" in toast and "illegal transition" in toast
+    assert _rows(db_path, "SELECT stage FROM lead WHERE id = ?", ids[0]) == [("TOAPPLY",)]
+    assert page.locator(f'[data-testid="lead-select-{ids[0]}"]').is_checked()
+
+
+def test_leads_render_compact_rows_for_early_stages_and_cards_for_active_stages(page, ui_app):
+    base_url, db_path = ui_app
+    ids = _add_toapply_leads(db_path, 30, "rows")
+    _add_leads(db_path, "CALLBACK", 1, "cards")
+    page.goto(base_url + "/leads")
+    _visible(page, f"lead-row-{ids[0]}")
+    headers = page.locator('[data-testid="leads-column-TOAPPLY"] table.lead-table th').all_text_contents()
+    assert [h for h in headers if h] == ["Title", "Company", "Track", "Salary", "Deadline", "Days left"]
+    heights = page.evaluate("() => [...document.querySelectorAll('tr[data-testid^=\"lead-row-\"]')].map(e => Math.round(e.getBoundingClientRect().height))")
+    assert len(heights) >= 30 and max(heights) - min(heights) <= 2
+    page.click('[data-testid="leads-tab-callbacks"]')
+    assert page.locator("table.lead-table").count() == 0
+    assert page.locator('[data-testid^="lead-latest-note-"]').count() >= 1
+
+
+def test_rows_sort_by_days_remaining_and_active_stages_by_last_contact(page, ui_app):
+    base_url, db_path = ui_app
+    early = _add_toapply_leads(db_path, 3, "sortdays")
+    contacts = _add_leads(db_path, "CALLBACK", 3, "sortcontact", contacts=["2026-09-01", "2026-09-10", None])
+    closed = _add_leads(db_path, "CLOSED", 2, "sortclosed", updated=["2026-09-01 07:00:00", "2026-09-10 07:00:00"])
+    page.goto(base_url + "/leads")
+    page.fill('[data-testid="leads-search"]', "sortdays")
+    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 3")
+    assert _row_order(page, "sortdays") == list(reversed(early))
+    page.click('[data-testid="leads-tab-callbacks"]')
+    page.fill('[data-testid="leads-search"]', "sortcontact")
+    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 3")
+    assert _row_order(page, "sortcontact") == [contacts[1], contacts[0], contacts[2]]
+    page.click('[data-testid="leads-tab-closed"]')
+    page.fill('[data-testid="leads-search"]', "sortclosed")
+    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 2")
+    assert _row_order(page, "sortclosed") == [closed[1], closed[0]]
+
+
+def test_active_cards_show_the_latest_note_and_the_last_contact_and_refresh_on_a_new_note(page, ui_app):
+    base_url, db_path = ui_app
+    with_contact, without = _add_leads(db_path, "CALLBACK", 2, "cardtext", contacts=["2026-09-10", None])
+    conn = sqlite3.connect(db_path)
+    conn.execute("INSERT INTO lead_note (lead_id, note, created_at) VALUES (?, 'first note', '2026-09-10 07:00:00')", (with_contact,))
+    conn.execute("INSERT INTO lead_note (lead_id, note, created_at) VALUES (?, 'newest note', '2026-09-11 07:00:00')", (with_contact,))
+    conn.commit()
+    conn.close()
+    page.goto(base_url + "/leads")
+    page.click('[data-testid="leads-tab-callbacks"]')
+    assert _visible(page, f"lead-latest-note-{with_contact}").inner_text() == "newest note"
+    assert page.locator(f'[data-testid="lead-last-contact-{with_contact}"]').inner_text() == "Last contact: 2026-09-10"
+    assert page.locator(f'[data-testid="lead-last-contact-{without}"]').inner_text() == "No contact logged"
+    page.click(f'[data-testid="lead-row-{with_contact}"]')
+    page.fill('[data-testid="lead-detail-note-input"]', "called back today")
+    page.click('[data-testid="lead-detail-note-add"]')
+    page.wait_for_function(f"document.querySelector('[data-testid=\"lead-latest-note-{with_contact}\"]').innerText === 'called back today'")
+
+
+def test_expected_salary_shows_on_the_lead_and_edits_from_lead_detail(page, ui_app):
+    base_url, db_path = ui_app
+    lead_id = _add_toapply_leads(db_path, 1, "salary")[0]
+    page.goto(base_url + "/leads")
+    assert _visible(page, f"lead-salary-{lead_id}").inner_text() == "S$ 10,000"
+    page.click(f'[data-testid="lead-row-{lead_id}"]')
+    page.fill('[data-testid="lead-detail-field-expected_salary_sgd"]', "12345")
+    page.click('[data-testid="lead-detail-save"]')
+    page.wait_for_function(f"document.querySelector('[data-testid=\"lead-salary-{lead_id}\"]').innerText === 'S$ 12,345'")
+    assert _rows(db_path, "SELECT expected_salary_sgd FROM lead WHERE id = ?", lead_id) == [(12345,)]
+    page.fill('[data-testid="lead-detail-field-expected_salary_sgd"]', "")
+    page.click('[data-testid="lead-detail-save"]')
+    page.wait_for_function(f"document.querySelector('[data-testid=\"lead-salary-{lead_id}\"]').innerText === '—'")
+
+
+def test_the_first_tab_is_toapply(page, ui_app):
+    base_url, _ = ui_app
+    page.goto(base_url + "/leads")
+    assert _visible(page, "leads-tab-toapply").inner_text().startswith("TOAPPLY")
+    assert page.locator('[data-testid="leads-tab-pipeline"]').count() == 0
+
+
+def test_a_lead_reassigns_to_another_track_from_lead_detail(page, ui_app):
+    base_url, db_path = ui_app
+    lead_id = _add_toapply_leads(db_path, 1, "retrack")[0]
+    page.goto(base_url + "/leads")
+    page.click(f'[data-testid="lead-row-{lead_id}"]')
+    select = _visible(page, "lead-detail-field-track_id")
+    labels = select.locator("option").all_inner_texts()
+    assert any("Data Engineer" in label for label in labels) and not any("Sustainability" in label for label in labels)
+    page.select_option('[data-testid="lead-detail-field-track_id"]', label="Data Engineer / mid")
+    page.click('[data-testid="lead-detail-save"]')
+    assert _poll(db_path, "SELECT track_id FROM lead WHERE id = ?", [(3,)], 8.0, lead_id) == [(3,)]
+    assert ("field_edited", "track_id: 1 -> 3") in _rows(db_path, "SELECT event_type, detail FROM lead_event WHERE lead_id = ?", lead_id)
+    page.wait_for_function(f"document.querySelector('[data-testid=\"lead-row-{lead_id}\"] td:nth-child(4)').innerText === 'Data Engineer'")

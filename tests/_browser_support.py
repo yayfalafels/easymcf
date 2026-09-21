@@ -34,19 +34,21 @@ def _free_port() -> int:
     return port
 
 
-def spawn_app(db_path: str, timeout_s: float = 15.0):
+def spawn_app(db_path: str, timeout_s: float = 15.0, extra_env: dict | None = None, port: int | None = None):
     """Start `python -m easymcf` on an ephemeral port against db_path, in
     fixture MCF mode, headless. Polls /api/v1/health until ready (ARCH-TEST-04)
     — this polling happens over plain `requests`, never through a Playwright
     page, so it is unaffected by any page.route() interception a caller sets
-    up afterward. Returns (process, base_url); caller must terminate_app() it.
+    up afterward. extra_env adds or overrides environment variables, and port pins the port when the caller must know it
+    before the app starts (a redirect URI built from it). Returns (process, base_url); caller must terminate_app() it.
     """
-    port = _free_port()
+    port = port or _free_port()
     env = os.environ.copy()
     env["DB_PATH"] = db_path
     env["PORT"] = str(port)
     env.setdefault("MCF_MODE", "fixture")
     env.setdefault("HEADLESS", "1")
+    env.update(extra_env or {})
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "easymcf"],

@@ -33,6 +33,13 @@ def test_system_promotion_runs_from_no_stage_to_toapply(isolated_client, isolate
     assert _events(isolated_db, lead_id) == [("stage_change", None, "TOAPPLY")]
 
 
+def test_manual_add_runs_from_no_stage_to_applied(isolated_client, isolated_db):
+    body = {"track_id": 1, "position_title": "Manual role", "company_name": "Manual Co"}
+    lead = isolated_client.post("/api/v1/lead/manual", json=body).get_json()
+    assert lead["stage"] == "APPLIED" and lead["applied_date"] is not None
+    assert _events(isolated_db, lead["id"]) == [("stage_change", None, "APPLIED")]
+
+
 def test_transition_and_close_events_record_both_stages(isolated_client, isolated_db):
     isolated_client.put("/api/v1/lead/1", json={"stage": "APPLIED"})
     assert _events(isolated_db, 1)[-1] == ("stage_change", "TOAPPLY", "APPLIED")
@@ -45,7 +52,7 @@ def test_note_contact_and_field_events_hold_the_stage(isolated_client, isolated_
     isolated_client.post("/api/v1/lead_note", json={"lead_id": 3, "note": "chased"})
     assert _events(isolated_db, 3)[-1] == ("note_edited", "CALLBACK", "CALLBACK")
     isolated_client.put("/api/v1/lead/4", json={"last_contact_date": "2026-09-19"})
-    isolated_client.put("/api/v1/lead/4", json={"title_override": "Renamed"})
+    isolated_client.put("/api/v1/lead/4", json={"position_title": "Renamed"})
     isolated_client.put("/api/v1/lead/4", json={"deadline": "2031-01-01"})
     assert _events(isolated_db, 4)[-3:] == [
         ("contact_logged", "INTERVIEW", "INTERVIEW"), ("field_edited", "INTERVIEW", "INTERVIEW"),

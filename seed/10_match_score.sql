@@ -16,3 +16,7 @@ INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-promote-nodate', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-promote-past', 1, 0.8, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('manual-seed-1', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff', 7, 0.04, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-1', 7, 0.7, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-2', 8, 0.7, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-3', 8, 0.7, 'title_keyword_v1');

@@ -15,4 +15,6 @@ dependencies = [
     "pytest-timeout",
     "pandas",
     "numpy",
+    "authlib",
+    "pillow",
 ]

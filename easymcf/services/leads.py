@@ -1,4 +1,4 @@
-"""REQ-CRM-01..08 — lead promotion, transitions, activity log, deadline maintenance, expiry."""
+"""REQ-CRM-01..11 — lead creation, transitions, batch moves, activity log, deadline maintenance, expiry."""
 
 from __future__ import annotations
 
@@ -15,9 +15,10 @@ TRANSITIONS = {
     "CALLBACK": {"INTERVIEW", "CLOSED"},
     "INTERVIEW": {"OFFER", "CLOSED"},
     "OFFER": {"CLOSED"},
-    "CLOSED": set(),
+    "CLOSED": {"INTERVIEW"},  # re-open, legal only for a lead closed from OFFER (see _check_gates)
 }
-ROLLING_STAGES = frozenset({"CALLBACK", "INTERVIEW", "OFFER"})
+ROLLING_STAGES = frozenset({"CALLBACK", "INTERVIEW"})
+BATCH_MAX = 200
 ROLLING_DAYS = 28
 UNDATED_POST_DAYS = 28
 PAST_CLOSING_DAYS = 7
@@ -70,23 +71,35 @@ def _refresh_deadline(db, lead_id: int, at: str) -> None:
                lead["stage"], lead["stage"])
 
 
-def promote(db, body: dict) -> int:
-    post = db.execute("SELECT id, posted_date, closing_date FROM post WHERE id = ?", (body["post_id"],)).fetchone()
+def _profile_salary(db, track_id: int) -> int | None:
+    row = db.execute("SELECT min_salary FROM search_profile WHERE track_id = ?", (track_id,)).fetchone()
+    return row["min_salary"] if row else None
+
+
+def promote(db, body: dict, *, stage: str = "TOAPPLY", copies: dict | None = None) -> int:
+    """Create a lead. The search process calls it at TOAPPLY, manual add at APPLIED (REQ-CRM-01)."""
+    post = db.execute(
+        "SELECT id, position_title, company_name, url_ref, posted_date, closing_date FROM post WHERE id = ?", (body["post_id"],)).fetchone()
     if post is None:
         raise RecordNotFound(f"post {body['post_id']} not found")
-    if db.execute("SELECT 1 FROM track WHERE id = ?", (body["track_id"],)).fetchone() is None:
+    track = db.execute("SELECT user_id FROM track WHERE id = ?", (body["track_id"],)).fetchone()
+    if track is None:
         raise RecordNotFound(f"track {body['track_id']} not found")
-    existing = db.execute("SELECT id FROM lead WHERE post_id = ?", (body["post_id"],)).fetchone()
+    existing = db.execute("SELECT id FROM lead WHERE user_id = ? AND post_id = ?", (track["user_id"], body["post_id"])).fetchone()
     if existing:
         raise Conflict(f"post {body['post_id']} is already promoted", lead_id=existing["id"])
     at = clock.stamp()
     deadline = initial_deadline(post, clock.today()).isoformat()
+    salary = body.get("expected_salary_sgd", _profile_salary(db, body["track_id"]))
+    values = {"position_title": post["position_title"], "company_name": post["company_name"], "url_ref": post["url_ref"], **(copies or {})}
     lead_id = db.execute(
-        "INSERT INTO lead (post_id, track_id, status, stage, deadline, created_at, updated_at) "
-        "VALUES (?, ?, 'OPEN', 'TOAPPLY', ?, ?, ?)",
-        (body["post_id"], body["track_id"], deadline, at, at),
+        "INSERT INTO lead (user_id, post_id, track_id, status, stage, position_title, company_name, url_ref, deadline, "
+        "applied_date, expected_salary_sgd, created_at, updated_at) VALUES (?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (track["user_id"], body["post_id"], body["track_id"], stage, values["position_title"], values["company_name"],
+         values["url_ref"], deadline, at[:10] if stage == "APPLIED" else None, salary, at, at),
     ).lastrowid
-    _event(db, lead_id, "stage_change", "promoted to TOAPPLY", at, None, "TOAPPLY")
+    detail = "promoted to TOAPPLY" if stage == "TOAPPLY" else f"added manually at {stage}"
+    _event(db, lead_id, "stage_change", detail, at, None, stage)
     return lead_id
 
 
@@ -100,25 +113,79 @@ def _event_type(changed: dict) -> str:
     return "field_edited"
 
 
-def update_lead(db, lead_id: int, body: dict) -> None:
+def _closed_from(db, lead_id: int) -> str | None:
+    row = db.execute(
+        "SELECT stage_from FROM lead_event WHERE lead_id = ? AND stage_to = 'CLOSED' ORDER BY id DESC LIMIT 1", (lead_id,)
+    ).fetchone()
+    return row["stage_from"] if row else None
+
+
+def _check_gates(db, lead, new_stage: str) -> None:
+    """Stage moves that only the offer routes (or the re-open rule) may perform (REQ-CRM-10)."""
+    if new_stage == "OFFER":
+        raise Conflict("an offer is required to reach OFFER: create it with POST /api/v1/offer", lead_id=lead["id"])
+    if lead["stage"] == "OFFER" and new_stage == "CLOSED":
+        raise Conflict("close the lead through its offer: PUT /api/v1/offer/{id}", lead_id=lead["id"])
+    if lead["stage"] == "CLOSED" and _closed_from(db, lead["id"]) != "OFFER":
+        raise Conflict("only a lead closed from OFFER can be re-opened", lead_id=lead["id"])
+
+
+def _check_track(db, track_id: int, owner_id: int) -> None:
+    """A lead can move only to an existing, active track (REQ-CRM-12)."""
+    track = db.execute("SELECT is_active, user_id FROM track WHERE id = ?", (track_id,)).fetchone()
+    if track is None:
+        raise ValidationFailed(f"track {track_id} not found", field="track_id")
+    if not track["is_active"]:
+        raise ValidationFailed(f"track {track_id} is archived", field="track_id")
+    if track["user_id"] != owner_id:
+        raise ValidationFailed(f"track {track_id} belongs to another user", field="track_id")
+
+
+def update_lead(db, lead_id: int, body: dict, *, internal: bool = False, detail: str | None = None) -> None:
+    """The single lead write path. `internal` lets the offer service perform its own stage moves."""
     lead = _load(db, lead_id)
     changed = {k: v for k, v in body.items() if lead[k] != v}
     if not changed:
         return
-    closing = changed.get("stage") == "CLOSED"
-    if "stage" in changed and changed["stage"] not in TRANSITIONS[lead["stage"]]:
-        raise Conflict(f"illegal transition {lead['stage']} -> {changed['stage']}")
+    if "track_id" in changed:
+        _check_track(db, changed["track_id"], lead["user_id"])
+    new_stage = changed.get("stage")
+    closing = new_stage == "CLOSED"
+    reopening = new_stage == "INTERVIEW" and lead["stage"] == "CLOSED"
+    if new_stage is not None:
+        if new_stage not in TRANSITIONS[lead["stage"]]:
+            raise Conflict(f"illegal transition {lead['stage']} -> {new_stage}", lead_id=lead_id)
+        if not internal:
+            _check_gates(db, lead, new_stage)
     if closing and not body.get("close_reason"):
-        raise ValidationFailed("close_reason is required when closing", field="close_reason")
+        raise ValidationFailed("close_reason is required when closing", field="close_reason", lead_id=lead_id)
     if body.get("close_reason") and not closing:
-        raise ValidationFailed("close_reason applies only when closing", field="close_reason")
-    values = {**changed, **({"status": "CLOSED"} if closing else {})}
+        raise ValidationFailed("close_reason applies only when closing", field="close_reason", lead_id=lead_id)
+    values = dict(changed)
+    if closing:
+        values["status"] = "CLOSED"
+    if reopening:
+        values.update(status="OPEN", close_reason=None)
     at = clock.stamp()
     _write(db, lead_id, values)
-    detail = "; ".join(f"{k}: {lead[k]} -> {v}" for k, v in changed.items() if k != "stage") or None
-    _event(db, lead_id, _event_type(changed), detail, at, lead["stage"], changed.get("stage", lead["stage"]))
+    if detail is None:
+        detail = "re-opened from an offer" if reopening else (
+            "; ".join(f"{k}: {lead[k]} -> {v}" for k, v in changed.items() if k != "stage") or None)
+    _event(db, lead_id, _event_type(changed), detail, at, lead["stage"], new_stage or lead["stage"])
     if "deadline" not in changed:
         _refresh_deadline(db, lead_id, at)
+
+
+def batch_update(db, rows: list) -> list[int]:
+    """POST /lead/batch: stage moves for many leads, atomic under the caller's transaction (REQ-CRM-11)."""
+    if not 1 <= len(rows) <= BATCH_MAX:
+        raise ValidationFailed(f"rows must hold 1 to {BATCH_MAX} entries", field="rows")
+    ids = [row.get("id") for row in rows]
+    if len(set(ids)) != len(ids):
+        raise ValidationFailed("rows must not repeat an id", field="rows")
+    for row in rows:
+        update_lead(db, row["id"], {k: v for k, v in row.items() if k != "id"})
+    return ids
 
 
 def add_note(db, body: dict) -> int:
@@ -139,3 +206,4 @@ def expire_due(db) -> None:
             at = clock.stamp()
             _write(db, row["id"], {"stage": "CLOSED", "status": "CLOSED", "close_reason": "expired"})
             _event(db, row["id"], "stage_change", "auto-closed: deadline passed", at, row["stage"], "CLOSED")
+            db.execute("UPDATE offer SET status = 'expired', updated_at = ? WHERE lead_id = ? AND status = 'open'", (at, row["id"]))

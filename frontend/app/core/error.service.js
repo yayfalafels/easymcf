@@ -9,9 +9,9 @@ angular.module('easymcfApp').factory('ErrorService', ['$timeout', function ($tim
 
   return {
     toasts: toasts,
-    report: function (r) {
+    report: function (r, prefix) {
       if (r.status === 400 && r.data && r.data.field) { return; }
-      var toast = { text: messageFor(r) };
+      var toast = { text: (prefix ? prefix + ': ' : '') + messageFor(r) };
       toasts.push(toast);
       $timeout(function () { toasts.splice(toasts.indexOf(toast), 1); }, 8000);
     },

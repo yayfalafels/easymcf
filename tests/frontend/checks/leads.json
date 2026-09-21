@@ -41,7 +41,7 @@
       },
       {
         "op": "visible",
-        "selector": "[data-testid=\"lead-detail-field-title_override\"]",
+        "selector": "[data-testid=\"lead-detail-field-position_title\"]",
         "value": true
       }
     ]
@@ -64,7 +64,7 @@
     ]
   },
   {
-    "name": "lead detail title and company show post values as placeholders",
+    "name": "lead detail heading shows the lead's own title",
     "route": "/leads",
     "actions": [
       {
@@ -82,16 +82,9 @@
     ],
     "expect": [
       {
-        "op": "attribute_equals",
-        "selector": "[data-testid=\"lead-detail-field-title_override\"]",
-        "attribute": "placeholder",
-        "value": "gen ai engineer"
-      },
-      {
-        "op": "attribute_equals",
-        "selector": "[data-testid=\"lead-detail-field-company_override\"]",
-        "attribute": "placeholder",
-        "value": "APAR TECHNOLOGIES PTE. LTD."
+        "op": "text_equals",
+        "selector": "[data-testid=\"lead-detail\"] h2",
+        "value": "GEN AI ENGINEER"
       }
     ]
   },

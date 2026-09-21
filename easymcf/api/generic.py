@@ -31,6 +31,8 @@ class Resource:
     create_fn: Callable | None = None     # (db, body) -> new row id
     update_fn: Callable | None = None     # (db, row_id, body) -> None
     before_read: Callable | None = None   # (db) -> None
+    batch_schema: dict | None = None      # per-row schema for a hook-backed batch of updates
+    batch_fn: Callable | None = None      # (db, rows) -> list of row ids, applied in one transaction
 
 
 def register(resource: Resource) -> None:
@@ -166,12 +168,26 @@ def batch(table: str):
     rows = (request.get_json(silent=True) or {}).get("rows")
     if not isinstance(rows, list):
         raise ValidationFailed("rows must be a list", field="rows")
+    if resource.batch_fn:
+        return _batch_update(resource, db, rows)
     created = []
     with db:
         for body in rows:
             _validate(body, resource.create_schema)
             created.append(_fetch(db, resource, _guarded(_insert, db, resource, body)))
     return jsonify(created), 201
+
+
+def _batch_update(resource: Resource, db, rows: list):
+    """The `batch` shape on a hook-backed table: every row is an update, applied all-or-nothing (REQ-CRM-11)."""
+    for body in rows:
+        try:
+            _validate(body, resource.batch_schema)
+        except ValidationFailed as exc:
+            raise ValidationFailed(exc.message, field="rows") from exc
+    with db:
+        ids = resource.batch_fn(db, rows)
+    return jsonify([_fetch(db, resource, row_id) for row_id in ids])
 
 
 @bp.post("/<table>/delete")

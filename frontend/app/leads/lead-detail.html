@@ -1,27 +1,37 @@
 <section data-testid="lead-detail">
   <header class="detail-header">
     <div><button ng-click="vm.closeDetail()" class="secondary" data-testid="lead-detail-back">Back</button>
-      <h2>{{detail.lead.title_override || detail.lead.position_title}}</h2>
+      <h2>{{detail.lead.position_title}}</h2>
       <p>{{detail.lead.stage}} / {{detail.lead.status}} <span ng-if="detail.lead.close_reason">({{detail.lead.close_reason}})</span></p></div>
     <div class="detail-actions">
       <a ng-if="detail.hasPostUrl()" ng-href="{{detail.lead.url_ref}}" target="_blank" rel="noopener" data-testid="lead-detail-post-link">Open post</a>
       <span ng-if="!detail.hasPostUrl()" class="post-link-unavailable" data-testid="lead-detail-post-unavailable">Open post unavailable</span>
-      <label>Post URL <input type="text" ng-model="detail.lead.url_ref" placeholder="https://..." data-testid="lead-detail-post-url"></label>
-      <button ng-click="detail.savePostUrl()" class="secondary" data-testid="lead-detail-post-url-save">Save post URL</button>
+      <label>Post URL <input type="text" ng-model="detail.lead.url_ref" placeholder="https://..." data-testid="lead-detail-field-url_ref"></label>
       <span ng-if="detail.lead.status === 'OPEN'">
       <button ng-if="detail.nextStage()" ng-click="detail.advance()" data-testid="lead-detail-advance">Move to {{detail.nextStage()}}</button>
       <label>Contact date <input type="date" ng-model="detail.contactDate" data-testid="lead-detail-contact-date"></label>
       <button ng-click="detail.logContact()" data-testid="lead-detail-contact">Log contact</button>
-      <select ng-model="detail.closeReason" ng-options="r for r in detail.reasons" data-testid="lead-detail-close-reason"></select>
-      <button ng-click="detail.close()" class="danger" data-testid="lead-detail-close">Close lead</button>
+      <select ng-if="detail.lead.stage !== 'OFFER'" ng-model="detail.closeReason" ng-options="r for r in detail.reasons" data-testid="lead-detail-close-reason"></select>
+      <button ng-if="detail.lead.stage !== 'OFFER'" ng-click="detail.close()" class="danger" data-testid="lead-detail-close">Close lead</button>
       <button ng-click="detail.saveFields()" data-testid="lead-detail-save">Save changes</button>
       </span>
+      <button ng-if="detail.canReopen()" ng-click="detail.reopen()" data-testid="lead-detail-reopen">Re-open</button>
     </div>
   </header>
 
-  <label>Title <input ng-model="detail.lead.title_override" placeholder="{{detail.lead.position_title}}" data-testid="lead-detail-field-title_override"></label>
-  <label>Company <input ng-model="detail.lead.company_override" placeholder="{{detail.lead.company_name}}" data-testid="lead-detail-field-company_override"></label>
+  <div ng-if="detail.lead.stage === 'OFFER' && detail.lead.offer_id" data-testid="lead-detail-offer">
+    <h3>Offer</h3>
+    <p>S$ {{detail.lead.offer_amount_sgd | number}}, offered {{detail.lead.offer_date}}, deadline {{detail.lead.offer_deadline}}</p>
+    <button ng-click="detail.settle('accepted')" data-testid="lead-detail-offer-accept">Accept</button>
+    <button ng-click="detail.settle('rejected')" data-testid="lead-detail-offer-reject">Reject</button>
+    <button ng-click="detail.settle('withdrawn')" data-testid="lead-detail-offer-withdraw">Withdrawn</button>
+  </div>
+
+  <label>Title <input ng-model="detail.lead.position_title" data-testid="lead-detail-field-position_title"></label>
+  <label>Track <select ng-model="detail.lead.track_id" ng-options="t.id as (t.role_name + ' / ' + t.seniority) for t in detail.tracks()" data-testid="lead-detail-field-track_id"></select></label>
+  <label>Company <input ng-model="detail.lead.company_name" data-testid="lead-detail-field-company_name"></label>
   <label>Deadline <input type="text" ng-model="detail.lead.deadline" data-testid="lead-detail-field-deadline"></label>
+  <label>Expected salary (SGD) <input type="number" min="0" ng-model="detail.lead.expected_salary_sgd" data-testid="lead-detail-field-expected_salary_sgd"></label>
   <label>Applied <input ng-model="detail.lead.applied_date" data-testid="lead-detail-field-applied_date"></label>
   <label>First attempt <input ng-model="detail.lead.first_attempt_date" data-testid="lead-detail-field-first_attempt_date"></label>
   <p data-testid="lead-detail-field-last_contact_date">Last contact: {{detail.lead.last_contact_date}}</p>

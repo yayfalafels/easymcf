@@ -1,11 +1,11 @@
-angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiClient', 'ConfirmDialog', 'ErrorService',
-  function ($scope, $q, ApiClient, ConfirmDialog, ErrorService) {
+angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiClient', 'ConfirmDialog', 'OfferDialog', 'ErrorService',
+  function ($scope, $q, ApiClient, ConfirmDialog, OfferDialog, ErrorService) {
     var d = this;
     var NEXT = { TOAPPLY: 'APPLIED', APPLIED: 'CALLBACK', CALLBACK: 'INTERVIEW', INTERVIEW: 'OFFER' };
-    var EDITABLE = ['title_override', 'company_override', 'deadline', 'applied_date', 'first_attempt_date'];
+    var EDITABLE = ['position_title', 'company_name', 'url_ref', 'deadline', 'applied_date', 'first_attempt_date', 'expected_salary_sgd', 'track_id'];
     d.lead = angular.copy($scope.vm.selected);
     d.loaded = angular.copy(d.lead);
-    d.reasons = ['offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed'];
+    d.reasons = ['offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped'];
     d.closeReason = ''; d.noteText = ''; d.contactDate = new Date(); d.fieldError = null; d.activity = []; d.notes = [];
 
     function adopt(server) {
@@ -54,23 +54,36 @@ angular.module('easymcfApp').controller('LeadDetailCtrl', ['$scope', '$q', 'ApiC
     }
 
     d.hasPostUrl = function () { return /^https?:\/\/\S+$/i.test(d.lead.url_ref || ''); };
-    d.savePostUrl = function () {
-      ApiClient.update('post', d.lead.post_id, { url_ref: d.lead.url_ref || null }).then(
-        function () { d.fieldError = null; changed(); },
-        function (response) { d.fieldError = ErrorService.fieldMessage(response); });
-    };
 
     d.nextStage = function () { return NEXT[d.lead.stage]; };
-    d.advance = function () { save({ stage: d.nextStage() }); };
+    d.advance = function () {
+      if (d.lead.stage === 'INTERVIEW') {
+        OfferDialog.open(d.lead).then(changed, angular.noop);
+        return;
+      }
+      save({ stage: d.nextStage() });
+    };
+    d.settle = function (status) {
+      ConfirmDialog.ask({ message: 'Mark this offer ' + status + '? The lead will close.', confirmLabel: 'Mark ' + status })
+        .then(function () { return ApiClient.update('offer', d.lead.offer_id, { status: status }); })
+        .then(function () { $scope.vm.closeDetail(); }, angular.noop);
+    };
+    d.tracks = function () {
+      return $scope.vm.tracks.filter(function (t) { return t.is_active || t.id === d.lead.track_id; });
+    };
+    d.canReopen = function () { return d.lead.status === 'CLOSED' && d.lead.closed_from === 'OFFER'; };
+    d.reopen = function () { save({ stage: 'INTERVIEW' }); };
     d.close = function () {
       ConfirmDialog.ask({ message: 'Close this lead?', confirmLabel: 'Close lead' })
         .then(function () { save({ stage: 'CLOSED', close_reason: d.closeReason || null }); }, angular.noop);
     };
     d.logContact = function () { save({ last_contact_date: dateValue(d.contactDate) }); };
     d.saveFields = function () {
-      save({ title_override: d.lead.title_override || null, company_override: d.lead.company_override || null,
+      save({ position_title: d.lead.position_title, company_name: d.lead.company_name, url_ref: d.lead.url_ref || null,
              deadline: d.lead.deadline || null, applied_date: d.lead.applied_date || null,
-             first_attempt_date: d.lead.first_attempt_date || null });
+             first_attempt_date: d.lead.first_attempt_date || null,
+             expected_salary_sgd: d.lead.expected_salary_sgd === undefined ? null : d.lead.expected_salary_sgd,
+             track_id: d.lead.track_id });
     };
     d.addNote = function () {
       ApiClient.create('lead_note', { lead_id: d.lead.id, note: d.noteText }).then(function () { d.noteText = ''; changed(); });

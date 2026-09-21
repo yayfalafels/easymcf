@@ -601,3 +601,11 @@ td button { margin: 0.18rem; }
   td { display: block; text-align: left; }
   td:last-child { text-align: left; }
 }
+.batch-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; margin-top: 0.8rem; }
+.lead-table { width: 100%; margin-top: 0.8rem; border-collapse: collapse; font-size: 0.86rem; }
+.lead-table th { padding: 0.3rem 0.5rem; text-align: left; color: var(--muted); border-bottom: 1px solid var(--line); }
+.lead-table td { padding: 0.28rem 0.5rem; white-space: nowrap; }
+tr[data-testid^="lead-row-"] { display: table-row; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; transform: none; }
+tr[data-testid^="lead-row-"]:hover { background: rgba(13, 107, 89, 0.06); transform: none; box-shadow: none; }
+tr[data-testid^="lead-row-"] > td { border-bottom: 1px solid #e4e9e5; }
+.lead-board > [data-testid^="leads-column-"]:has(.lead-table) { width: 100%; }

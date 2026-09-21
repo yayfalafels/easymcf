@@ -16,3 +16,11 @@ INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-prom
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-promote-nodate', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-promote-past', 1, 0);
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('manual-seed-1', 1, 0);
+-- second user shared or private match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff', 7, 1);
+-- second user shared or private match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-1', 7, 0);
+-- second user shared or private match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-2', 8, 0);
+-- second user shared or private match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-3', 8, 0);

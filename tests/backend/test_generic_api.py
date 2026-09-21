@@ -87,7 +87,7 @@ def test_manual_lead_endpoint_creates_post_and_promotes(isolated_client, isolate
     })
     assert response.status_code == 201
     lead = response.get_json()
-    assert lead["stage"] == "TOAPPLY" and lead["status"] == "OPEN"
+    assert lead["stage"] == "APPLIED" and lead["status"] == "OPEN"
     post = sqlite3.connect(isolated_db).execute(
         "SELECT src_method, url_ref FROM post WHERE id = ?", (lead["post_id"],)
     ).fetchone()

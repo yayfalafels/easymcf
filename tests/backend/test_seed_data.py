@@ -36,12 +36,44 @@ def test_track_and_post_coverage(conn):
     assert conn.execute("SELECT COUNT(*) FROM (SELECT post_id FROM post_track GROUP BY post_id HAVING COUNT(*) > 1)").fetchone()[0] >= 1
 
 
-def test_user_ownership(conn):
-    assert conn.execute("SELECT COUNT(*) FROM user").fetchone()[0] == 1
-    (user_id,) = conn.execute("SELECT id FROM user").fetchone()
-    assert conn.execute("SELECT COUNT(*) FROM track WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
-    assert conn.execute("SELECT COUNT(*) FROM cv WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
-    assert conn.execute("SELECT COUNT(*) FROM session WHERE user_id != ?", (user_id,)).fetchone()[0] == 0
+def test_two_users_with_distinct_data(conn):
+    assert conn.execute("SELECT COUNT(*) FROM user").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM track WHERE user_id = 2").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM lead WHERE user_id = 2").fetchone()[0] == 4
+    assert conn.execute("SELECT COUNT(*) FROM cv WHERE user_id = 2").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM lead_note WHERE lead_id IN (SELECT id FROM lead WHERE user_id = 2)").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM run_log WHERE user_id = 2").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM mcf_session").fetchone()[0] == 2
+
+
+def test_ownership_columns_are_consistent(conn):
+    assert conn.execute("SELECT COUNT(*) FROM lead JOIN track ON track.id = lead.track_id WHERE lead.user_id != track.user_id").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM track JOIN cv ON cv.id = track.default_cv_id WHERE cv.user_id != track.user_id").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM mcf_session WHERE user_id != id").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM lead WHERE position_title = '' OR company_name = ''").fetchone()[0] == 0
+
+
+def test_seeded_passwords_verify(conn):
+    from werkzeug.security import check_password_hash
+    rows = dict(conn.execute("SELECT id, password_hash FROM user"))
+    assert rows[1].startswith("scrypt:") and check_password_hash(rows[1], "Seed-Password-1!")
+    assert check_password_hash(rows[2], "Seed-Password-2!")
+    assert rows[1] != rows[2]
+    assert conn.execute("SELECT COUNT(*) FROM user WHERE google_sub IS NOT NULL OR photo_ref IS NOT NULL").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM auth_session").fetchone()[0] == 0
+
+
+def test_shared_posts_and_per_user_leads(conn):
+    matched_to_both = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT pt.post_id FROM post_track pt JOIN track t ON t.id = pt.track_id "
+        "GROUP BY pt.post_id HAVING COUNT(DISTINCT t.user_id) = 2)").fetchone()[0]
+    assert matched_to_both >= 1
+    only_user_2 = conn.execute(
+        "SELECT COUNT(*) FROM (SELECT pt.post_id FROM post_track pt JOIN track t ON t.id = pt.track_id "
+        "GROUP BY pt.post_id HAVING MIN(t.user_id) = 2)").fetchone()[0]
+    assert only_user_2 == 3
+    both_lead = conn.execute("SELECT COUNT(*) FROM (SELECT post_id FROM lead GROUP BY post_id HAVING COUNT(DISTINCT user_id) = 2)").fetchone()[0]
+    assert both_lead == 1
 
 
 def test_match_score_paired_with_post_track(conn):
@@ -87,12 +119,13 @@ def test_event_type_enumeration_is_complete(conn):
 
 
 def test_seeded_user_identity(conn):
-    assert conn.execute("SELECT name, email FROM user").fetchall() == [("Taylor Hickem", "yayfalafels@gmail.com")]
+    assert conn.execute("SELECT name, email FROM user ORDER BY id").fetchall() == [
+        ("Taylor Hickem", "yayfalafels@gmail.com"), ("Sam Second", "second.user@example.test")]
 
 
 def test_seeded_roles_and_tracks(conn):
     assert distinct(conn, "SELECT name FROM role") == SEEDED_ROLES
-    rows = conn.execute("SELECT r.name, t.is_active, t.default_cv_id FROM track t JOIN role r ON r.id = t.role_id").fetchall()
+    rows = conn.execute("SELECT r.name, t.is_active, t.default_cv_id FROM track t JOIN role r ON r.id = t.role_id WHERE t.user_id = 1").fetchall()
     assert {row[0] for row in rows} == SEEDED_ROLES
     new = {row[0]: row for row in rows if row[0] in SEEDED_ROLES - {"Data Analyst", "Sustainability Consultant"}}
     assert len(new) == 4 and all(row[1] == 1 for row in new.values())
@@ -160,11 +193,11 @@ def test_open_stages_expire_and_closed_leads_keep_state(isolated_client, isolate
     conn = sqlite3.connect(isolated_db)
     conn.execute("UPDATE lead SET deadline = '2026-01-01'")
     conn.commit()
-    closed_before = conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' ORDER BY id").fetchall()
+    closed_before = conn.execute("SELECT * FROM lead WHERE user_id = 1 AND status = 'CLOSED' ORDER BY id").fetchall()
     fixed_clock("2026-09-15T07:00:00")
     leads = isolated_client.get("/api/v1/lead/search").get_json()
     assert all(l["close_reason"] == "expired" for l in leads if l["id"] <= 5)
-    assert conn.execute("SELECT * FROM lead WHERE status = 'CLOSED' AND id >= 6 ORDER BY id").fetchall() == closed_before
+    assert conn.execute("SELECT * FROM lead WHERE user_id = 1 AND status = 'CLOSED' AND id >= 6 ORDER BY id").fetchall() == closed_before
 
 
 def _pin_after_anchor(isolated_db, fixed_clock, days: int) -> date:
@@ -201,7 +234,7 @@ def test_activity_at_callback_or_later_keeps_the_window_rolling(isolated_client,
 def test_activity_before_callback_leaves_the_deadline(isolated_client, isolated_db, fixed_clock):
     _pin_after_anchor(isolated_db, fixed_clock, 5)
     before = isolated_client.get("/api/v1/lead/1").get_json()["deadline"]
-    isolated_client.put("/api/v1/lead/1", json={"company_override": "Seed Co"})
+    isolated_client.put("/api/v1/lead/1", json={"company_name": "Seed Co"})
     assert isolated_client.get("/api/v1/lead/1").get_json()["deadline"] == before
     assert "deadline_changed" not in _events(isolated_db, 1)[-2:]
 

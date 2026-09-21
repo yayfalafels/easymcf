@@ -25,7 +25,7 @@
 </form>
 
 <div class="lead-tabs">
-  <button ng-repeat="tab in vm.tabs" ng-click="vm.tab = tab" data-testid="leads-tab-{{tab.key}}">
+  <button ng-repeat="tab in vm.tabs" ng-click="vm.setTab(tab)" data-testid="leads-tab-{{tab.key}}">
     {{tab.label}} ({{vm.count(tab)}})
   </button>
 </div>
@@ -33,10 +33,47 @@
 <div class="lead-board">
   <div ng-repeat="stage in vm.tab.stages" data-testid="leads-column-{{stage}}">
     <h2>{{stage}}</h2>
-    <div ng-repeat="l in vm.inStages([stage])" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
-      <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
-      <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong><span>{{vm.company(l)}}</span>
-      <span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span>
+    <div class="batch-actions" ng-if="stage === 'TOAPPLY'">
+      <label><input type="checkbox" ng-model="vm.allChecked" ng-change="vm.toggleAll(vm.allChecked)" data-testid="lead-select-all"> Select all</label>
+      <button type="button" ng-click="vm.apply()" ng-disabled="!vm.checkedCount()" data-testid="lead-batch-apply">Apply ({{vm.checkedCount()}})</button>
+      <button type="button" class="danger" ng-click="vm.drop()" ng-disabled="!vm.checkedCount()" data-testid="lead-batch-drop">Drop ({{vm.checkedCount()}})</button>
+    </div>
+
+    <table class="lead-table" ng-if="vm.tab.layout === 'table'">
+      <thead><tr>
+        <th ng-if="stage === 'TOAPPLY'"></th><th>Title</th><th>Company</th><th>Track</th><th>Salary</th><th>Deadline</th><th>Days left</th>
+      </tr></thead>
+      <tbody>
+        <tr ng-repeat="l in vm.inStages([stage], vm.tab.sort)" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
+          <td ng-if="stage === 'TOAPPLY'" ng-click="$event.stopPropagation()"><input type="checkbox" ng-model="vm.checked[l.id]" data-testid="lead-select-{{l.id}}"></td>
+          <td>
+            <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
+            <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong>
+          </td>
+          <td>{{vm.company(l)}}</td>
+          <td>{{vm.trackName(l)}}</td>
+          <td data-testid="lead-salary-{{l.id}}">{{vm.money(vm.salary(l))}}</td>
+          <td>{{l.deadline}}</td>
+          <td><span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div ng-if="vm.tab.layout === 'card'">
+      <div ng-repeat="l in vm.inStages([stage], vm.tab.sort)" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
+        <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
+        <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong><span>{{vm.company(l)}}</span>
+        <span data-testid="lead-salary-{{l.id}}">{{vm.money(vm.salary(l))}}</span>
+        <span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span>
+        <span data-testid="lead-latest-note-{{l.id}}" title="{{l.latest_note}}">{{vm.excerpt(l.latest_note)}}</span>
+        <span data-testid="lead-last-contact-{{l.id}}">{{l.last_contact_date ? 'Last contact: ' + l.last_contact_date : 'No contact logged'}}</span>
+        <span ng-if="l.stage === 'OFFER'" data-testid="lead-offer-terms-{{l.id}}">Offer {{l.offer_date}}, deadline {{l.offer_deadline}}</span>
+        <div ng-if="l.stage === 'OFFER'" ng-click="$event.stopPropagation()">
+          <button ng-click="vm.settle(l, 'accepted')" data-testid="offer-accept-{{l.offer_id}}">Accept</button>
+          <button ng-click="vm.settle(l, 'rejected')" data-testid="offer-reject-{{l.offer_id}}">Reject</button>
+          <button ng-click="vm.settle(l, 'withdrawn')" data-testid="offer-withdraw-{{l.offer_id}}">Withdrawn</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

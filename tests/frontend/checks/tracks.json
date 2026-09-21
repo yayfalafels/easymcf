@@ -19,6 +19,7 @@
         "selector": "[data-testid=\"track-role-select\"]",
         "value": true
       }
-    ]
+    ],
+    "as_user": "seed_a"
   }
 ]

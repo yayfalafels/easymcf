@@ -1,0 +1,11 @@
+[
+  {"name": "upload a photo", "as_user": "seed_a", "method": "PUT", "path": "/api/v1/users/1/photo", "files": {"photo": "tests/support/photo_ok.png"}, "expected_status": 200},
+  {"name": "the owner reads the photo", "as_user": "seed_a", "method": "GET", "path": "/api/v1/users/1/photo", "expected_status": 200,
+   "expected_headers": [{"name": "Content-Type", "contains": "image/png"}, {"name": "Cache-Control", "contains": "private"}]},
+  {"name": "another user gets 404 for it", "as_user": "seed_b", "method": "GET", "path": "/api/v1/users/1/photo", "expected_status": 404},
+  {"name": "another user cannot replace it", "as_user": "seed_b", "method": "PUT", "path": "/api/v1/users/1/photo", "files": {"photo": "tests/support/photo_ok.png"}, "expected_status": 404},
+  {"name": "text under a png name is refused", "as_user": "seed_a", "method": "PUT", "path": "/api/v1/users/1/photo", "files": {"photo": "tests/support/photo_fake.png"}, "expected_status": 415},
+  {"name": "a jpeg is accepted", "as_user": "seed_a", "method": "PUT", "path": "/api/v1/users/1/photo", "files": {"photo": "tests/support/photo_wide.jpg"}, "expected_status": 200},
+  {"name": "delete the photo", "as_user": "seed_a", "method": "DELETE", "path": "/api/v1/users/1/photo", "expected_status": 200},
+  {"name": "the photo is gone", "as_user": "seed_a", "method": "GET", "path": "/api/v1/users/1/photo", "expected_status": 404}
+]

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from flask import jsonify, request
+from flask import g, jsonify, request
 
 from .. import clock
+from .. import tenancy
 from ..services import leads, offers
 from .db import get_db
 from .generic import GENERIC, REGISTRY, Resource, _fetch, _validate, bp, register
@@ -16,9 +17,9 @@ _DATE = {"type": ["string", "null"], "pattern": r"^\d{4}-\d{2}-\d{2}$"}
 _ANY = {"type": "object"}
 
 
-def _only_user(db) -> dict:
-    row = db.execute("SELECT id FROM user ORDER BY id LIMIT 1").fetchone()
-    return {"user_id": row["id"]} if row else {}
+def _owner(db, uid: int) -> dict:
+    """The server-set owner of a new row (ARCH-AUTH-04). A client body can never carry user_id."""
+    return {"user_id": uid}
 
 
 _TRACK_PROPS = {
@@ -29,13 +30,13 @@ _TRACK_PROPS = {
 }
 register(Resource(
     "track",
-    create_schema={"type": "object", "properties": {**_TRACK_PROPS, "user_id": {"type": "integer"}},
-                   "required": ["user_id", "role_id", "seniority"], "additionalProperties": False},
+    create_schema={"type": "object", "properties": _TRACK_PROPS,
+                   "required": ["role_id", "seniority"], "additionalProperties": False},
     update_schema={"type": "object", "properties": _TRACK_PROPS, "additionalProperties": False},
     verbs=frozenset({"get", "search", "create", "update"}),
     bool_columns=("is_active",),
     select_sql="SELECT track.*, role.name AS role_name FROM track JOIN role ON role.id = track.role_id",
-    defaults=_only_user,
+    owned=_owner, parents=(("default_cv_id", "cv"),),
 ))
 register(Resource(
     "role",
@@ -47,10 +48,9 @@ register(Resource(
 _CV_PROPS = {"label": {"type": "string", "minLength": 1}}
 register(Resource(
     "cv",
-    create_schema={"type": "object", "properties": {**_CV_PROPS, "user_id": {"type": "integer"}},
-                   "required": ["user_id", "label"], "additionalProperties": False},
+    create_schema={"type": "object", "properties": _CV_PROPS, "required": ["label"], "additionalProperties": False},
     update_schema={"type": "object", "properties": _CV_PROPS, "required": ["label"], "additionalProperties": False},
-    verbs=frozenset({"get", "search", "create", "update", "delete"}), defaults=_only_user,
+    verbs=frozenset({"get", "search", "create", "update", "delete"}), owned=_owner,
 ))
 _PROFILE_PROPS = {
     "keywords": {"type": "string", "minLength": 1}, "min_salary": {"type": ["integer", "null"]},
@@ -63,7 +63,7 @@ register(Resource(
     create_schema={"type": "object", "properties": {"track_id": {"type": "integer"}, **_PROFILE_PROPS},
                    "required": ["track_id", "keywords", "min_match_score", "employment_type"], "additionalProperties": False},
     update_schema={"type": "object", "properties": _PROFILE_PROPS, "additionalProperties": False},
-    verbs=frozenset({"get", "search", "create", "update"}), pk="track_id",
+    verbs=frozenset({"get", "search", "create", "update"}), pk="track_id", parents=(("track_id", "track"),),
 ))
 _SCHEDULE_PROPS = {
     "schedule_enabled": {"type": ["boolean", "integer"]},
@@ -76,14 +76,10 @@ register(Resource(
                    "required": ["track_id", "schedule_enabled", "schedule_interval_hours"], "additionalProperties": False},
     update_schema={"type": "object", "properties": _SCHEDULE_PROPS, "additionalProperties": False},
     verbs=frozenset({"get", "search", "create", "update"}), pk="track_id", bool_columns=("schedule_enabled",),
+    parents=(("track_id", "track"),),
 ))
-_POST_UPDATE_PROPS = {"url_ref": {"type": ["string", "null"]}}
-register(Resource(
-    "post",
-    create_schema=_ANY,
-    update_schema={"type": "object", "properties": _POST_UPDATE_PROPS, "required": ["url_ref"], "additionalProperties": False},
-    verbs=frozenset({"get", "search", "update"}), bool_columns=("is_open",),
-))
+# A post is shared and read-only to every user (REQ-AUTH-06). Only the search run and the manual entry endpoints write it.
+register(Resource("post", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY, bool_columns=("is_open",)))
 
 _LEAD_SELECT = (
     "SELECT lead.*, "
@@ -117,6 +113,7 @@ register(Resource(
         "id": {"type": "integer"}, "stage": {"enum": list(leads.STAGES)},
         "close_reason": {"enum": [*leads.CLOSE_REASONS, None]}}},
     batch_fn=leads.batch_update,
+    parents=(("track_id", "track"), ("post_id", "post")),
 ))
 
 _MANUAL_LEAD_SCHEMA = {
@@ -135,7 +132,8 @@ _MANUAL_LEAD_SCHEMA = {
 def create_manual_lead():
     body = request.get_json(silent=True)
     _validate(body, _MANUAL_LEAD_SCHEMA)
-    db = get_db()
+    db, uid = get_db(), g.user_id
+    tenancy.require_visible(db, uid, "track", body["track_id"])
     post_id = f"manual-{uuid.uuid4()}"
     with db:
         db.execute(
@@ -149,7 +147,7 @@ def create_manual_lead():
             lead_body["expected_salary_sgd"] = body["expected_salary_sgd"]
         copies = {"position_title": body["position_title"], "company_name": body["company_name"], "url_ref": body.get("url_ref")}
         lead_id = leads.promote(db, lead_body, stage="APPLIED", copies=copies)
-        lead = _fetch(db, REGISTRY["lead"], lead_id)
+        lead = _fetch(db, REGISTRY["lead"], lead_id, uid)
     return jsonify(lead), 201
 
 
@@ -159,6 +157,7 @@ register(Resource(
                                                    "note": {"type": "string", "minLength": 1}},
                    "required": ["lead_id", "note"], "additionalProperties": False},
     update_schema=_ANY, verbs=frozenset({"get", "search", "create"}), create_fn=leads.add_note,
+    parents=(("lead_id", "lead"),),
 ))
 register(Resource("lead_event", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY))
 register(Resource("application", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY))
@@ -172,5 +171,5 @@ register(Resource(
     verbs=frozenset({"get", "search", "create", "update"}),
     select_sql=("SELECT offer.*, lead.position_title AS lead_title, lead.company_name AS lead_company, lead.track_id "
                 "FROM offer JOIN lead ON lead.id = offer.lead_id"),
-    create_fn=offers.create_offer, update_fn=offers.update_offer,
+    create_fn=offers.create_offer, update_fn=offers.update_offer, parents=(("lead_id", "lead"),),
 ))

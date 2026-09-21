@@ -89,6 +89,18 @@ def check_mcf_mode(mode: str) -> str | None:
     return None
 
 
+def check_google_secret(config: Config) -> str | None:
+    """A Google client id in .env needs its secret file, at mode 0600 (ARCH-AUTH-06)."""
+    if not config.gcp_client_id:
+        return None
+    path = config.gcp_secret_path
+    if not os.path.exists(path):
+        return f"GCP_OAUTH_CLIENT_ID is set but {path} is missing"
+    if os.stat(path).st_mode & 0o077:
+        return f"{path} must have mode 0600 (chmod 600 {path})"
+    return None
+
+
 def main() -> int:
     config = Config()
     checks = [
@@ -99,6 +111,7 @@ def main() -> int:
         ("db schema_version", check_schema_version(config.db_path)),
         ("port free", check_port_free(config.port)),
         ("mcf mode", check_mcf_mode(config.mcf_mode)),
+        ("google client secret file", check_google_secret(config)),
     ]
 
     failures = [(name, msg) for name, msg in checks if msg]

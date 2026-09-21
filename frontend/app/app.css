@@ -609,3 +609,30 @@ tr[data-testid^="lead-row-"] { display: table-row; margin: 0; padding: 0; border
 tr[data-testid^="lead-row-"]:hover { background: rgba(13, 107, 89, 0.06); transform: none; box-shadow: none; }
 tr[data-testid^="lead-row-"] > td { border-bottom: 1px solid #e4e9e5; }
 .lead-board > [data-testid^="leads-column-"]:has(.lead-table) { width: 100%; }
+
+/* Accounts and sign-in (feature 13) */
+.user-section { position: relative; margin-top: auto; padding: 0.7rem; }
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 32px; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 50%;
+  background: var(--brand); color: #fff; font-weight: 600; font-size: 0.8rem; cursor: pointer;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-menu {
+  position: absolute; left: calc(100% + 0.4rem); bottom: 0.5rem; z-index: 20; min-width: 12rem;
+  display: flex; flex-direction: column; gap: 0.4rem; padding: 0.8rem;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(23, 33, 31, 0.15);
+}
+.user-menu span { color: var(--muted); font-size: 0.85rem; word-break: break-all; }
+.auth-form { display: flex; flex-direction: column; gap: 0.8rem; max-width: 24rem; }
+.auth-form label { display: flex; flex-direction: column; gap: 0.25rem; }
+.auth-error, .field-error { color: var(--danger); margin: 0; }
+.google-button { display: inline-block; padding: 0.55rem 0.9rem; text-align: center; border: 1px solid var(--line); border-radius: 6px; text-decoration: none; color: var(--ink); background: var(--surface); }
+.rule-list { list-style: none; margin: 0; padding: 0; font-size: 0.9rem; }
+.rule-list li::before { content: "\2713  "; }
+.rule-list li[data-state="unmet"] { color: var(--muted); }
+.rule-list li[data-state="unmet"]::before { content: "\25CB  "; }
+.rule-list li[data-state="met"] { color: #1f7a4d; }
+@media (max-width: 760px) { .user-section { margin-left: auto; margin-top: 0; } .user-menu { left: auto; right: 0; bottom: auto; top: 100%; } }

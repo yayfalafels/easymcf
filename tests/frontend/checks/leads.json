@@ -14,7 +14,8 @@
         "selector": "[data-testid^=\"leads-tab-\"]",
         "value": 6
       }
-    ]
+    ],
+    "as_user": "seed_a"
   },
   {
     "name": "lead detail opens from a row",
@@ -44,7 +45,8 @@
         "selector": "[data-testid=\"lead-detail-field-position_title\"]",
         "value": true
       }
-    ]
+    ],
+    "as_user": "seed_a"
   },
   {
     "name": "lead card title is a post link",
@@ -61,7 +63,8 @@
         "selector": "[data-testid=\"lead-title-link-1\"]",
         "value": true
       }
-    ]
+    ],
+    "as_user": "seed_a"
   },
   {
     "name": "lead detail heading shows the lead's own title",
@@ -86,7 +89,8 @@
         "selector": "[data-testid=\"lead-detail\"] h2",
         "value": "GEN AI ENGINEER"
       }
-    ]
+    ],
+    "as_user": "seed_a"
   },
   {
     "name": "lead detail activity shows the manual add stage",
@@ -117,8 +121,9 @@
       {
         "op": "text_equals",
         "selector": "[data-testid=\"lead-detail-activity-stage\"]",
-        "value": "new → APPLIED"
+        "value": "new \u2192 APPLIED"
       }
-    ]
+    ],
+    "as_user": "seed_a"
   }
 ]

@@ -13,6 +13,7 @@ browser, page` in a conftest.py registers them exactly as if defined there.
 
 from __future__ import annotations
 
+import json
 import os
 import socket
 import subprocess
@@ -81,6 +82,14 @@ def terminate_app(proc: subprocess.Popen) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait()
+
+
+def sign_in(page, base_url: str, name: str = "seed_a") -> None:
+    """Sign the page's browser context in through the real sign-in endpoint as a seeded account (STRAT-SILO-08)."""
+    with open(os.path.join(_REPO_ROOT, "tests", "support", "users.json"), encoding="utf-8") as handle:
+        creds = json.load(handle)[name]
+    response = page.request.post(base_url + "/api/v1/auth/signin", data=creds)
+    assert response.status == 200, f"sign-in as {name} returned {response.status}"
 
 
 @pytest.fixture(scope="session")

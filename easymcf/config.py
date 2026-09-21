@@ -19,6 +19,11 @@ import os
 from dataclasses import dataclass, field
 
 
+def _client_id() -> str:
+    value = os.environ.get("GCP_OAUTH_CLIENT_ID", "").strip()
+    return "" if value.startswith("%%") else value  # an unfilled .env.example placeholder never enables Google
+
+
 @dataclass(frozen=True)
 class Config:
     db_path: str = field(default_factory=lambda: os.environ.get("DB_PATH", "data/easymcf.db"))
@@ -32,3 +37,33 @@ class Config:
     apply_poll_delay_s: float = field(
         default_factory=lambda: float(os.environ.get("APPLY_POLL_DELAY_S", "5"))
     )
+    session_lifetime_h: int = field(default_factory=lambda: int(os.environ.get("SESSION_LIFETIME_H", "336")))
+    cookie_secure: bool = field(default_factory=lambda: os.environ.get("COOKIE_SECURE", "0") == "1")
+    signin_max_failures: int = field(default_factory=lambda: int(os.environ.get("SIGNIN_MAX_FAILURES", "5")))
+    signin_window_s: int = field(default_factory=lambda: int(os.environ.get("SIGNIN_WINDOW_S", "900")))
+    password_min_length: int = field(default_factory=lambda: int(os.environ.get("PASSWORD_MIN_LENGTH", "12")))
+    photo_dir: str = field(default_factory=lambda: os.environ.get("PHOTO_DIR", "data/photos"))
+    photo_max_bytes: int = field(default_factory=lambda: int(os.environ.get("PHOTO_MAX_BYTES", "2097152")))
+    gcp_client_id: str = field(default_factory=lambda: _client_id())
+    google_discovery_url: str = field(
+        default_factory=lambda: os.environ.get("GOOGLE_DISCOVERY_URL", "https://accounts.google.com/.well-known/openid-configuration")
+    )
+
+    @property
+    def gcp_secret_path(self) -> str:
+        return os.environ.get("GCP_OAUTH_SECRET_FILE") or os.path.join(self.secrets_dir, "gcp_oauth_client_secret")
+
+    @property
+    def google_redirect_uri(self) -> str:
+        return os.environ.get("GOOGLE_REDIRECT_URI") or f"http://127.0.0.1:{self.port}/api/v1/auth/google/callback"
+
+    def google_client_secret(self) -> str:
+        try:
+            with open(self.gcp_secret_path, encoding="utf-8") as handle:
+                return handle.read().strip()
+        except OSError:
+            return ""
+
+    @property
+    def google_enabled(self) -> bool:
+        return bool(self.gcp_client_id and self.google_client_secret())

@@ -1,0 +1,11 @@
+[
+  {"name": "auth config reports Google", "method": "GET", "path": "/api/v1/auth/config", "expected_status": 200,
+   "expected_body": {"google_enabled": true}},
+  {"name": "start redirects to the provider without following it", "method": "GET", "path": "/api/v1/auth/google/start?next=/leads",
+   "follow_redirects": false, "expected_status": 302,
+   "expected_headers": [{"name": "Location", "contains": "code_challenge="}, {"name": "Location", "contains": "state="},
+                        {"name": "Location", "contains": "nonce="}, {"name": "Location", "contains": "code_challenge_method=S256"}]},
+  {"name": "a callback with a state that was never issued redirects to sign in", "method": "GET",
+   "path": "/api/v1/auth/google/callback?state=wrong&code=x", "follow_redirects": false, "expected_status": 302,
+   "expected_headers": [{"name": "Location", "contains": "/signin?error=google_invalid"}]}
+]

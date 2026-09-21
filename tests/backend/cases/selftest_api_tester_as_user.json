@@ -1,0 +1,79 @@
+[
+  {
+    "name": "anonymous request is refused",
+    "method": "GET",
+    "path": "/api/v1/track/search",
+    "expected_status": 401
+  },
+  {
+    "name": "as seed_a reads the current user",
+    "as_user": "seed_a",
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "expected_status": 200,
+    "expected_body": {
+      "id": 1,
+      "name": "Taylor Hickem",
+      "email": "yayfalafels@gmail.com",
+      "photo_url": null,
+      "auth_methods": [
+        "password"
+      ]
+    }
+  },
+  {
+    "name": "as seed_b reads a different user",
+    "as_user": "seed_b",
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "expected_status": 200,
+    "expected_body": {
+      "id": 2,
+      "name": "Sam Second",
+      "email": "second.user@example.test",
+      "photo_url": null,
+      "auth_methods": [
+        "password"
+      ]
+    }
+  },
+  {
+    "name": "seed_a still holds its own cookie",
+    "as_user": "seed_a",
+    "method": "GET",
+    "path": "/api/v1/track/search",
+    "expected_status": 200
+  },
+  {
+    "name": "sign in sets an HttpOnly cookie",
+    "method": "POST",
+    "path": "/api/v1/auth/signin",
+    "body": {
+      "email": "yayfalafels@gmail.com",
+      "password": "Seed-Password-1!"
+    },
+    "expected_status": 200,
+    "expected_cookie": {
+      "name": "easymcf_session",
+      "http_only": true
+    }
+  },
+  {
+    "name": "the anonymous jar keeps that cookie",
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "expected_status": 200
+  },
+  {
+    "name": "a header assertion reads the response",
+    "method": "GET",
+    "path": "/api/v1/auth/config",
+    "expected_status": 200,
+    "expected_headers": [
+      {
+        "name": "Content-Type",
+        "contains": "application/json"
+      }
+    ]
+  }
+]

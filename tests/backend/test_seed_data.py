@@ -53,8 +53,10 @@ def test_ownership_columns_are_consistent(conn):
     assert conn.execute("SELECT COUNT(*) FROM lead WHERE position_title = '' OR company_name = ''").fetchone()[0] == 0
 
 
-def test_seeded_passwords_verify(conn):
+def test_seeded_passwords_verify(isolated_db):
     from werkzeug.security import check_password_hash
+
+    conn = sqlite3.connect(isolated_db)
     rows = dict(conn.execute("SELECT id, password_hash FROM user"))
     assert rows[1].startswith("scrypt:") and check_password_hash(rows[1], "Seed-Password-1!")
     assert check_password_hash(rows[2], "Seed-Password-2!")
@@ -183,7 +185,9 @@ def test_rolling_deadline_27_and_29_days(isolated_client, isolated_db, fixed_clo
     conn.execute("UPDATE lead SET stage = 'CALLBACK', deadline = '2026-10-12' WHERE id = 1")
     conn.execute("UPDATE lead SET stage = 'CALLBACK', deadline = '2026-10-10' WHERE id = 2")
     conn.commit()
-    fixed_clock("2026-10-11T07:00:00")
+    fixed_clock("2026-10-11T07:00:00")  # after the session the fixture opened at real time has expired
+    assert isolated_client.get("/api/v1/auth/me").status_code == 401
+    isolated_client.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"})
     leads = {l["id"]: l for l in isolated_client.get("/api/v1/lead/search").get_json()}
     assert leads[1]["status"] == "OPEN"
     assert leads[2]["status"] == "CLOSED" and leads[2]["close_reason"] == "expired"

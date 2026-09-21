@@ -25,6 +25,14 @@ from initdb import apply_schema  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import browser, page  # noqa: E402,F401
 
+# scripts/initdb.py and scripts/resetdb.py call load_dotenv() when imported, which copies a developer's personal
+# .env into this process. Google sign-in and session settings must come from the tests alone (ENV-CFG-03), so the
+# Google and cookie values are removed here, before any app is created. The live tier reads .env itself.
+for _key in ("GCP_OAUTH_CLIENT_ID", "GCP_OAUTH_TEST_EMAIL", "GCP_OAUTH_SECRET_FILE", "GOOGLE_REDIRECT_URI",
+             "GOOGLE_DISCOVERY_URL", "SECRET_KEY", "COOKIE_SECURE", "SESSION_LIFETIME_H", "SIGNIN_MAX_FAILURES",
+             "SIGNIN_WINDOW_S", "PASSWORD_MIN_LENGTH", "PHOTO_DIR", "PHOTO_MAX_BYTES"):
+    os.environ.pop(_key, None)
+
 # `browser`/`page` (ARCH-TEST-04/09) are registered exactly once, here at the
 # top level, deliberately — 07.IS.06. Registering them separately in both
 # tests/frontend/conftest.py and tests/e2e/conftest.py (each importing the
@@ -48,15 +56,18 @@ def db_path(tmp_path_factory):
     apply_schema(path)
     apply_seed(path)
 
-    previous = os.environ.get("DB_PATH")
-    os.environ["DB_PATH"] = path
+    scratch = {"DB_PATH": path, "SECRETS_DIR": str(tmp_path_factory.mktemp("easymcf-secrets")),
+               "PHOTO_DIR": str(tmp_path_factory.mktemp("easymcf-photos"))}
+    previous = {key: os.environ.get(key) for key in scratch}
+    os.environ.update(scratch)
     try:
         yield path
     finally:
-        if previous is None:
-            os.environ.pop("DB_PATH", None)
-        else:
-            os.environ["DB_PATH"] = previous
+        for key, value in previous.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
 
 
 @pytest.fixture()
@@ -68,11 +79,6 @@ def app(db_path):
     return create_app(Config(db_path=db_path))
 
 
-@pytest.fixture()
-def client(app):
-    return app.test_client()
-
-
 _USERS = json.load(open(os.path.join(_TESTS_DIR, "support", "users.json"), encoding="utf-8"))
 
 
@@ -82,6 +88,26 @@ def signed_in(app, name: str):
     response = test_client.post("/api/v1/auth/signin", json=_USERS[name])
     assert response.status_code == 200, response.get_json()
     return test_client
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    from easymcf.auth import ratelimit
+
+    ratelimit.reset()
+    yield
+
+
+@pytest.fixture()
+def client(app):
+    """Signed in as seeded user 1 through the real sign-in endpoint."""
+    return signed_in(app, "seed_a")
+
+
+@pytest.fixture()
+def client_b(app):
+    """Signed in as seeded user 2."""
+    return signed_in(app, "seed_b")
 
 
 @pytest.fixture()
@@ -100,7 +126,7 @@ def stub_provider():
 
 
 @pytest.fixture()
-def google_app(db_path, stub_provider, tmp_path, monkeypatch):
+def google_app(isolated_db, stub_provider, tmp_path, monkeypatch):
     """An app configured for Google sign-in against the stub provider and a temp photo store."""
     secret = tmp_path / "gcp_oauth_client_secret"
     secret.write_text("stub-client-secret\n")
@@ -112,7 +138,7 @@ def google_app(db_path, stub_provider, tmp_path, monkeypatch):
     from easymcf import create_app
     from easymcf.config import Config
 
-    return create_app(Config(db_path=db_path))
+    return create_app(Config(db_path=isolated_db))
 
 
 from datetime import datetime
@@ -142,4 +168,12 @@ def isolated_client(isolated_db):
     from easymcf import create_app
     from easymcf.config import Config
 
-    return create_app(Config(db_path=isolated_db)).test_client()
+    return signed_in(create_app(Config(db_path=isolated_db)), "seed_a")
+
+
+@pytest.fixture()
+def isolated_client_b(isolated_db):
+    from easymcf import create_app
+    from easymcf.config import Config
+
+    return signed_in(create_app(Config(db_path=isolated_db)), "seed_b")

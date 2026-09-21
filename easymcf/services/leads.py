@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .. import clock
+from .. import clock, tenancy
 from ..errors import Conflict, RecordNotFound, ValidationFailed
 
 STAGES = ("TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED")
@@ -176,7 +176,7 @@ def update_lead(db, lead_id: int, body: dict, *, internal: bool = False, detail:
         _refresh_deadline(db, lead_id, at)
 
 
-def batch_update(db, rows: list) -> list[int]:
+def batch_update(db, rows: list, uid: int | None = None) -> list[int]:
     """POST /lead/batch: stage moves for many leads, atomic under the caller's transaction (REQ-CRM-11)."""
     if not 1 <= len(rows) <= BATCH_MAX:
         raise ValidationFailed(f"rows must hold 1 to {BATCH_MAX} entries", field="rows")
@@ -184,6 +184,8 @@ def batch_update(db, rows: list) -> list[int]:
     if len(set(ids)) != len(ids):
         raise ValidationFailed("rows must not repeat an id", field="rows")
     for row in rows:
+        if uid is not None:
+            tenancy.require_visible(db, uid, "lead", row["id"])   # another user's lead answers 404 and rolls the batch back
         update_lead(db, row["id"], {k: v for k, v in row.items() if k != "id"})
     return ids
 

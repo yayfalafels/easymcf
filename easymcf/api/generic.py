@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 import jsonschema
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
+from .. import tenancy
 from ..errors import Conflict, RecordNotFound, ValidationFailed
 from .db import get_db
 
@@ -27,15 +28,18 @@ class Resource:
     pk: str = "id"
     select_sql: str | None = None
     bool_columns: tuple = ()
-    defaults: Callable | None = None      # (db) -> dict merged beneath the request body on create
+    parents: tuple = ()                   # ((body_field, parent_table), ...) each must be visible to the caller
+    owned: Callable | None = None         # (db, uid) -> server-set columns, merged over the body after validation
     create_fn: Callable | None = None     # (db, body) -> new row id
     update_fn: Callable | None = None     # (db, row_id, body) -> None
     before_read: Callable | None = None   # (db) -> None
     batch_schema: dict | None = None      # per-row schema for a hook-backed batch of updates
-    batch_fn: Callable | None = None      # (db, rows) -> list of row ids, applied in one transaction
+    batch_fn: Callable | None = None      # (db, rows, uid) -> list of row ids, applied in one transaction
 
 
 def register(resource: Resource) -> None:
+    if resource.table not in tenancy.SCOPES and resource.table not in tenancy.UNSCOPED:
+        raise RuntimeError(f"resource {resource.table} has no ownership declaration in easymcf/tenancy.py")
     REGISTRY[resource.table] = resource
 
 
@@ -62,6 +66,29 @@ def _validate(body, schema: dict) -> None:
     raise ValidationFailed(error.message, field=field)
 
 
+def _uid() -> int:
+    return g.user_id
+
+
+def _scope_sql(resource: Resource) -> str | None:
+    return tenancy.SCOPES.get(resource.table)
+
+
+def _check_parents(db, resource: Resource, body: dict, uid: int, updating: bool = False) -> None:
+    """A create or update that names a parent row (a track, a lead, a post) needs that row visible to the caller.
+    A parent that is missing or not visible answers 404 on create and 400 on the field on update, with one message
+    for both, so a request never reveals whether another user's row exists."""
+    for field, table in resource.parents:
+        if body.get(field) is not None:
+            pk = REGISTRY[table].pk if table in REGISTRY else "id"
+            try:
+                tenancy.require_visible(db, uid, table, body[field], pk)
+            except RecordNotFound:
+                if updating:
+                    raise ValidationFailed(f"{table} {body[field]} not found", field=field)
+                raise
+
+
 def _select(resource: Resource) -> str:
     return resource.select_sql or f"SELECT {resource.table}.* FROM {resource.table}"
 
@@ -77,8 +104,10 @@ def _coerce(resource: Resource, body: dict) -> dict:
     return {k: int(v) if k in resource.bool_columns else v for k, v in body.items()}
 
 
-def _fetch(db, resource: Resource, row_id) -> dict:
-    row = db.execute(f"{_select(resource)} WHERE {resource.table}.{resource.pk} = ?", (row_id,)).fetchone()
+def _fetch(db, resource: Resource, row_id, uid: int) -> dict:
+    scope = _scope_sql(resource)
+    sql = f"{_select(resource)} WHERE {resource.table}.{resource.pk} = :id" + (f" AND ({scope})" if scope else "")
+    row = db.execute(sql, {"id": row_id, "uid": uid}).fetchone()
     if row is None:
         raise RecordNotFound(f"{resource.table} {row_id} not found")
     return _serialize(resource, row)
@@ -103,7 +132,7 @@ def get_one(table: str, row_id: str):
     resource, db = _resource(table, "get"), get_db()
     if resource.before_read:
         resource.before_read(db)
-    return jsonify(_fetch(db, resource, row_id))
+    return jsonify(_fetch(db, resource, row_id, _uid()))
 
 
 @bp.get("/<table>/search")
@@ -112,44 +141,52 @@ def search(table: str):
     if resource.before_read:
         resource.before_read(db)
     columns = {r["name"] for r in db.execute(f"PRAGMA table_info({resource.table})")}
-    clauses, params = [], []
-    for key, value in request.args.items():
+    clauses, params = [], {"uid": _uid()}
+    for i, (key, value) in enumerate(request.args.items()):
         if key not in columns:
             raise ValidationFailed(f"unknown filter: {key}", field=key)
-        clauses.append(f"{resource.table}.{key} = ?")
-        params.append(value)
+        clauses.append(f"{resource.table}.{key} = :f{i}")
+        params[f"f{i}"] = value
+    if _scope_sql(resource):
+        clauses.append(f"({_scope_sql(resource)})")
     where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
     rows = db.execute(f"{_select(resource)}{where} ORDER BY {resource.table}.{resource.pk}", params).fetchall()
     return jsonify([_serialize(resource, r) for r in rows])
 
 
+def _prepare(db, resource: Resource, body, uid: int) -> dict:
+    """Validate the client body, check its parents, then add the server-owned columns, which the body can never set."""
+    _validate(body, resource.create_schema)
+    _check_parents(db, resource, body, uid)
+    return {**body, **(resource.owned(db, uid) if resource.owned else {})}
+
+
 @bp.post("/<table>")
 def create(table: str):
     resource, db = _resource(table, "create"), get_db()
-    body = request.get_json(silent=True)
-    if resource.defaults and isinstance(body, dict):
-        body = {**resource.defaults(db), **body}
-    _validate(body, resource.create_schema)
+    body, uid = request.get_json(silent=True), _uid()
+    body = _prepare(db, resource, body, uid)
     with db:
         row_id = resource.create_fn(db, body) if resource.create_fn else _guarded(_insert, db, resource, body)
-        row = _fetch(db, resource, row_id)
+        row = _fetch(db, resource, row_id, uid)
     return jsonify(row), 201
 
 
 @bp.put("/<table>/<row_id>")
 def update(table: str, row_id: str):
     resource, db = _resource(table, "update"), get_db()
-    body = request.get_json(silent=True)
+    body, uid = request.get_json(silent=True), _uid()
     _validate(body, resource.update_schema)
     with db:
-        _fetch(db, resource, row_id)
+        _fetch(db, resource, row_id, uid)
+        _check_parents(db, resource, body, uid, updating=True)
         if resource.update_fn:
             resource.update_fn(db, row_id, body)
         elif body:
             body = _coerce(resource, body)
             sets = ", ".join(f"{k} = ?" for k in body)
             _guarded(db.execute, f"UPDATE {resource.table} SET {sets} WHERE {resource.pk} = ?", (*body.values(), row_id))
-        row = _fetch(db, resource, row_id)
+        row = _fetch(db, resource, row_id, uid)
     return jsonify(row)
 
 
@@ -157,7 +194,7 @@ def update(table: str, row_id: str):
 def delete(table: str, row_id: str):
     resource, db = _resource(table, "delete"), get_db()
     with db:
-        _fetch(db, resource, row_id)
+        _fetch(db, resource, row_id, _uid())
         _guarded(db.execute, f"DELETE FROM {resource.table} WHERE {resource.pk} = ?", (row_id,))
     return "", 204
 
@@ -170,11 +207,11 @@ def batch(table: str):
         raise ValidationFailed("rows must be a list", field="rows")
     if resource.batch_fn:
         return _batch_update(resource, db, rows)
-    created = []
+    created, uid = [], _uid()
     with db:
         for body in rows:
-            _validate(body, resource.create_schema)
-            created.append(_fetch(db, resource, _guarded(_insert, db, resource, body)))
+            body = _prepare(db, resource, body, uid)
+            created.append(_fetch(db, resource, _guarded(_insert, db, resource, body), uid))
     return jsonify(created), 201
 
 
@@ -185,9 +222,10 @@ def _batch_update(resource: Resource, db, rows: list):
             _validate(body, resource.batch_schema)
         except ValidationFailed as exc:
             raise ValidationFailed(exc.message, field="rows") from exc
+    uid = _uid()
     with db:
-        ids = resource.batch_fn(db, rows)
-    return jsonify([_fetch(db, resource, row_id) for row_id in ids])
+        ids = resource.batch_fn(db, rows, uid)   # the hook checks each row is visible after its own shape checks
+        return jsonify([_fetch(db, resource, row_id, uid) for row_id in ids])
 
 
 @bp.post("/<table>/delete")
@@ -199,7 +237,11 @@ def bulk_delete(table: str):
     columns = {r["name"] for r in db.execute(f"PRAGMA table_info({resource.table})")}
     if not set(where) <= columns:
         raise ValidationFailed("filter names an unknown column", field="filter")
-    clause = " AND ".join(f"{k} = ?" for k in where)
+    params = {f"f{i}": v for i, v in enumerate(where.values())} | {"uid": _uid()}
+    clause = " AND ".join(f"{k} = :f{i}" for i, k in enumerate(where))
+    visible = tenancy.SCOPES.get(resource.table, "1 = 1")
+    sql = (f"DELETE FROM {resource.table} WHERE {clause} AND {resource.pk} IN "
+           f"(SELECT {resource.pk} FROM {resource.table} WHERE {visible})")
     with db:
-        count = _guarded(db.execute, f"DELETE FROM {resource.table} WHERE {clause}", tuple(where.values())).rowcount
+        count = _guarded(db.execute, sql, params).rowcount
     return jsonify({"deleted": count})

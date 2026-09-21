@@ -16,8 +16,12 @@ def init_api(app: Flask) -> None:
         body = {"error": exc.error, "message": exc.message}
         if exc.field:
             body["field"] = exc.field
-        body.update(exc.extra)
-        return jsonify(body), exc.status
+        extra = {k: v for k, v in exc.extra.items() if k != "retry_after"}
+        body.update(extra)
+        response = jsonify(body)
+        if "retry_after" in exc.extra:
+            response.headers["Retry-After"] = str(exc.extra["retry_after"])
+        return response, exc.status
 
     app.register_blueprint(bp)
     app.teardown_appcontext(close_db)

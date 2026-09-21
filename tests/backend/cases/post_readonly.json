@@ -1,0 +1,6 @@
+[
+  {"name": "a post can be read", "as_user": "seed_a", "method": "GET", "path": "/api/v1/post/search", "expected_status": 200},
+  {"name": "a post cannot be updated", "as_user": "seed_a", "method": "PUT", "path": "/api/v1/post/MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff", "body": {"url_ref": "https://x.example"}, "expected_status": 404},
+  {"name": "a post cannot be created", "as_user": "seed_a", "method": "POST", "path": "/api/v1/post", "body": {"id": "x"}, "expected_status": 404},
+  {"name": "a post cannot be deleted", "as_user": "seed_a", "method": "DELETE", "path": "/api/v1/post/MyCareerFutures-771e413d7bc340c16dfeac6ba88503ff", "expected_status": 404}
+]

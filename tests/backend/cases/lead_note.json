@@ -7,6 +7,7 @@
       "lead_id": 4,
       "note": "Interview scheduled with hiring manager"
     },
-    "expected_status": 201
+    "expected_status": 201,
+    "as_user": "seed_a"
   }
 ]

@@ -1,0 +1,22 @@
+[
+  {"name": "selftest - signed out visit lands on sign in", "route": "/leads",
+   "actions": [{"op": "wait_for", "selector": "[data-testid=\"signin-submit\"]"}],
+   "expect": [{"op": "url_path_equals", "value": "/signin"}]},
+  {"name": "selftest - as_user signs the browser in", "as_user": "seed_a", "route": "/leads",
+   "actions": [{"op": "wait_for", "selector": "[data-testid=\"user-avatar\"]"}],
+   "expect": [{"op": "text_equals", "selector": "[data-testid=\"user-initials\"]", "value": "TH"},
+              {"op": "url_path_equals", "value": "/leads"}]},
+  {"name": "selftest - a different as_user is a different account", "as_user": "seed_b", "route": "/leads",
+   "actions": [{"op": "wait_for", "selector": "[data-testid=\"user-avatar\"]"}],
+   "expect": [{"op": "text_equals", "selector": "[data-testid=\"user-initials\"]", "value": "SS"}]},
+  {"name": "selftest - upload op fills a file input", "as_user": "seed_a", "route": "/leads",
+   "actions": [{"op": "click", "selector": "[data-testid=\"user-avatar\"]"},
+               {"op": "upload", "selector": "[data-testid=\"user-menu-photo-input\"]", "path": "tests/support/photo_ok.png"},
+               {"op": "wait_for", "selector": "[data-testid=\"user-photo\"]"}],
+   "expect": [{"op": "count_equals", "selector": "[data-testid=\"user-initials\"]", "value": 0}]},
+  {"name": "selftest - wrong url path is a failure", "as_user": "seed_a", "route": "/leads",
+   "actions": [{"op": "wait_for", "selector": "[data-testid=\"user-avatar\"]"}],
+   "expect": [{"op": "url_path_equals", "value": "/tracks"}]},
+  {"name": "selftest - unknown as_user is an error", "as_user": "no_such_user", "route": "/leads",
+   "actions": [], "expect": []}
+]

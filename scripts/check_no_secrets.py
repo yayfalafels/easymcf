@@ -5,8 +5,9 @@
 
 Real secrets (the Google client secret file, the cookie signing key, and any EXTRA_LITERAL such as a captured
 session cookie or id token) are searched for in every tracked file, the database, and every file in .dev/logs/.
-The fake seed passwords appear by design in the seed generator, tests/support/users.json, and the design
-documents, so they are searched for in the database and the logs only. No matched value is ever printed.
+The fake seed passwords appear by design in the seed generator, tests/support/users.json, the design documents,
+and in pytest tracebacks that echo test source, so they are searched for in the database only, where a plain
+password would mean a hash was never written. No matched value is ever printed.
 """
 
 from __future__ import annotations
@@ -27,18 +28,19 @@ SECRETS_DIR = os.environ.get("SECRETS_DIR", ".secrets")
 MIN_LENGTH = 8
 
 
-def _read(path: str) -> str:
+def _read(path: str) -> bytes:
+    """The file's bytes with surrounding whitespace removed. The cookie signing key is binary, so no text decoding."""
     try:
-        with open(path, encoding="utf-8") as handle:
+        with open(path, "rb") as handle:
             return handle.read().strip()
     except OSError:
-        return ""
+        return b""
 
 
 def real_secrets(extra: list[str]) -> list[bytes]:
     secret_file = os.environ.get("GCP_OAUTH_SECRET_FILE") or os.path.join(SECRETS_DIR, "gcp_oauth_client_secret")
-    values = [_read(secret_file), _read(os.path.join(SECRETS_DIR, "session_key")), *extra]
-    return [v.encode() for v in values if len(v) >= MIN_LENGTH]
+    values = [_read(secret_file), _read(os.path.join(SECRETS_DIR, "session_key")), *(v.encode() for v in extra)]
+    return [v for v in values if len(v) >= MIN_LENGTH]
 
 
 def test_passwords() -> list[bytes]:
@@ -64,10 +66,10 @@ def main() -> int:
     listed = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split("\n")
     tracked = [os.path.join(ROOT, p) for p in listed if p]
     database = os.environ.get("DB_PATH", os.path.join("data", "easymcf.db"))
-    stored = [database if os.path.isabs(database) else os.path.join(ROOT, database)]
+    stored = [database if os.path.isabs(database) else os.path.join(ROOT, database)]  # the database first
     stored += glob.glob(os.path.join(ROOT, ".dev", "logs", "*"))
     failed = scan(tracked + stored, real_secrets(sys.argv[1:]), "secret")
-    failed |= scan(stored, test_passwords(), "test password")
+    failed |= scan(stored[:1], test_passwords(), "test password")
     print("[FAIL] forbidden values found" if failed else "[PASS] no forbidden value found")
     return failed
 

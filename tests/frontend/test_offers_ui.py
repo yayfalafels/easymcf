@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
-from tests._browser_support import spawn_app, terminate_app  # noqa: E402
+from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 
 pytestmark = pytest.mark.frontend
 
@@ -35,6 +35,16 @@ def ui_app(tmp_path_factory):
         yield base_url, db_path
     finally:
         terminate_app(proc)
+
+
+@pytest.fixture()
+def page(browser, ui_app):
+    """A page signed in as seeded user 1 through the real sign-in endpoint."""
+    context = browser.new_context()
+    pg = context.new_page()
+    sign_in(pg, ui_app[0])
+    yield pg
+    context.close()
 
 
 def _rows(db_path: str, sql: str, *args):

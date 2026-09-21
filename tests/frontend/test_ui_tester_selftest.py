@@ -70,3 +70,23 @@ def test_mocked_mode_wiring_smoke():
     exit_code, records = _run_ui_tester("mocked", "12.TC.mocked", name="selftest — leads column heading renders")
     assert records[0]["outcome"] == "PASS"
     assert exit_code == 0
+
+
+# 13.TC.37 - the as_user, upload, and url_path_equals extension (13.EL.47, STRAT-TOOL-05). Outcomes are hard-coded.
+@pytest.mark.e2e
+def test_as_user_upload_and_url_path_outcomes():
+    args = [sys.executable, os.path.join(_REPO_ROOT, "scripts", "ui_tester.py"), "--case",
+            os.path.join(_CHECKS_DIR, "selftest_ui_tester_as_user.json"), "--label", "13.TC.37.ui"]
+    result = subprocess.run(args, cwd=_REPO_ROOT, capture_output=True, text=True, timeout=90)
+    log_files = sorted(glob.glob(os.path.join(_LOGS_DIR, "*-13.TC.37.ui-ui_tester.log")))
+    assert log_files, result.stderr
+    with open(log_files[-1], encoding="utf-8") as f:
+        outcomes = {r["case"]: r for r in map(json.loads, f)}
+    assert outcomes["selftest - signed out visit lands on sign in"]["outcome"] == "PASS"
+    assert outcomes["selftest - as_user signs the browser in"]["outcome"] == "PASS"
+    assert outcomes["selftest - a different as_user is a different account"]["outcome"] == "PASS"
+    assert outcomes["selftest - upload op fills a file input"]["outcome"] == "PASS"
+    assert outcomes["selftest - wrong url path is a failure"]["outcome"] == "FAIL"
+    unknown = outcomes["selftest - unknown as_user is an error"]
+    assert unknown["outcome"] == "ERROR" and "no_such_user" in unknown["detail"]
+    assert result.returncode != 0

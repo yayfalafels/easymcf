@@ -94,3 +94,27 @@ def test_connection_refused_is_error():
     exit_code, records = _run_api_tester(env, "selftest_api_tester_unreachable.json", "12.TC.unreachable")
     assert records[0]["outcome"] == "ERROR"
     assert exit_code != 0
+
+
+# 13.TC.37 - the as_user extension (13.EL.46, STRAT-TOOL-05). Expected outcomes are hard-coded from the design.
+def test_as_user_cases_pass_and_each_user_keeps_its_own_cookie(app_base_url_env):
+    exit_code, records = _run_api_tester(app_base_url_env, "selftest_api_tester_as_user.json", "13.TC.37")
+    outcomes = {r["case"]: r["outcome"] for r in records}
+    assert len(outcomes) == 7 and set(outcomes.values()) == {"PASS"}, outcomes
+    assert exit_code == 0
+
+
+def test_an_unknown_as_user_is_an_error_not_a_failure(app_base_url_env):
+    exit_code, records = _run_api_tester(app_base_url_env, "selftest_api_tester_bad_user.json", "13.TC.37.bad")
+    assert records[0]["outcome"] == "ERROR" and "no_such_user" in records[0]["detail"]
+    assert exit_code != 0
+
+
+def test_a_rejected_sign_in_is_an_error(app_base_url_env, tmp_path):
+    case = tmp_path / "wrong_password.json"
+    case.write_text(json.dumps([{"name": "x", "as_user": "seed_a", "method": "GET", "path": "/api/v1/auth/me", "expected_status": 200}]))
+    users = tmp_path / "users.json"
+    users.write_text(json.dumps({"seed_a": {"email": "yayfalafels@gmail.com", "password": "Not-The-Password-1!"}}))
+    exit_code, records = _run_api_tester({**app_base_url_env, "EASYMCF_TEST_USERS": str(users)}, str(case), "13.TC.37.rejected")
+    assert records[0]["outcome"] == "ERROR" and "returned 401" in records[0]["detail"]
+    assert exit_code != 0

@@ -7,7 +7,8 @@
       "post_id": "synthetic-promote-future",
       "track_id": 1
     },
-    "expected_status": 201
+    "expected_status": 201,
+    "as_user": "seed_a"
   },
   {
     "name": "promote a post without a closing date",
@@ -17,7 +18,8 @@
       "post_id": "synthetic-promote-nodate",
       "track_id": 1
     },
-    "expected_status": 201
+    "expected_status": 201,
+    "as_user": "seed_a"
   },
   {
     "name": "promote a post with a past closing date",
@@ -27,7 +29,8 @@
       "post_id": "synthetic-promote-past",
       "track_id": 1
     },
-    "expected_status": 201
+    "expected_status": 201,
+    "as_user": "seed_a"
   },
   {
     "name": "promote the same post again",
@@ -37,7 +40,8 @@
       "post_id": "synthetic-promote-future",
       "track_id": 1
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "TOAPPLY to APPLIED",
@@ -46,7 +50,8 @@
     "body": {
       "stage": "APPLIED"
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "APPLIED to CALLBACK",
@@ -55,7 +60,8 @@
     "body": {
       "stage": "CALLBACK"
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "CALLBACK to INTERVIEW",
@@ -64,7 +70,8 @@
     "body": {
       "stage": "INTERVIEW"
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "the dropped PROSPECT stage is rejected",
@@ -73,7 +80,8 @@
     "body": {
       "stage": "PROSPECT"
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "skip-ahead is rejected",
@@ -82,7 +90,8 @@
     "body": {
       "stage": "INTERVIEW"
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "backward move is rejected",
@@ -91,7 +100,8 @@
     "body": {
       "stage": "APPLIED"
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "closing without a reason",
@@ -100,7 +110,8 @@
     "body": {
       "stage": "CLOSED"
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "OFFER through PUT is rejected",
@@ -109,7 +120,8 @@
     "body": {
       "stage": "OFFER"
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "closing a lead at OFFER is rejected",
@@ -119,7 +131,8 @@
       "stage": "CLOSED",
       "close_reason": "withdrawn"
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "update the expected salary",
@@ -128,7 +141,8 @@
     "body": {
       "expected_salary_sgd": 12000
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "a negative expected salary is rejected",
@@ -137,7 +151,8 @@
     "body": {
       "expected_salary_sgd": -1
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "INTERVIEW to CLOSED with a reason",
@@ -147,7 +162,8 @@
       "stage": "CLOSED",
       "close_reason": "withdrawn"
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "batch apply moves two leads",
@@ -156,16 +172,17 @@
     "body": {
       "rows": [
         {
-          "id": 14,
+          "id": 18,
           "stage": "APPLIED"
         },
         {
-          "id": 15,
+          "id": 19,
           "stage": "APPLIED"
         }
       ]
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "a batch with one illegal row is rejected",
@@ -174,7 +191,7 @@
     "body": {
       "rows": [
         {
-          "id": 14,
+          "id": 18,
           "stage": "CLOSED",
           "close_reason": "cancelled"
         },
@@ -184,7 +201,8 @@
         }
       ]
     },
-    "expected_status": 409
+    "expected_status": 409,
+    "as_user": "seed_a"
   },
   {
     "name": "batch drop closes a lead as dropped",
@@ -193,13 +211,14 @@
     "body": {
       "rows": [
         {
-          "id": 16,
+          "id": 20,
           "stage": "CLOSED",
           "close_reason": "dropped"
         }
       ]
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "an empty batch is rejected",
@@ -208,7 +227,8 @@
     "body": {
       "rows": []
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "a batch with a repeated id is rejected",
@@ -217,16 +237,17 @@
     "body": {
       "rows": [
         {
-          "id": 14,
+          "id": 18,
           "stage": "CALLBACK"
         },
         {
-          "id": 14,
+          "id": 18,
           "stage": "CALLBACK"
         }
       ]
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "re-assign a lead to another active track",
@@ -235,7 +256,8 @@
     "body": {
       "track_id": 3
     },
-    "expected_status": 200
+    "expected_status": 200,
+    "as_user": "seed_a"
   },
   {
     "name": "re-assigning to an archived track is rejected",
@@ -244,7 +266,8 @@
     "body": {
       "track_id": 2
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   },
   {
     "name": "re-assigning to an unknown track is rejected",
@@ -253,6 +276,7 @@
     "body": {
       "track_id": 999
     },
-    "expected_status": 400
+    "expected_status": 400,
+    "as_user": "seed_a"
   }
 ]

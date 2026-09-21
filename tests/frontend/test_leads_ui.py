@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
-from tests._browser_support import spawn_app, terminate_app  # noqa: E402
+from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 
 pytestmark = pytest.mark.frontend
 
@@ -36,6 +36,16 @@ def ui_app(tmp_path_factory):
         yield base_url, db_path
     finally:
         terminate_app(proc)
+
+
+@pytest.fixture()
+def page(browser, ui_app):
+    """A page signed in as seeded user 1 through the real sign-in endpoint."""
+    context = browser.new_context()
+    pg = context.new_page()
+    sign_in(pg, ui_app[0])
+    yield pg
+    context.close()
 
 
 def _rows(db_path: str, sql: str, *args):
@@ -56,7 +66,7 @@ def test_tracks_create_edit_archive_unarchive(page, ui_app):
     base_url, db_path = ui_app
     page.goto(base_url + "/tracks")
     _visible(page, "track-row-1")
-    assert page.locator('[data-testid^="track-row-"]').count() == 7
+    assert page.locator('[data-testid^="track-row-"]').count() == 5  # user 1's active tracks only
 
     page.select_option('[data-testid="track-role-select"]', label="Data Engineer")
     page.fill('[data-testid="track-seniority-input"]', "senior")
@@ -88,8 +98,8 @@ def test_tracks_form_shows_track_fields_only(page, ui_app):
     assert page.locator('[data-testid="track-form"] [data-testid^="search-profile-"]').count() == 0
 
 
-# The seed holds two users (feature 13 data) and the list is not yet scoped to the signed-in user.
-TAB_COUNTS = {"toapply": 2, "applied": 2, "callbacks": 2, "interviews": 1, "offers": 1, "closed": 9}
+# Seeded user 1 only. The second user's leads (feature 13 seed) are not visible to user 1.
+TAB_COUNTS = {"toapply": 1, "applied": 1, "callbacks": 1, "interviews": 1, "offers": 1, "closed": 8}
 
 
 def test_leads_tabs_follow_the_seeded_stages(page, ui_app):
@@ -101,7 +111,7 @@ def test_leads_tabs_follow_the_seeded_stages(page, ui_app):
         page.click(f'[data-testid="leads-tab-{key}"]')
         page.wait_for_function(f"document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === {expected}")
         assert f"({expected})" in page.locator(f'[data-testid="leads-tab-{key}"]').inner_text()
-    stage_counts = dict(_rows(db_path, "SELECT stage, COUNT(*) FROM lead GROUP BY stage"))
+    stage_counts = dict(_rows(db_path, "SELECT stage, COUNT(*) FROM lead WHERE user_id = 1 GROUP BY stage"))
     assert stage_counts["CLOSED"] == TAB_COUNTS["closed"] and stage_counts["TOAPPLY"] == TAB_COUNTS["toapply"]
 
 
@@ -122,7 +132,7 @@ def test_leads_search_and_pipeline_order(page, ui_app):
     columns = page.locator('[data-testid^="leads-column-"]')
     assert columns.nth(0).get_attribute("data-testid") == "leads-column-TOAPPLY"
     page.fill('[data-testid="leads-search"]', "gen ai engineer")
-    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 2")
+    page.wait_for_function("document.querySelectorAll('[data-testid^=\"lead-row-\"]').length === 1")
     assert page.locator('[data-testid="lead-row-1"]').count() == 1
 
 

@@ -72,7 +72,7 @@ def test_denied_consent_redirects_with_access_denied(stub):
 
 @pytest.mark.parametrize("prefix, check", [
     ("unverified", lambda c, b: c["email_verified"] is False),
-    ("expired", lambda c, b: c["exp"] < int(time.time())),
+    ("expired", lambda c, b: c["exp"] < int(time.time()) - 600),
     ("badaud", lambda c, b: c["aud"] == "another-client"),
     ("badiss", lambda c, b: c["iss"] != b),
     ("badnonce", lambda c, b: c["nonce"] == "wrong-nonce"),

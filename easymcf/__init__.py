@@ -15,6 +15,7 @@ from werkzeug.exceptions import NotFound
 
 from .config import Config
 from .api import init_api
+from .auth import google as auth_google, routes as auth_routes, sessions
 from .db.connection import schema_version
 
 SCHEMA_VERSION = 7  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
@@ -37,7 +38,19 @@ def create_app(config: Config | None = None) -> Flask:
     # itself (ARCH-RUN-09), so /api/v1/* routes can't ever be shadowed by it.
     app = Flask(__name__, static_folder=None)
     app.config["EASYMCF_CONFIG"] = config
+    app.secret_key = sessions.secret_key(config)
+    app.config.update(
+        SESSION_COOKIE_NAME="easymcf_oauth", SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_HTTPONLY=True,
+        PERMANENT_SESSION_LIFETIME=600, MAX_CONTENT_LENGTH=config.photo_max_bytes + 1024 * 1024,
+    )
+    auth_routes.install_guard(app)
+    auth_google.init(app, config)
+    app.register_blueprint(auth_routes.bp)
     init_api(app)
+
+    @app.errorhandler(413)
+    def too_large(_error):
+        return jsonify(error="payload_too_large", message="The image is larger than the upload limit."), 413
 
     @app.get("/api/v1/health")
     def health():

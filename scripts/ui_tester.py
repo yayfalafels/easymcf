@@ -25,6 +25,8 @@ import sys
 import tempfile
 import time
 
+from urllib.parse import urlparse
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
@@ -49,6 +51,9 @@ def _run_actions(page, actions: list[dict]) -> None:
         locator = page.locator(step["selector"])
         if op == "wait_for":
             locator.wait_for(state="visible", timeout=step.get("timeout_ms", 10_000))
+        elif op == "upload":
+            locator.wait_for(state="attached", timeout=step.get("timeout_ms", 10_000))
+            locator.set_input_files(os.path.join(_REPO_ROOT, step["path"]))
         elif op == "click":
             locator.click()
         elif op == "fill":
@@ -58,8 +63,11 @@ def _run_actions(page, actions: list[dict]) -> None:
 
 
 def _check_expect(page, expect: dict) -> tuple[bool, object, object]:
-    locator = page.locator(expect["selector"])
     op = expect["op"]
+    if op == "url_path_equals":
+        actual = urlparse(page.url).path
+        return actual == expect["value"], expect["value"], actual
+    locator = page.locator(expect["selector"])
     if op == "visible":
         value = expect.get("value", True)
         actual = locator.is_visible()
@@ -79,12 +87,21 @@ def _check_expect(page, expect: dict) -> tuple[bool, object, object]:
 def _run_check(browser, base_url: str, check: dict, label: str, log_path: str) -> str:
     case_name = check["name"]
     start = time.monotonic()
-    page = browser.new_page()
+    context = browser.new_context()
+    page = context.new_page()
     page_errors: list[str] = []
     page.on("pageerror", lambda exc: page_errors.append(str(exc)))
 
     outcome, expected, actual, detail = "PASS", None, None, None
     try:
+        if check.get("as_user"):
+            with open(os.path.join(_REPO_ROOT, "tests", "support", "users.json"), encoding="utf-8") as handle:
+                creds = json.load(handle).get(check["as_user"])
+            if creds is None:
+                raise RuntimeError(f"no user named {check['as_user']!r} in tests/support/users.json")
+            signed = context.request.post(base_url + "/api/v1/auth/signin", data=creds)
+            if signed.status != 200:
+                raise RuntimeError(f"sign-in as {check['as_user']} returned {signed.status}")
         page.goto(base_url + check["route"], timeout=10_000)
         _run_actions(page, check.get("actions", []))
         if page_errors:
@@ -105,7 +122,7 @@ def _run_check(browser, base_url: str, check: dict, label: str, log_path: str) -
         )
         os.makedirs(os.path.dirname(screenshot), exist_ok=True)
         page.screenshot(path=screenshot)
-    page.close()
+    context.close()
 
     if outcome == "PASS":
         print(f"[PASS] {case_name}")
@@ -153,6 +170,8 @@ def _case_batch(case_path: str, name: str | None, api_mode: str, api_fixtures: s
             print(f"[FAIL] no check named {name!r} in {case_path}", file=sys.stderr)
             return 1
 
+    if api_mode == "mocked" and not api_fixtures:
+        api_fixtures = os.path.join(_REPO_ROOT, "tests", "fixtures", "api", "auth.json")  # auth/me answers without a session
     db_dir = tempfile.mkdtemp(prefix="easymcf-ui-tester-")
     db_path = os.path.join(db_dir, "easymcf.db")
     apply_schema(db_path)

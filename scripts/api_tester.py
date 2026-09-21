@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import os
 import sys
 import time
@@ -55,6 +56,35 @@ def _base_url() -> str:
     return f"http://127.0.0.1:{Config().port}"
 
 
+_USERS_PATH = os.path.join(_REPO_ROOT, "tests", "support", "users.json")  # EASYMCF_TEST_USERS overrides it
+
+
+class SignInFailed(Exception):
+    """A case's `as_user` could not sign in, so its assertions never ran (13.EL.46)."""
+
+
+class SessionPool:
+    """One requests.Session (cookie jar) per `as_user` name. Cases without `as_user` share the key None, so a
+    sign-up, sign-in, and sign-out sequence keeps its cookie between cases (STRAT-TOOL-05)."""
+
+    def __init__(self, base_url: str):
+        self.base_url, self.jars = base_url, {}
+
+    def get(self, name: str | None) -> requests.Session:
+        if name not in self.jars:
+            session = requests.Session()
+            if name is not None:
+                with open(os.environ.get("EASYMCF_TEST_USERS") or _USERS_PATH, encoding="utf-8") as handle:
+                    creds = json.load(handle).get(name)
+                if creds is None:
+                    raise SignInFailed(f"no user named {name!r} in tests/support/users.json")
+                response = session.post(self.base_url + "/api/v1/auth/signin", json=creds, timeout=10)
+                if response.status_code != 200:
+                    raise SignInFailed(f"sign-in as {name} returned {response.status_code}")
+            self.jars[name] = session
+        return self.jars[name]
+
+
 def _classify_response(case: dict, resp) -> tuple[str, object, object, str | None]:
     """PASS/FAIL/ERROR for one response against one case's expectations
     (12.CK.02). ERROR is reserved for "the response can't be interpreted at
@@ -74,17 +104,41 @@ def _classify_response(case: dict, resp) -> tuple[str, object, object, str | Non
         return "FAIL", expected_status, resp.status_code, None
     if expected_body is not None and actual_body != expected_body:
         return "FAIL", expected_body, actual_body, None
+    for header in case.get("expected_headers", []):
+        actual_header = resp.headers.get(header["name"], "")
+        if header["contains"] not in actual_header:
+            return "FAIL", header, actual_header, None
+    cookie = case.get("expected_cookie")
+    if cookie:
+        raw = resp.headers.get("Set-Cookie", "")
+        if cookie["name"] not in raw or (cookie.get("http_only") and "HttpOnly" not in raw):
+            return "FAIL", cookie, raw.split(";")[0], None
     return "PASS", None, None, None
 
 
-def _run_case(case: dict, base_url: str) -> tuple[str, object, object, str | None]:
-    """(outcome, expected, actual, detail) — a connection/timeout failure is
+def _run_case(case: dict, pool: SessionPool) -> tuple[str, object, object, str | None]:
+    """(outcome, expected, actual, detail) - a connection/timeout failure is
     ERROR, never FAIL, so an agent doesn't have to parse message text to tell
     "the endpoint isn't running" from "the endpoint returned the wrong thing"."""
+    handles = []
     try:
-        resp = requests.request(case["method"], base_url + case["path"], json=case.get("body"), timeout=10)
+        session = pool.get(case.get("as_user"))
+        kwargs = {"timeout": 10, "allow_redirects": case.get("follow_redirects", True)}
+        if case.get("files"):
+            for part, rel in case["files"].items():
+                handle = open(os.path.join(_REPO_ROOT, rel), "rb")
+                handles.append(handle)
+                kwargs.setdefault("files", {})[part] = (os.path.basename(rel), handle, mimetypes.guess_type(rel)[0] or "application/octet-stream")
+        elif case.get("body") is not None:
+            kwargs["json"] = case["body"]
+        resp = session.request(case["method"], pool.base_url + case["path"], **kwargs)
+    except SignInFailed as exc:
+        return "ERROR", None, None, str(exc)
     except requests.RequestException as exc:
         return "ERROR", None, None, f"request error: {exc}"
+    finally:
+        for handle in handles:
+            handle.close()
     return _classify_response(case, resp)
 
 
@@ -107,11 +161,12 @@ def _case_batch(case_path: str, name: str | None, label: str) -> int:
             return 1
 
     base_url = _base_url()
+    pool = SessionPool(base_url)
     log = _val_log.log_path("api_tester", label)
     exit_code = 0
     for case in cases:
         start = time.monotonic()
-        outcome, expected, actual, detail = _run_case(case, base_url)
+        outcome, expected, actual, detail = _run_case(case, pool)
         duration_ms = int((time.monotonic() - start) * 1000)
         _report(case["name"], outcome, expected, actual, detail)
         _val_log.write_record(log, "api_tester", case["name"], outcome, duration_ms, expected, actual, detail)

@@ -55,7 +55,7 @@ def _id_token(base_url: str, email: str, nonce: str) -> str:
         "aud": "another-client" if scenario == "badaud" else CLIENT_ID,
         "sub": "stub-sub-" + hashlib.sha1(email.encode()).hexdigest()[:12],
         "iat": now,
-        "exp": now - 1 if scenario == "expired" else now + 3600,
+        "exp": now - 3600 if scenario == "expired" else now + 3600,
         "nonce": "wrong-nonce" if scenario == "badnonce" else nonce,
         "email": email,
         "email_verified": scenario != "unverified",

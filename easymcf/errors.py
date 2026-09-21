@@ -24,3 +24,31 @@ class RecordNotFound(ApiError):
 
 class Conflict(ApiError):
     status, error = 409, "conflict"
+
+
+class Unauthenticated(ApiError):
+    status, error = 401, "unauthenticated"
+
+
+class InvalidCredentials(ApiError):
+    status, error = 401, "invalid_credentials"
+
+
+class Forbidden(ApiError):
+    status, error = 403, "forbidden_origin"
+
+
+class PayloadTooLarge(ApiError):
+    status, error = 413, "payload_too_large"
+
+
+class UnsupportedMedia(ApiError):
+    status, error = 415, "unsupported_media_type"
+
+
+class TooManyAttempts(ApiError):
+    status, error = 429, "too_many_attempts"
+
+
+class GoogleNotConfigured(RecordNotFound):
+    error = "google_not_configured"

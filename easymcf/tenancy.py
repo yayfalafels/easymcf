@@ -16,6 +16,7 @@ SCOPES = {
     "track": "track.user_id = :uid",
     "cv": "cv.user_id = :uid",
     "mcf_session": "mcf_session.user_id = :uid",
+    "mcf_attempt": "mcf_attempt.user_id = :uid",
     "run_log": "run_log.user_id = :uid",
     "lead": "lead.user_id = :uid",
     "search_profile": f"search_profile.track_id IN ({_OWN_TRACKS})",

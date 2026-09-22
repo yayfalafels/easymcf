@@ -6,7 +6,7 @@
 - [Out of scope](#out-of-scope)
 - [References](#references)
 - [1. App structure and module layout](#1-app-structure-and-module-layout) — `FE-APP-01..03`
-- [2. Routing](#2-routing) — `FE-RTE-01`
+- [2. Routing](#2-routing) — `FE-RTE-01..04`
 - [3. API client service](#3-api-client-service) — `FE-SVC-01..03a`
 - [4. Async run handling (REQ-FE-02, 010-user-interface.md's "Async run handling")](#4-async-run-handling-req-fe-02-010-user-interfacemds-async-run-handling) — `FE-RUN-01..03`
 - [5. Session status and the shared session panel](#5-session-status-and-the-shared-session-panel) — `FE-SVC-04`
@@ -76,10 +76,13 @@ frontend/
       offer-modal/             # <offer-modal> directive backing offer-dialog.service.js
       empty-state/              # <empty-state> directive (010-user-interface's empty-state pattern)
     auth/                # screens 10–11 — auth.controller.js, signin.html, signup.html (FE-AUTH-05)
-    tracks/           # screen 1 — tracks.controller.js, tracks.html
-    search-profiles/    # screen 1b — search-profiles.controller.js, search-profiles.html (opened as a modal from Tracks, FE-RTE-02)
-    cvs/               # screen 2 — cvs.controller.js, cvs.html (also opened as a modal, FE-RTE-02)
-    posts/              # screens 3–4 — posts.controller.js, posts.html, manual-post-entry.controller.js, manual-post-entry.html
+    tracks/           # screen 1 — tracks.controller.js, tracks.html, and screen 1b's search-profile.controller.js,
+                       # search-profile.html, its own route reached from Tracks (FE-RTE-02), colocated here rather
+                       # than a separate top-level folder since it has no lifecycle apart from Tracks
+    cvs/               # screen 2 — cvs.controller.js, cvs.html, its own route reached from Tracks or Applications (FE-RTE-02)
+    posts/              # screen 3 — posts.controller.js, posts.html; screen 4, Manual Post Entry, is a dialog backed
+                       # by manual-post-dialog.service.js and the shared manual-post-modal directive (FE-RTE-04),
+                       # not a controller of its own
     leads/                # screens 5–6 — leads.controller.js, leads.html, lead-detail.controller.js, lead-detail.html
     offers/                # screen 9 — offers.controller.js, offers.html
     applications/          # screen 7 — applications.controller.js, applications.html
@@ -94,19 +97,22 @@ frontend/
 
 **FE-RTE-01** `ngRoute`, vendored `angular-route.min.js`, the one dependency `ARCH-RUN-06` doesn't already name, runs in **HTML5 mode**, `$locationProvider.html5Mode(true)`: plain paths such as `/tracks`, `/posts`, rather than `#!/tracks` hashbang URLs. This is possible without a rewrite proxy specifically because `ARCH-RUN-09` already has Flask return `index.html` for any unmatched non-`/api` path. A hashbang fallback would be solving a problem `010`'s backend doesn't have. `/` and any unmatched path redirect to `/leads`, so the app opens on the Leads page for a signed-in user. Route table, one entry per nav destination plus the two public sign-in pages, per the **user-interface doc**'s Navigation structure:
 
-| path            | controller           | template                         | nav destination |
-| --------------- | -------------------- | -------------------------------- | --------------- |
-| `/tracks`       | `TracksCtrl`         | `tracks/tracks.html`             | Tracks          |
-| `/posts`        | `PostsCtrl`          | `posts/posts.html`               | Posts           |
-| `/leads`        | `LeadsCtrl`          | `leads/leads.html`               | Leads           |
-| `/offers`       | `OffersCtrl`         | `offers/offers.html`             | Offers          |
-| `/applications` | `ApplicationsCtrl`   | `applications/applications.html` | Applications    |
-| `/automation`   | `AutomationCtrl`     | `automation/automation.html`     | Automation      |
-| `/signin`       | `AuthCtrl`           | `auth/signin.html`               | — (public)      |
-| `/signup`       | `AuthCtrl`           | `auth/signup.html`               | — (public)      |
-| (unmatched)     | redirect to `/leads` | —                                | —               |
+| path                      | controller           | template                         | nav destination |
+| ------------------------- | -------------------- | -------------------------------- | --------------- |
+| `/tracks`                 | `TracksCtrl`         | `tracks/tracks.html`             | Tracks          |
+| `/tracks/:trackId/search` | `SearchProfileCtrl`  | `tracks/search-profile.html`     | — (from Tracks) |
+| `/posts`                  | `PostsCtrl`          | `posts/posts.html`               | Posts           |
+| `/leads`                  | `LeadsCtrl`          | `leads/leads.html`               | Leads           |
+| `/offers`                 | `OffersCtrl`         | `offers/offers.html`             | Offers          |
+| `/applications`           | `ApplicationsCtrl`   | `applications/applications.html` | Applications    |
+| `/automation`             | `AutomationCtrl`     | `automation/automation.html`     | Automation      |
+| `/signin`                 | `AuthCtrl`           | `auth/signin.html`               | — (public)      |
+| `/signup`                 | `AuthCtrl`           | `auth/signup.html`               | — (public)      |
+| (unmatched)               | redirect to `/leads` | —                                | —               |
 
-**FE-RTE-02** **CVs, Search Profiles, Manual Post Entry, Lead Detail, and the offer dialog are not routes.** The **user-interface doc** is explicit that these are dialogs/panels reached from a page, not nav destinations. Giving each its own URL would let a bookmark or browser-back land on a dialog with no parent list underneath it, and the **user-interface doc** never specifies a standalone rendering for that state. Each is a controller instantiated by its parent, `PostsCtrl` opens `ManualPostEntryCtrl` in an `ng-if`-gated modal, `LeadsCtrl` opens `LeadDetailCtrl` the same way, and `TracksCtrl` opens `SearchProfilesCtrl` the same way from its "Configure search" row action, per the **user-interface doc**'s page 1b description, dismissed back to the parent's existing route rather than a route transition. `CvsCtrl` is the one exception with two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
+**FE-RTE-02** **Manual Post Entry, Lead Detail, and the offer dialog are not routes; Search Profiles and CVs are.** The **user-interface doc** calls Search Profiles and CVs "reached from a page" rather than standalone nav destinations, but each turned out to need its own bookmarkable URL and its own full-page form once built, so each is a real route above (`/tracks/:trackId/search`, `/cvs`), reached by `$location.path()` from its parent row action rather than an `ng-if`-gated overlay, and dismissed by navigating back. Manual Post Entry, Lead Detail, and the offer dialog have no parent list of their own underneath them, so each stays a dialog: `PostsCtrl` opens `ManualPostEntryCtrl` in an `ng-if`-gated modal, and `LeadsCtrl` opens `LeadDetailCtrl` the same way, per `FE-RTE-04`'s dialog-service pattern. `CvsCtrl` has two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
+
+**FE-RTE-04** **A dialog that isn't a route is a shared state service plus a directive, not a controller.** `ManualPostDialog`/`OfferDialog`-shaped: a factory holds an `open()`/`save()`/`cancel()` API and a `state` object a directive's `link` function reads (`manual-post-modal`/`offer-modal`), rendered with `ng-if="dialog.open"`. The opening controller calls `open()` and gets a promise back, exactly the shape `ConfirmDialog` and `OfferDialog` already established. There is no separate `*Ctrl` for a dialog — the directive's own scope and the shared service are enough, and a second call site never needs a second instantiation path.
 
 **FE-RTE-03** **Every route except `/signin` and `/signup` is guarded.** Each guarded route carries `resolve: { auth: ['AuthService', function (a) { return a.require(); }] }`, which rejects with `'unauthenticated'` when nobody is signed in. One `$routeChangeError` handler turns that rejection into `$location.path('/signin').search({next: <requested path>})`. The public routes resolve `AuthService.redirectIfSignedIn()`, which sends an already signed-in user to `/leads`. The guard is a convenience for navigation. The `401` from the API remains the actual enforcement (`FE-AUTH-03`).
 
@@ -114,7 +120,7 @@ frontend/
 
 **FE-SVC-01** **One `ApiClient` service is the only code that issues an `/api/**` request.** No controller constructs a raw `$http` call. This is the seam `ARCH-TEST-09`'s frontend-silo tier (`page.route()` intercepting `/api/**`) and `ARCH-TEST-05`'s mock-e2e tier both rely on. Since every request funnels through one service, mocking at the network boundary requires no test-only branch in application code, and a future change to the **api doc**'s surface touches one file, not eight controllers.
 
-**FE-SVC-02** **Table-generic methods**, parameterized by table name, thin promise-returning wrappers over the **api doc**'s seven generic shapes: `get(table, id)`, `list(table, params)` (→ `GET /api/v1/{table}/search`), `create(table, body)`, `update(table, id, body)`, `remove(table, id)`, `batch(table, rows)`. These are used directly for every `API-CAT-01` pure-generic table, `role`, `track`, `search_profile`, `cv`, `post_track`, and every `API-CAT-02` hook-backed table's non-restricted verbs, for example `ApiClient.update('lead', id, {stage: 'APPLIED'})`. `LeadsCtrl` uses `ApiClient.batch('lead', rows)` (`POST /api/v1/lead/batch`) for the Apply and Drop actions on the `TOAPPLY` column, and reads a `409` naming the failing `lead_id` through `ErrorService`. The hook is transparent to the client per the **api doc**'s `lead` resource entry, so the call shape does not differ from a pure-generic table. The backend enforces the invariant. The frontend does not need to know one exists beyond surfacing whatever `400`/`409` comes back (`FE-ERR-01`).
+**FE-SVC-02** **Table-generic methods**, parameterized by table name, thin promise-returning wrappers over the **api doc**'s seven generic shapes: `get(table, id)`, `list(table, params)` (→ `GET /api/v1/{table}/search`), `create(table, body)`, `update(table, id, body)`, `remove(table, id)`, `batch(table, rows)`. These are used directly for every `API-CAT-01` pure-generic table, `role`, `search_profile`, `search_schedule`, `cv`, and every `API-CAT-02` hook-backed table's non-restricted verbs — `track`'s create hook and every restriction below are invisible at this call shape, so `ApiClient.create('track', body)` is still a plain generic call, for example `ApiClient.update('lead', id, {stage: 'APPLIED'})`. `LeadsCtrl` uses `ApiClient.batch('lead', rows)` (`POST /api/v1/lead/batch`) for the Apply and Drop actions on the `TOAPPLY` column, and reads a `409` naming the failing `lead_id` through `ErrorService`. The hook is transparent to the client per the **api doc**'s `lead` resource entry, so the call shape does not differ from a pure-generic table. The backend enforces the invariant. The frontend does not need to know one exists beyond surfacing whatever `400`/`409` comes back (`FE-ERR-01`).
 
 **FE-SVC-03** **Named-endpoint methods, one per `API-EP-*`, spelled by name rather than as a generic POST.**
 
@@ -166,10 +172,10 @@ No screen implements its own modal markup. `ConfirmDialog.ask({message, confirmL
 | # | page                          | controller               | primary services                                                                                 | notes |
 | - | ------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------- | ------- |
 | 1 | Tracks                          | `TracksCtrl`                  | `ApiClient` (`track`, `cv` list for the CV picker, read-only `search_profile` for the row summary)                                     | archive toggle is `ApiClient.update('track', id, {is_active: false})` — `FE-SVC-02`, no named endpoint (010-api.md's classification); search-profile editing happens on Search Profiles (1b), not here |
-| 1b | Search Profiles                | `SearchProfilesCtrl`           | `ApiClient` (`search_profile`)                                                                                | opened from Tracks as a modal, `FE-RTE-02`; generic `PUT /api/v1/search_profile/{track_id}` |
-| 2 | CVs                               | `CvsCtrl`                       | `ApiClient` (`cv`)                                                                                            | opened from Tracks or Applications, `FE-RTE-02` |
-| 3 | Posts                              | `PostsCtrl`                       | `ApiClient` (`post`, `post_track`), `ApiClient.triggerSearchRun`, `RunPoller`, `ErrorService`                     | the page offers no promote action, since promotion is a system action (Workflow 4); see note below |
-| 4 | Manual Post Entry                   | `ManualPostEntryCtrl`               | `ApiClient.promoteManualPost`                                                                                       | `API-EP-01`; opened as a modal from Posts, `FE-RTE-02` |
+| 1b | Search Profiles                | `SearchProfileCtrl`           | `ApiClient` (`search_profile`, `search_schedule`)                                                                                | its own route from Tracks, `FE-RTE-02`; generic `PUT /api/v1/search_profile/{track_id}` and `/search_schedule/{track_id}` |
+| 2 | CVs                               | `CvsCtrl`                       | `ApiClient` (`cv`)                                                                                            | its own route from Tracks or Applications, `FE-RTE-02` |
+| 3 | Posts                              | `PostsCtrl`                       | `ApiClient` (`post`), `ApiClient.triggerSearchRun`, `RunPoller`, `ManualPostDialog`, `ErrorService`                     | the page offers no promote action, since promotion is a system action (Workflow 4); see note below |
+| 4 | Manual Post Entry                   | `ManualPostDialog` (service) + `manual-post-modal` directive               | `ApiClient.promoteManualPost`                                                                                       | `API-EP-01`; dialog opened from Posts, `FE-RTE-04` |
 | 5 | Leads                                 | `LeadsCtrl`                           | `ApiClient` (`lead`, `batch`, `createManualLead`), `ConfirmDialog`                                                       | single-lead stage transitions are generic `PUT /api/v1/lead/{id}` (`API-HOOK-01` is transparent, `FE-SVC-02`) and the `TOAPPLY` column's Apply and Drop are `ApiClient.batch('lead', rows)`; tab filters, layouts, and sorts are client-side on one `list('lead')` fetch, not one request per tab; the expiry-warning indicator is computed client-side from the fetched `deadline` field, not a separate API flag |
 | 6 | Lead Detail                            | `LeadDetailCtrl`                        | `ApiClient` (`lead`, `offer`, read-only `lead_event` per `FE-SVC-03a`), `ConfirmDialog`, `OfferDialog`                   | opened as a panel from Leads, `FE-RTE-02`; the Track drop-down reads the active tracks from `LeadsCtrl`'s `list('track')` fetch; a stage move to `OFFER` opens the offer dialog, and every action ends in `changed()`, which reloads the panel and the list |
 | 7 | Applications                             | `ApplicationsCtrl`                        | `ApiClient` (`lead` for the apply queue, `application`), `ApiClient.triggerApplyRun`, `RunPoller`, `ConfirmDialog`     | `API-EP-05`; a per-row drop is `ApiClient.update('lead', id, {stage: 'CLOSED', close_reason: 'dropped'})` |

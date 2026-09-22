@@ -17,4 +17,5 @@ dependencies = [
     "numpy",
     "authlib",
     "pillow",
+    "opencv-python-headless",
 ]

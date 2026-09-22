@@ -83,8 +83,8 @@ Flask's test client against a seeded temp database (`ARCH-TEST-03`, `STRAT-SILO-
 | TC-API-005 | REQ-APPLY-02               | cv delete-while-referenced 409                             |
 | TC-API-006 | REQ-SRCH-06                | post read-only surface                                     |
 | TC-API-007 | REQ-SRCH-07                | API-EP-01 manual post entry                                |
-| TC-API-008 | REQ-SRCH-07                | Manual post bypasses score filter                          |
-| TC-API-009 | REQ-SRCH-08                | post_track many-to-many                                    |
+| TC-API-008 | REQ-SRCH-07                | Manual post promotes unconditionally, same as search       |
+| TC-API-009 | REQ-SRCH-08                | post_track/match_score: exactly one pairing per post       |
 | TC-API-010 | REQ-CRM-01                 | lead create (system promote at TOAPPLY)                    |
 | TC-API-011 | REQ-CRM-01                 | lead create rejects a second promotion of one post         |
 | TC-API-012 | REQ-CRM-02                 | lead legal stage transitions accepted                      |
@@ -119,15 +119,15 @@ Flask's test client against a seeded temp database (`ARCH-TEST-03`, `STRAT-SILO-
 | TC-API-041 | REQ-CRM-01, REQ-CRM-11     | manual lead add at APPLIED                                 |
 | TC-API-042 | REQ-CRM-12                 | lead re-assigns to another active track                    |
 
-- **TC-API-001** — For each pure-generic table (`role`, `track`, `search_profile`, `cv`, `post_track`, `match_score`): `POST` creates (`201`), `GET` reads it back unchanged, `PUT` updates, `GET /search` lists/filters it, `DELETE` removes it, `POST /batch` creates/updates several rows in one call. This is the `STRAT-SILO-04` checklist's happy-path leg, run once per table.
+- **TC-API-001** — For each pure-generic table (`role`, `search_profile`, `search_schedule`, `cv`): `POST` creates (`201`), `GET` reads it back unchanged, `PUT` updates, `GET /search` lists/filters it, `DELETE` removes it, `POST /batch` creates/updates several rows in one call. This is the `STRAT-SILO-04` checklist's happy-path leg, run once per table. `track`'s create hook (`API-EP-01`'s classification note) and `post_track`/`match_score`'s internal-only write path are each covered by their own case instead.
 - **TC-API-002** — Omitting a required field on `POST`/`PUT` for any pure-generic table returns `400` naming the missing field. A malformed type or date-format value returns `400` naming the offending field, per `mcfpipe`'s validation checklist (`easymcf-backend-api` skill).
 - **TC-API-003** — `GET/PUT/DELETE` on a nonexistent row id returns `404` with a descriptive message. Any of the seven generic shapes against an unrecognized `{table}` name returns `404` naming the unknown table, not a `500`.
 - **TC-API-004** — `PUT /api/v1/track/{id} {"is_active": false}` succeeds as a plain generic write. The track's historical `post_track`/`lead`/`application` rows stay readable, and `is_active=true` un-archives it the same way.
 - **TC-API-005** — `DELETE /api/v1/cv/{id}` for a label referenced by `track.default_cv_id` or `application.cv_id` returns `409` naming the referencing rows, per the **api doc**'s `cv` entry, not a bare SQL error.
 - **TC-API-006** — `GET`/`search /api/v1/post` work normally including `is_open`/`closing_date`/`applicants`/etc. `PUT`/`DELETE /api/v1/post/{id}` and a bare `POST /api/v1/post` are all rejected. Only `API-EP-01` may create one.
-- **TC-API-007** — `POST /api/v1/posts/manual` with position/company/url/salary/date creates the `post` (`src_method='manual'`), scores it against every track, and creates the resulting `post_track`/`match_score` row pairs (`search_match=false`) in the same request.
-- **TC-API-008** — A manually-entered post whose computed match score is below a track's `min_match_score` is still promoted to a lead under that track. The score filter (`REQ-SRCH-09`) only screens search-discovered posts.
-- **TC-API-009** — A single `post` scored against two different tracks produces two independent `post_track` rows, each with its own `match_score` row carrying independent `match_score`/`score_method` values, editable/removable independently via generic CRUD.
+- **TC-API-007** — `POST /api/v1/posts/manual` with `track_id` plus position/company/url/salary/date creates the `post` (`src_method='manual'`) and the named track's one `post_track`/`match_score` row pair (`search_match=false`, `match_score=1.0`, `score_method='manual_v1'`) in the same request, returning the post, its pairing, and the new lead's id.
+- **TC-API-008** — A manually-entered post is promoted to a lead under the one track named on the request, unconditionally, exactly as a search-discovered post is (`REQ-SRCH-09`) — neither this release's fixed score nor the still-present `min_match_score` field gates promotion.
+- **TC-API-009** — A single `post` carries exactly one `post_track` row and its one paired `match_score` row, to whichever track found it or was named on its manual entry; neither is reachable through a client-facing generic endpoint of its own (`POST`/`PUT /api/v1/post_track`, `/api/v1/match_score`), only through the joined `post` read.
 - **TC-API-010** — `POST /api/v1/lead {post_id, track_id}` creates the row with `status='OPEN'`, `stage='TOAPPLY'`, `created_at`/`updated_at` set, `expected_salary_sgd` copied from the track's profile, and one `stage_change` `lead_event` from `NULL` to `TOAPPLY`. This is the **api doc**'s `lead` create path, called by the search process.
 - **TC-API-011** — A second `POST /api/v1/lead` for a `post_id` that already has a `lead` row returns `409` naming the existing `lead_id`. This drives the Posts screen's `already a lead` state.
 - **TC-API-012** — Every edge in the **workflows doc**'s Workflow 5 state diagram (`TOAPPLY→APPLIED→CALLBACK→INTERVIEW`, and each stage's path to `CLOSED`) is accepted by `PUT /api/v1/lead/{id}`, except `INTERVIEW→OFFER` and the `CLOSED` of a lead at `OFFER`, which only `TC-API-037` and `TC-API-038` cover, and `CLOSED→INTERVIEW` for a lead closed from `OFFER` (`TC-API-039`).

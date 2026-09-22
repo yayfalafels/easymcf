@@ -135,7 +135,7 @@ Exactly one per track (REQ-SRCH-01). Modeled as a 1:1 extension of `track` rathe
 | `keywords`        | one or more search keyword strings    |
 | `min_salary`      | REQ-SRCH-01                           |
 | `max_age_weeks`   | REQ-SRCH-01                           |
-| `min_match_score` | screening threshold, REQ-SRCH-09      |
+| `min_match_score` | user-set threshold, dormant until a differentiating scoring method exists, REQ-SRCH-09 |
 | `employment_type` | defaults `'Full Time'`, REQ-SRCH-01   |
 
 ### `search_schedule`
@@ -187,15 +187,15 @@ An `is_open = false` post is not physically deleted. History stays available to 
 
 ### `post_track`
 
-Many-to-many: a post can match more than one track (REQ-SRCH-08/09).
+One row per post: the track its search found it under, or the track a manual entry names (REQ-SRCH-08/09). The shape is a join table, but `010` never writes more than one pairing per post — see Decision 2.
 
-| field          | notes                                                                              |
-| -------------- | ---------------------------------------------------------------------------------- |
-| `post_id`      | PK part, FK → `post`                                                               |
-| `track_id`     | PK part, FK → `track`                                                              |
-| `search_match` | bool — true if found by this track's search, false if auto-assigned (manual entry) |
+| field          | notes                                                                        |
+| -------------- | ----------------------------------------------------------------------------- |
+| `post_id`      | PK part, FK → `post`                                                         |
+| `track_id`     | PK part, FK → `track`                                                        |
+| `search_match` | bool — true if found by this track's search, false if named on manual entry |
 
-No "assigned"/primary flag lives here. Which track a resulting lead belongs to is the track of the search run that promotes the post (Decision 2), and no track flag lives on the post. Each pairing's score lives in `match_score` below rather than on this row, so a rescoring pass can replace a score without touching the association itself.
+The one track a resulting lead belongs to is simply this row's `track_id`, since a post carries only one (Decision 2), and no separate track flag lives on the post. Each pairing's score lives in `match_score` below rather than on this row, so a rescoring pass can replace a score without touching the association itself.
 
 ### `match_score`
 
@@ -364,6 +364,7 @@ One row per user tracking that user's uploaded MCF session credential (Workflow 
 | 05 | 5       | 09        | adds `lead_event.stage_from` and `lead_event.stage_to`                        |
 | 06 | 6       | 09        | `lead.expected_salary_sgd`, `offer`, six stage values, `dropped` close reason |
 | 07 | 7       | 13        | accounts, `auth_session`, `mcf_session`, `lead.user_id`, `run_log.user_id`    |
-| 08 | 8       | 10        | adds `run_log.trigger_source`                                                 |
+| 08 | 8       | 17        | adds `mcf_attempt`, `mcf_session.confirmed_account_email`/`confirmed_at`      |
+| 09 | 9       | 10        | adds `run_log.trigger_source`, `lead.close_reason` `track_not_matched`        |
 
-Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, and version 8 is specified for milestone 10 to implement. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).
+Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, version 8 is specified for feature 17, and version 9 is specified for milestone 10 to implement. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. Version 8 adds the Google connect-attempt table and the two account-confirmation columns `mcf_session` gained for that flow. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).

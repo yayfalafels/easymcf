@@ -139,20 +139,20 @@ Every list-bearing page, meaning Posts, Leads, Offers, Applications, and Automat
 
 **Purpose:** the primary daily-use screen. Review postings for a track and act on them, Workflow 2 and 4.
 
-- Track selector at the top. Postings are always viewed in the context of one track, since match score is per-track.
+- Track selector at the top. Postings are always viewed in the context of one track, since a post belongs to the one track that found it or that a manual entry named it to.
 - "Run search" button → enters the async running state described above.
-- Results table: title, company, salary, posted date, match score, age, closing date if known, and an `already a lead` indicator if a lead already exists for this post under this track. Results are sorted by score descending by default so the highest-priority postings surface first. This is the entire point of REQ-SRCH-09.
-- Filters: match-score threshold, defaulting to the track's configured `min_match_score` but adjustable per view, max age, and an "include below-threshold" toggle to see what's screened out.
+- Results table: title, company, salary, posted date, age, closing date if known, a `manual` tag for manual entries, and an `already a lead` indicator, true for every row since every result promotes on its own. Results are sorted by posted date descending by default.
+- Filter: maximum age, adjustable per view. It limits only what this screen shows — every result is already a lead regardless of age, since promotion applies no filter of its own.
 - Manual entries and scraped postings share this same list once persisted. Manual entries carry a small "manual" tag rather than living in a separate view, Workflow 3, since they fold into the same review flow per the requirements' framing.
-- The system promotes qualifying posts to leads when a search run ends, Workflow 4, so this page offers no promote action. A post that became a lead shows `already a lead`, and a post becomes at most one lead.
+- The system promotes every qualifying post to a lead when a search run ends, Workflow 4, so this page offers no promote action. Every row shows `already a lead`, and a post becomes at most one lead.
 - "Add posting manually" button opens page 4 as a dialog.
 
 ### 4. Manual Post Entry (dialog)
 
 **Purpose:** capture a posting MCF search didn't surface, Workflow 3 and REQ-SRCH-07.
 
-- Form fields mirror `post`: position title, company, URL/reference, salary, and posted date, defaulting to today.
-- Matching tracks are auto-assigned on save using the same match-scoring logic as a search run. This feeds `post_track` with `search_match = false`, per the data model. An inline track-assignment editor lets the user adjust it afterward.
+- Form fields mirror `post`: position title, company, URL/reference, salary, and posted date, defaulting to today, plus a required track picker naming the one track the post belongs to.
+- On save, the named track receives the posting's one `post_track` row, `search_match = false`, per the data model. There is no auto-assignment and no separate reassignment editor — the request names the track once.
 - On save, returns the user to Posts with the new posting visible (tagged "manual"), promoted to a lead by the system on save (Workflow 4).
 
 ### 5. Leads

@@ -86,6 +86,26 @@ def test_one_mcf_session_per_user(conn):
         conn.execute("INSERT INTO mcf_session (user_id, status) VALUES (?, 'missing')", (uid,))
 
 
+def test_mcf_attempt_status_is_constrained(conn):
+    uid = _user(conn, "a@example.test")
+    row = "INSERT INTO mcf_attempt (user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?)"
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(row, (uid, "bogus", AT, AT))
+    conn.execute(row, (uid, "starting", AT, AT))
+
+
+def test_mcf_attempt_active_is_unique_per_user(conn):
+    a, b = _user(conn, "a@example.test"), _user(conn, "b@example.test")
+    row = "INSERT INTO mcf_attempt (user_id, status, created_at, updated_at) VALUES (?, ?, ?, ?)"
+    conn.execute(row, (a, "starting", AT, AT))
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(row, (a, "awaiting_approval", AT, AT))  # a second active status still conflicts
+    conn.execute(row, (b, "starting", AT, AT))               # another user's own active attempt is unaffected
+
+    conn.execute(row, (a, "failed", AT, AT))                 # a terminal status never conflicts, even repeated
+    conn.execute(row, (a, "failed", AT, AT))
+
+
 def test_cv_label_unique_within_a_user_only(conn):
     a, b = _user(conn, "a@example.test"), _user(conn, "b@example.test")
     conn.execute("INSERT INTO cv (user_id, label) VALUES (?, 'L')", (a,))

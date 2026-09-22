@@ -32,7 +32,7 @@ Read the **requirements** doc first for the requirement IDs, `REQ-*`, referenced
 ## Design decisions 
 
 1. **Post vs. lead split.** 010 keeps the two-entity split already implied by the requirements glossary: `post`, the source-of-truth listing shared by every user and read-only to them, and `lead`, one user's personal trackable instance created on promotion, rather than importing `mcfpipe`'s three-entity `post`/`job`/`crm_status` split. There is no per-user `job` wrapper entity. The lead holds its own copies of the post's position title, company name, and URL, and its own deadline, so the user edits the lead and the shared post is never touched. Per-track scoring attaches directly to `post` via a join, per the **data model**.
-2. **Primary track assignment.** When a post matches more than one track, the track a resulting lead belongs to is **the track of the search run that promotes the post**, Workflow 4. A post becomes at most one lead, so a post that matches several tracks is filed under the first run that promotes it and is not re-filed under the others by the system. The user can re-assign the lead to another active track from Lead Detail, REQ-CRM-12, which logs a field edit and leaves the stage, deadline, and expected salary unchanged.
+2. **One track per post.** A post carries exactly one `post_track`/`match_score` pairing: the track whose own search found it, or the track a manual entry names, per REQ-SRCH-08. There is no cross-track matching to resolve, since a track's own search keywords already are the whole of that track's relevance filter, and the resulting lead is filed under that same track, Workflow 4. The user can re-assign the lead to another active track afterward from Lead Detail, REQ-CRM-12, which logs a field edit and leaves the stage, deadline, and expected salary unchanged.
 3. **Apply-failure → lead effect.** This isn't a single blanket rule. It depends on whether the *post* is the problem or the *apply mechanics/config* are the problem, per Workflow 7's full table. `post_closed` and `post_unavailable` auto-close the lead as `apply failed`. Other failure outcomes, `cv_not_found`, `cv_selector_error`, `unable_to_apply`, and `invalid_input`, leave the lead open at `TOAPPLY` for the user to fix and retry.
 4. **Session establishment UX.** There is in-app UI for this, Workflow 8: the app redirects the user to MCF's Singpass-federated login. Login and MFA itself stays manual and out of scope per REQ-APPLY-06. A custom upload dialog lets the user paste or upload the exported session cookie afterward.
 5. **Track archival.** Track deletion is a soft delete, REQ-SRCH-10: an archived track is hidden from active track selectors, including search run, manual lead add, and apply default CV, but its historical posts, leads, and applications remain intact and readable.
@@ -66,28 +66,28 @@ flowchart TD
     E -- no --> H[Next keyword/salary combo,\nor sweep complete]
     H --> I[Detail pass: posts without detail yet]
     I --> J{Post still open?}
-    J -- no --> K[Remove from active posts\nREQ-SRCH-06]
+    J -- no --> K[Flag is_open=false, keep the row\nREQ-SRCH-06]
     J -- yes --> L[Populate detail fields]
-    L --> M[Score post per matching track\ntitle-keyword match]
-    M --> N[Screen: visible if age <= max_age\nand score >= min_score]
+    L --> M[Write fixed match_score=1.0\nsearch_match_v1]
+    M --> N[Promote: every open, detailed pairing\nwith no lead yet -> TOAPPLY]
     K --> O[Close run_log: outcome counts, errors]
     N --> O
 ```
 
 - Incremental persistence, per REQ-SRCH-04, means a crash mid-run keeps whatever was already saved. This is the one deliberate improvement over the `jobsearch` prototype's all-or-nothing write, per the **prototype extraction**.
-- Dedup id, the title-keyword match-score formula, and screening thresholds reuse the `jobsearch` mechanics as-is, per the **prototype extraction**. 010 does not change the algorithm. It only changes where and when results are persisted.
-- Score is stored with its `method` string, per REQ-SRCH-09, so a future semantic-scoring method can be added without a schema change.
+- Dedup id reuses the `jobsearch` mechanics as-is, per the **prototype extraction**. 010 does not change that algorithm. It only changes where and when results are persisted, and replaces the prototype's title-keyword scoring with a fixed value, per REQ-SRCH-09.
+- The fixed score is stored with its `method` string, `search_match_v1`, per REQ-SRCH-09, so a future differentiating scoring method can be added later without a schema change.
 
 ## 3. Manual posting entry
 
-- User submits a posting MCF search didn't find, via a form using the same fields as a scraped post, per REQ-SRCH-07: position title, company, URL/reference, salary, and so on.
-- The post is created on the server. A posting whose id already exists and is not visible to the user reuses the existing shared post, and only the user's own `post_track` associations are written. A posting the user already sees is rejected as a duplicate.
-- On save, the system auto-assigns the posting's matching tracks using the same match-scoring logic as a search run, per REQ-SRCH-09, creating the same `post_track` association a search match would, with `search_match = false`. The user can update this track assignment afterward via the UI.
-- Manual postings bypass the match-score filter in screening, per REQ-SRCH-07, for the tracks they're assigned to. They are promoted to leads on save, regardless of score, so they enter the apply queue at `TOAPPLY` like any system-created lead.
+- User submits a posting MCF search didn't find, via a form using the same fields as a scraped post, per REQ-SRCH-07: position title, company, URL/reference, salary, and so on, naming the one track it belongs to.
+- The post is created on the server. A posting whose id already exists and is not visible to the user reuses the existing shared post, and only the user's own `post_track` association is written. A posting the user already sees is rejected as a duplicate.
+- On save, the named track receives the posting's one `post_track` association, `search_match = false`, with a `match_score` row fixed at `1.0`, `score_method = 'manual_v1'`, in the same request.
+- Manual postings bypass the match-score filter in screening, per REQ-SRCH-07 — there is none to bypass in `010`, since neither a manual nor a search-found post is filtered by score before promotion. They are promoted to leads on save, so they enter the apply queue at `TOAPPLY` like any system-created lead.
 
 ## 4. Promote post to lead
 
-- The search process (Workflow 2) ends with a promotion step: each post that passes the track's screen (REQ-SRCH-09) and is not yet a lead becomes a lead under the track of that run, Decision 2 above. Manually entered posts (Workflow 3) are promoted the same way on save. Promotion is a system action, and no page offers the user a promote control.
+- The search process (Workflow 2) ends with a promotion step: each post the run's track found that is open, detailed, and not yet a lead becomes a lead under that same track, Decision 2 above. Manually entered posts (Workflow 3) are promoted the same way on save. Promotion is a system action, and no page offers the user a promote control.
 - System creates a **lead**: `status = OPEN`, `stage = TOAPPLY`, `user_id` set to the track's owner, `post_id`, `track_id` set to the track of the run, `position_title`, `company_name`, and `url_ref` copied from the post, a computed `deadline`, and `expected_salary_sgd` copied from the track's search profile `min_salary`, per REQ-CRM-01, REQ-CRM-03, and REQ-CRM-09. The copy happens once. A later change to the post never rewrites the lead. Its first activity event records the promotion, from no stage to `TOAPPLY`.
 - The user adds a lead manually from the Leads page. The form creates a copy of the post (`source = 'Manual'`) and the lead together, at `stage = APPLIED` with `applied_date` set to the creation date, because the user applied outside the tool. Its first activity event runs from no stage to `APPLIED`.
 - The post record itself is never mutated by this step, and no user can edit a post. REQ-CRM-04 gives the lead its own editable title, company, URL, and deadline, separate from the post.
@@ -122,6 +122,7 @@ This diagram is the complete, closed list of legal `stage` transitions. `API-HOO
   06. duplicate
   07. apply failed
   08. dropped
+  09. track not matched — the track's own keywords over-matched a lead that turns out not to actually fit it, distinct from `withdrawn`
 - **Activity log**, REQ-CRM-08 and **Decision 7**: every update to a lead, whether a stage change, contact logged, note added, or deadline changed, is recorded as a timestamped event in an append-only per-lead log, rather than only mutating a bare `updated_at` field. This log is the basis for both the lead's `deadline` maintenance, feeding auto-expiry below, and the activity history shown to the user, per the **user interface** design's Lead Detail. Scheduled interview and callback details are captured as free text within a `lead_note` or an event entry rather than as dedicated per-stage date fields. Every event carries `stage_from` and `stage_to`: the promotion runs from no stage to `TOAPPLY` (or `APPLIED` for a manual lead), a transition from the old stage to the new one, and every other update holds the current stage in both.
 - **Auto-expiry**, REQ-CRM-05: a lead auto-closes (`close_reason='expired'`) once the current date passes its `deadline`. `deadline` is set at promotion to the post's `closing_date` when that date is after the promotion date, `posted_date` plus 28 days when the post has no `closing_date`, and the promotion date plus 1 week when `closing_date` is on or before the promotion date, and refreshed to 28 days from the most recent activity on every update at `CALLBACK` and `INTERVIEW`, set to the deadline of the open offer at `OFFER`, and evaluated on each backend list call, for example `GET /lead/search` per REQ-PLAT-01, so the UI reflects current expiry state on every page load or refresh. Only a lead with `status='OPEN'` is evaluated.
 - **Auto apply-failed close**: see Workflow 7 for the specific outcomes that trigger this and the ones that leave the lead open.

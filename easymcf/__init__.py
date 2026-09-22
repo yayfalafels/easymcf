@@ -18,7 +18,7 @@ from .api import init_api
 from .auth import google as auth_google, routes as auth_routes, sessions
 from .db.connection import schema_version
 
-SCHEMA_VERSION = 7  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
+SCHEMA_VERSION = 8  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")

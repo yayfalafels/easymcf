@@ -10,12 +10,13 @@
 -- schema_version 7 (feature 13) adds accounts and ownership: sign-in fields on `user`, `auth_session`,
 -- `mcf_session` (renamed from `session`, one row per user), `lead.user_id`, the lead's own
 -- `position_title`, `company_name`, and `url_ref`, and `run_log.user_id`.
+-- schema_version 8 (feature 17) adds `mcf_attempt` and `mcf_session.confirmed_account_email`/`confirmed_at`.
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (7);
+INSERT INTO meta (schema_version) VALUES (8);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -211,5 +212,23 @@ CREATE TABLE mcf_session (
     user_id INTEGER NOT NULL UNIQUE REFERENCES user(id),
     status TEXT NOT NULL CHECK (status IN ('valid', 'expired', 'missing')),
     uploaded_at TEXT,
-    cookie_ref TEXT
+    cookie_ref TEXT,
+    confirmed_account_email TEXT,
+    confirmed_at TEXT
 );
+
+CREATE TABLE mcf_attempt (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES user(id),
+    status TEXT NOT NULL CHECK (status IN (
+        'starting', 'awaiting_approval', 'verifying', 'account_confirmation_required',
+        'connected', 'expired', 'cancelled', 'failed', 'interaction_required', 'reauthentication_required'
+    )),
+    account_email TEXT,
+    error_code TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_mcf_attempt_user_id ON mcf_attempt(user_id);
+CREATE UNIQUE INDEX ux_mcf_attempt_active ON mcf_attempt(user_id)
+    WHERE status IN ('starting', 'awaiting_approval', 'verifying', 'account_confirmation_required');

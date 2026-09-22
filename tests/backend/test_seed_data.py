@@ -44,6 +44,16 @@ def test_two_users_with_distinct_data(conn):
     assert conn.execute("SELECT COUNT(*) FROM lead_note WHERE lead_id IN (SELECT id FROM lead WHERE user_id = 2)").fetchone()[0] == 2
     assert conn.execute("SELECT COUNT(*) FROM run_log WHERE user_id = 2").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM mcf_session").fetchone()[0] == 2
+    assert conn.execute("SELECT COUNT(*) FROM mcf_attempt").fetchone()[0] == 2
+
+
+def test_seeded_mcf_connection_covers_both_branches(conn):
+    connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 1").fetchone()
+    assert connected == ("valid", "mcf_session_1.json", "yayfalafels@gmail.com")
+    never_connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 2").fetchone()
+    assert never_connected == ("missing", None, None)
+    assert conn.execute("SELECT status, account_email FROM mcf_attempt WHERE user_id = 1").fetchone() == ("connected", "yayfalafels@gmail.com")
+    assert conn.execute("SELECT status, error_code FROM mcf_attempt WHERE user_id = 2").fetchone() == ("failed", "SingpassTimeoutError")
 
 
 def test_ownership_columns_are_consistent(conn):

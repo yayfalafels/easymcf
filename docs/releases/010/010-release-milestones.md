@@ -17,9 +17,9 @@ The `seq` column present in earlier drafts of this table is dropped (per [010-is
 | 12 | 010     | 09  | closed   | validation utilities                     |
 | 09 | 010     | 10  | closed   | job leads tracking                       |
 | 13 | 010     | 11  | closed   | oauth login                              |
-| 10 | 010     | 12  | open     | search by keywords                       |
-| 11 | 010     | 13  | pending  | apply automation                         |
-| 17 | 010     | 14  | pending  | MCF website redirect                     |
+| 17 | 010     | 12  | open     | MCF website session                      |
+| 10 | 010     | 13  | pending  | search by keywords                       |
+| 11 | 010     | 14  | pending  | apply automation                         |
 | 14 | 010     | 15  | pending  | performance dashboard reports            |
 | 15 | 010     | 16  | pending  | scraper drift repair                     |
 | 16 | 010     | 17  | pending  | position title score model develop       |

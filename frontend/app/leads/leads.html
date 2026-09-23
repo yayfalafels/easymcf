@@ -48,7 +48,7 @@
           <td ng-if="stage === 'TOAPPLY'" ng-click="$event.stopPropagation()"><input type="checkbox" ng-model="vm.checked[l.id]" data-testid="lead-select-{{l.id}}"></td>
           <td>
             <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
-            <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong>
+            <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" mcf-link ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong>
           </td>
           <td>{{vm.company(l)}}</td>
           <td>{{vm.trackName(l)}}</td>
@@ -62,7 +62,7 @@
     <div ng-if="vm.tab.layout === 'card'">
       <div ng-repeat="l in vm.inStages([stage], vm.tab.sort)" ng-click="vm.open(l)" data-testid="lead-row-{{l.id}}">
         <strong ng-if="!vm.hasPostUrl(l)">{{vm.title(l)}}</strong>
-        <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong><span>{{vm.company(l)}}</span>
+        <strong ng-if="vm.hasPostUrl(l)"><a ng-href="{{l.url_ref}}" target="_blank" rel="noopener" mcf-link ng-click="$event.stopPropagation()" data-testid="lead-title-link-{{l.id}}">{{vm.title(l)}}</a></strong><span>{{vm.company(l)}}</span>
         <span data-testid="lead-salary-{{l.id}}">{{vm.money(vm.salary(l))}}</span>
         <span ng-class="{warn: vm.warn(l)}" data-testid="lead-expiry-{{l.id}}">{{vm.daysLeft(l)}} days left</span>
         <span data-testid="lead-latest-note-{{l.id}}" title="{{l.latest_note}}">{{vm.excerpt(l.latest_note)}}</span>

@@ -30,6 +30,8 @@ OWNER_SQL = {
     "post": ("SELECT pt.post_id FROM post_track pt JOIN track t ON t.id = pt.track_id WHERE t.user_id = 1 "
              "AND pt.post_id NOT IN (SELECT pt2.post_id FROM post_track pt2 JOIN track t2 ON t2.id = pt2.track_id WHERE t2.user_id = 2) "
              "AND pt.post_id NOT IN (SELECT post_id FROM lead WHERE user_id = 2) LIMIT 1"),
+    "mcf_attempt": "SELECT id FROM mcf_attempt WHERE user_id = 1 LIMIT 1",
+    "mcf_session": "SELECT id FROM mcf_session WHERE user_id = 1 LIMIT 1",
 }
 # A valid update body per table, so the answer reflects ownership and not body validation.
 UPDATE_BODY = {"cv": {"label": "x"}, "post": {}}

@@ -16,6 +16,14 @@ angular.module('easymcfApp').factory('ApiClient', ['$http', '$q', 'ErrorService'
     batch: function (table, rows, describe) { return call({ method: 'POST', url: base + table + '/batch', data: { rows: rows } }, describe); },
     update: function (table, id, body) { return call({ method: 'PUT', url: base + table + '/' + id, data: body }); },
     remove: function (table, id) { return call({ method: 'DELETE', url: base + table + '/' + id }); },
+    startMcfAttempt: function () { return call({ method: 'POST', url: base + 'mcf_attempt/start' }); },
+    mcfAttemptQrUrl: function (attemptId) { return base + 'mcf_attempt/' + attemptId + '/qr'; },
+    mcfAttemptQrLink: function (attemptId) { return call({ method: 'GET', url: base + 'mcf_attempt/' + attemptId + '/qr_link' }); },
+    openMcfSession: function (url) { return call({ method: 'POST', url: base + 'mcf_session/open', data: { url: url } }); },
+    confirmMcfAttempt: function (attemptId, accept) {
+      return call({ method: 'POST', url: base + 'mcf_attempt/' + attemptId + '/confirm', data: { accept: accept } });
+    },
+    cancelMcfAttempt: function (attemptId) { return call({ method: 'DELETE', url: base + 'mcf_attempt/' + attemptId }); },
     signup: function (body) { return call({ method: 'POST', url: base + 'auth/signup', data: body }); },
     signin: function (body) { return call({ method: 'POST', url: base + 'auth/signin', data: body }); },
     signout: function () { return call({ method: 'POST', url: base + 'auth/signout' }); },

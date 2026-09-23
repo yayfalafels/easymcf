@@ -312,15 +312,15 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     u2_applied = next(row["id"] for row in leads if row["user_id"] == 2 and row["stage"] == "APPLIED")
     sql["application"] += insert("application", {"id": app_id, "lead_id": u2_applied, "cv_id": 3, "status": "applied", "error_detail": None, "attempted_at": f"{anchor} 11:01:00", "run_id": 6}, "second user apply attempt")
     for account in ACCOUNTS:
-        connected = account["id"] == 1
+        previously_confirmed = account["id"] == 1
         sql["mcf_session"] += insert("mcf_session", {
             "id": account["id"], "user_id": account["id"],
-            "status": "valid" if connected else "missing",
-            "uploaded_at": f"{anchor} 12:00:00" if connected else None,
-            "cookie_ref": f"mcf_session_{account['id']}.json" if connected else None,
-            "confirmed_account_email": account["email"] if connected else None,
-            "confirmed_at": f"{anchor} 12:00:00" if connected else None,
-        }, "no real cookie payload is ever seeded, cookie_ref names a file this seed never creates")
+            "status": "missing",
+            "uploaded_at": None,
+            "cookie_ref": None,
+            "confirmed_account_email": account["email"] if previously_confirmed else None,
+            "confirmed_at": f"{anchor} 12:00:00" if previously_confirmed else None,
+        }, "no real cookie payload is ever seeded; a seeded row must not claim an authenticated session")
 
     attempt_rows = [
         {"id": 1, "user_id": 1, "status": "connected", "account_email": ACCOUNTS[0]["email"], "error_code": None,

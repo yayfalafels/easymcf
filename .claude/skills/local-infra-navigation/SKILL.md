@@ -46,6 +46,13 @@ curl -sf http://127.0.0.1:5000/api/v1/health             # confirm it's up
 kill %1                                                   # stop it when done
 ```
 
+Use the tracked restart helper for repeat local runs. It reads and exports `MCF_MODE` from `.env`, reads the configured port, refuses to kill a listener unless `/proc` identifies this repo's `python -m easymcf` process, and starts through the operational environment. The default preserves the database. `--reset-seed` performs the destructive clean-seed flow before starting.
+
+```bash
+scripts/restart.sh                 # kill the current EasyMCF listener and restart
+scripts/restart.sh --reset-seed    # kill, reset schema and seed data, then restart
+```
+
 If Chromium's binary is present but fails to *launch* (a `libnspr4.so`/similar dynamic-linker error), the sandboxed OS is missing shared libraries `playwright install` alone doesn't provide — that needs a one-time, human-run `sudo env/bin/python -m playwright install --with-deps chromium` (or the equivalent `apt-get install`); an agent session has no `sudo` by default.
 
 ## Database — location, reset, seed data

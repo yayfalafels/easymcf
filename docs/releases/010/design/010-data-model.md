@@ -328,15 +328,17 @@ Each run belongs to one user, and at most one run of each type per user is `runn
 
 ### `mcf_session`
 
-One row per user tracking that user's uploaded MCF session credential (Workflow 8, REQ-APPLY-06). The cookie payload itself is treated as sensitive material handled like `jobsearch`'s `cookies_mcf.json`. It is stored as a local file the backend reads, one per user, referenced rather than embedded from this row, consistent with the project boundary against committing real session exports.
+One row per user tracking browser state established through Workflow 8 and consumed by apply automation and authenticated MCF links. The credential payload is sensitive and stored outside SQLite as one Playwright storage-state file plus one sessionStorage sidecar per user. This row stores only the primary filename and confirmed account identity. A seeded row starts `missing` because seed data creates no credential files.
 
-| field         | notes                                                                      |
-| ------------- | -------------------------------------------------------------------------- |
-| `id`          | PK                                                                         |
-| `user_id`     | unique FK → `user`, one row per user, created at sign-up                   |
-| `status`      | `valid` \| `expired` \| `missing`, `missing` until the first upload        |
-| `uploaded_at` | when the user last uploaded a cookie                                       |
-| `cookie_ref`  | filename of the stored payload, never the raw cookie value                 |
+| field                     | notes                                                   |
+| ------------------------- | ------------------------------------------------------- |
+| `id`                      | PK                                                      |
+| `user_id`                 | unique FK → `user`, one row per user, created at sign-up |
+| `status`                  | `valid` \| `expired` \| `missing`                      |
+| `uploaded_at`             | when authenticated browser state was last saved         |
+| `cookie_ref`              | storage-state filename, never the credential payload     |
+| `confirmed_account_email` | nullable MCF account identity confirmed by the user      |
+| `confirmed_at`            | nullable ISO-8601 timestamp of identity confirmation     |
 
 ## Design notes
 

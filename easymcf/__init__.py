@@ -15,13 +15,16 @@ from werkzeug.exceptions import NotFound
 
 from .config import Config
 from .api import init_api
+from .api import mcf_attempt_routes, mcf_session_routes
 from .auth import google as auth_google, routes as auth_routes, sessions
 from .db.connection import schema_version
+from .services import mcf_connection
 
 SCHEMA_VERSION = 8  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")
+_ASSETS_DIR = os.path.join(_REPO_ROOT, "assets")
 
 
 def create_app(config: Config | None = None) -> Flask:
@@ -33,6 +36,7 @@ def create_app(config: Config | None = None) -> Flask:
             f"database is version {on_disk_version}, code expects {SCHEMA_VERSION} "
             "— run scripts/resetdb.py"
         )
+    mcf_connection.reconcile_local_sessions(config)
 
     # No Flask-managed static folder: the catch-all route below does that job
     # itself (ARCH-RUN-09), so /api/v1/* routes can't ever be shadowed by it.
@@ -46,6 +50,8 @@ def create_app(config: Config | None = None) -> Flask:
     auth_routes.install_guard(app)
     auth_google.init(app, config)
     app.register_blueprint(auth_routes.bp)
+    app.register_blueprint(mcf_attempt_routes.bp)
+    app.register_blueprint(mcf_session_routes.bp)
     init_api(app)
 
     @app.errorhandler(413)
@@ -57,6 +63,10 @@ def create_app(config: Config | None = None) -> Flask:
         # API-EP-07 — no body, no db touch; readiness probe only, application
         # code never calls this itself.
         return jsonify(status="ok")
+
+    @app.get("/assets/<path:path>")
+    def assets(path: str):
+        return send_from_directory(_ASSETS_DIR, path)
 
     @app.get("/")
     @app.get("/<path:path>")

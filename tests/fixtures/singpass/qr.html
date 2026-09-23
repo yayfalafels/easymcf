@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<!-- 17.EL.14 fixture: the Singpass QR page. Real Singpass renders the QR as an inline <svg id="ndi-qr-canvas">
+     (see QR_ELEMENT_LOCATORS' own comment in probe_mcf_singpass.py); this fixture uses an <img> with the same
+     id carrying a real, freshly cv2.QRCodeEncoder-generated PNG as a data URI instead, so _decode_qr_element()
+     takes its src-attribute fast path rather than an element screenshot — deterministic and fast for a fixture,
+     while still exercising the real explicit-priority locator list and the real decode pipeline end to end.
+     After a short delay, simulating the phone-approval redirect Singpass's own page performs once scanned and
+     approved, this page navigates the browser back to the MCF fixture's connected page on its own, the same
+     same-page navigation _run_attempt()'s wait_for_authenticated() polls for via page.wait_for_url(). -->
+<html lang="en">
+<head><meta charset="utf-8"><title>Singpass</title></head>
+<body>
+  <main>
+    <img id="ndi-qr-canvas" data-testid="ndi-qr-canvas"
+         src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAlCAAAAADg9X/fAAABRElEQVQ4EY3BwY0cQRAEMYb/RqeqBzi9l2x+0PygyWe0RpPJ8pmmOa01sqw1mtM0Ldac1sgzLdY0LdZieZa11mJN02JN87QWpsWapjktyzM0NKdp8llrrbXWWstnmv9iZFqYP03OwlqjaU1rrdE0rWUtQ55pxDSaMI2saWSxRkNMRms0rWWtoYnFYllYC4s5TebJ0LJMGDJN1mJhMmLN02haa4jRiDWyhqblTGstljUt02haWNZaa61pmpZpWpZniGnNyRpNa5rWmiyLtaahobWsyWhNmKbRZJms0eSsZVqmaXJGJmutIdZoWmu0TEzOshiaTIyM1rSWM5rmTyOTZTRaa5p81hDTsqyF0TSnaTJkYYTRtFhrtDCt5ZnTtFhrPk2GljU0LdaaTEbLYjKa5rSsiYU5LUOTz7JGLCOsNZofND/4B2v5TxC2M9iZAAAAAElFTkSuQmCC"
+         alt="Scan with Singpass">
+  </main>
+  <script>
+    setTimeout(function () {
+      window.location.href = "https://www.mycareersfuture.gov.sg/dashboard/career";
+    }, 8000);
+  </script>
+</body>
+</html>

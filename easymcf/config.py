@@ -49,6 +49,10 @@ class Config:
         default_factory=lambda: os.environ.get("GOOGLE_DISCOVERY_URL", "https://accounts.google.com/.well-known/openid-configuration")
     )
 
+    def __post_init__(self) -> None:
+        if self.mcf_mode not in {"fixture", "live"}:
+            raise ValueError("MCF_MODE must be 'fixture' or 'live'")
+
     @property
     def gcp_secret_path(self) -> str:
         return os.environ.get("GCP_OAUTH_SECRET_FILE") or os.path.join(self.secrets_dir, "gcp_oauth_client_secret")

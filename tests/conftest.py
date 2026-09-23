@@ -33,6 +33,11 @@ for _key in ("GCP_OAUTH_CLIENT_ID", "GCP_OAUTH_TEST_EMAIL", "GCP_OAUTH_SECRET_FI
              "SIGNIN_WINDOW_S", "PASSWORD_MIN_LENGTH", "PHOTO_DIR", "PHOTO_MAX_BYTES"):
     os.environ.pop(_key, None)
 
+# 17.IS.11: a developer's own .env may set MCF_MODE=live for their own `python -m easymcf` runs. Popped here for
+# the same reason as the block above — every non-live test tier forces fixture mode itself regardless (ARCH-RUN-08),
+# so this is defense in depth, not the only thing standing between the suite and a real MCF/Singpass request.
+os.environ.pop("MCF_MODE", None)
+
 # `browser`/`page` (ARCH-TEST-04/09) are registered exactly once, here at the
 # top level, deliberately — 07.IS.06. Registering them separately in both
 # tests/frontend/conftest.py and tests/e2e/conftest.py (each importing the

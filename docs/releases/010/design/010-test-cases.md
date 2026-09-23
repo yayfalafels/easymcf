@@ -229,7 +229,7 @@ Playwright drives the real AngularJS app served by a real `python -m easymcf` pr
 | TC-FE-015 | REQ-APPLY-11           | Applications — drop behind confirmation                    |
 | TC-FE-016 | REQ-APPLY-03           | Applications — run batch behind confirmation, async state  |
 | TC-FE-017 | REQ-APPLY-04           | Applications — results view per-outcome actions            |
-| TC-FE-018 | REQ-PLAT-03, REQ-FE-02 | Automation — Runs tab and Session tab                      |
+| TC-FE-018 | REQ-PLAT-03, REQ-FE-02 | Automation runs and global MCF connection pop-up          |
 | TC-FE-019 | REQ-FE-02              | Cross-cutting — error surfacing and empty states           |
 | TC-FE-020 | REQ-CRM-10             | Offers — dialog, page history, and actions                 |
 | TC-FE-021 | REQ-CRM-09             | Leads — expected salary display and edit                   |
@@ -252,7 +252,7 @@ Playwright drives the real AngularJS app served by a real `python -m easymcf` pr
 - **TC-FE-015** — Dropping a lead from the queue requires confirmation, then removes it from the list and reflects the mocked lead-closed-as-dropped outcome.
 - **TC-FE-016** — "Run apply batch" requires confirmation, since it mutates MCF-side state, then enters the async running state with mocked per-application progress counts.
 - **TC-FE-017** — Post-run, each mocked outcome renders its Workflow-7 next action inline. `cv_not_found` gets "fix CV and retry," `post_closed` gets "lead auto-closed" with a link, `applied` gets "lead moved to Applied."
-- **TC-FE-018** — The Runs tab (page 8) lists mocked `run_log` rows reverse-chronological with expandable error detail. The Session tab shows mocked status/upload-history and the upload dialog round-trips a mocked cookie payload.
+- **TC-FE-018** — Automation lists mocked `run_log` rows reverse-chronological with expandable error detail. The MCF nav icon reflects missing, active, and valid states. Its pop-up reaches the QR step, confirms a first account, shows connected state, and disconnects. A valid lead link calls authenticated Open; a missing session leaves native new-tab navigation unchanged.
 - **TC-FE-019** — A mocked failed/partial run surfaces inline on its triggering page and in the Runs tab, never console-only. A mocked missing/expired session blocks the Applications run button specifically. Every list page's mocked-empty response renders its documented empty-state call to action.
 - **TC-FE-020** — `Move to OFFER` on an `INTERVIEW` lead opens the offer dialog with today's date, the current lead, the lead's expected salary as the amount, and the lead's deadline. The Offers page (page 9) lists every offer including closed ones, filters by status, and its `Accept`, `Reject`, and `Withdrawn` buttons ask for confirmation and then show the final status. A lead at `OFFER` shows no close control, and a lead closed from an offer shows `Re-open`.
 - **TC-FE-021** — The lead lists show `S$` expected salary, the Lead Detail field edits it, and a lead at `OFFER` shows its offer amount instead.

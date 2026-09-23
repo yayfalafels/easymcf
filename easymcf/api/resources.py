@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import uuid
 
-from flask import g, jsonify, request
+from flask import current_app, g, jsonify, request
 
 from .. import clock
 from .. import tenancy
-from ..services import leads, offers
+from ..services import leads, mcf_connection, offers
 from .db import get_db
 from .generic import GENERIC, REGISTRY, Resource, _fetch, _validate, bp, register
 
@@ -80,6 +80,21 @@ register(Resource(
 ))
 # A post is shared and read-only to every user (REQ-AUTH-06). Only the search run and the manual entry endpoints write it.
 register(Resource("post", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY, bool_columns=("is_open",)))
+
+# mcf_attempt is written only through its own named endpoints (mcf_attempt_routes.py); this registers the
+# generic-shaped, tenancy-scoped GET /api/v1/mcf_attempt/search poll, run_log's own trigger-plus-generic-read split.
+register(Resource("mcf_attempt", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY))
+# mcf_session itself had no read endpoint before this feature (17.IS.03): signup (auth/accounts.py,
+# auth/google.py) and mcf_connection.confirm()/cancel() are its only writers, and the frontend status
+# page/badge need to read it the same generic-shaped, tenancy-scoped way.
+def _reconcile_mcf_session_read(db) -> None:
+    mcf_connection.reconcile_local_sessions(current_app.config["EASYMCF_CONFIG"], db=db)
+
+
+register(Resource(
+    "mcf_session", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY,
+    before_read=_reconcile_mcf_session_read,
+))
 
 _LEAD_SELECT = (
     "SELECT lead.*, "

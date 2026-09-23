@@ -102,7 +102,7 @@ Every list-bearing page, meaning Posts, Leads, Offers, Applications, and Automat
 | 5 | Leads                                  | Leads           | REQ-CRM-01..07, 09, 11, REQ-FE-01    |
 | 6 | Lead Detail (panel, from Leads)        | —               | REQ-CRM-03, 04, 09, 10               |
 | 7 | Applications                           | Applications    | REQ-APPLY-01..09, REQ-FE-01          |
-| 8 | Automation (Runs / Session tabs)       | Automation      | REQ-PLAT-03, REQ-FE-02, REQ-APPLY-06 |
+| 8 | Automation (Runs)                      | Automation      | REQ-PLAT-03, REQ-FE-02               |
 | 9 | Offers                                 | Offers          | REQ-CRM-10                           |
 | 10 | Sign in                               | —               | REQ-AUTH-03..05                      |
 | 11 | Sign up                               | —               | REQ-AUTH-01, 02                      |
@@ -192,6 +192,8 @@ Clicking a card or row on any tab opens the Lead Detail panel.
 
 ### 6. Lead Detail (panel/dialog)
 
+MCF posting links use the saved authenticated MCF session when it is valid, opening the exact target in a separate visible Chromium window. Without a valid saved session, the same link remains an ordinary unauthenticated new-tab URL. The Leads page title links use the same behavior.
+
 **Purpose:** the day-to-day working surface for one lead. Everything REQ-CRM-03 lists that doesn't fit on a board card.
 
 - Deadline, applied date, first-attempt date, last-contact date (editable date fields).
@@ -225,23 +227,25 @@ Clicking a card or row on any tab opens the Lead Detail panel.
 - "Run apply batch" button, behind the confirmation modal since this mutates real MCF-side state, → async running state as described above, with per-application progress such as "3 of 8 processed."
 - **Results view**, same page, post-run: each application's outcome, per REQ-APPLY-04's full vocabulary, with a per-outcome next action surfaced inline per Workflow 7's table. For example, a `cv_not_found` row gets a "fix CV and retry" action right there, a `post_closed` row shows "lead auto-closed" with a link to it, and an `applied` row shows "lead moved to Applied."
 
+### MCF connection pop-up
+
+**Purpose:** establish, inspect, open, or disconnect the MCF session from any guarded page, Workflow 8 and REQ-APPLY-06.
+
+- The MCF nav icon carries a red, amber, or green status indicator and toggles one global pop-up. There is no separate MCF route or Automation Session tab.
+- Missing or expired shows **Connect MCF**. Starting opens an isolated MCF/Singpass browser context and shows the current QR image and decoded Singpass app link. The user completes Singpass approval manually.
+- A first authenticated account shows its email and requires confirmation. A previously confirmed matching account connects directly. A mismatch is blocked and explained.
+- Connected shows the confirmed account, **Open**, and **Disconnect**. Open launches authenticated MCF home in a visible browser. Disconnect deletes the saved browser-state files and returns the session to missing.
+- MCF posting links use the authenticated visible browser while valid. Otherwise they retain ordinary unauthenticated new-tab navigation.
+
 ### 8. Automation
 
-**Purpose:** the operational and diagnostic hub for the machinery underneath Posts and Applications. It isn't a thing the user curates. It's where they check on it and fix it when something's broken. Two tabs:
+**Purpose:** the operational and diagnostic hub for search and apply runs. It is where the user checks run outcomes and errors.
 
-**Runs tab**, REQ-PLAT-03 and REQ-FE-02: diagnose a run without re-running it:
+REQ-PLAT-03 and REQ-FE-02: diagnose a run without re-running it:
 
 - Reverse-chronological list of `run_log` rows: type, search or apply, track if applicable, start and end time, status, and outcome counts.
 - Expand a row for full error detail. For apply runs this also links to the resulting applications. For search runs it links back to Posts filtered to that run's discoveries.
 - This is the page the "run in progress" nav badge indicator links to.
-
-**Session tab**, REQ-APPLY-06: establish or refresh the session apply runs depend on, Workflow 8:
-
-- Current status, valid, expired, or missing, and, if valid, when it was uploaded.
-- "Log in to MCF" button: opens MCF's Singpass login flow in an external browser context. The app does not attempt to automate or observe this step, per the out-of-scope boundary on login, MFA, and CAPTCHA automation.
-- "Upload session" control: paste or upload the exported cookie data. On submit, the backend validates the domain match and updates status. A failed validation shows an inline error explaining the cookie wasn't recognized rather than failing as a silent no-op.
-- Overwriting an existing valid session goes through the confirmation-modal pattern, since it invalidates the current one.
-- This tab is the same component the top-right session badge opens as an overlay from any page. It's one implementation with two entry points, so an expired session noticed mid-Applications-review can be fixed without losing place, while the same content is still reachable with full context, including last-upload history sitting next to Runs, via the nav.
 
 ### 9. Offers
 

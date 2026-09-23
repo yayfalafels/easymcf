@@ -50,7 +50,7 @@ Job seekers who run the system on their own machine and each hold their own acco
 - **user:** A person with an account. Every track, CV, lead, application, run, and MCF session belongs to exactly one user.
 - **account:** A user's identity in the system, holding a name, a unique email address, a photo, and one or both sign-in methods, a password and a linked Google identity.
 - **sign-in session:** The server-side record that keeps a user signed in across page loads, ended by sign-out or expiry. It is distinct from the **MCF session**.
-- **MCF session:** The authenticated `MCF` cookie a user uploads so apply automation can act on their behalf (REQ-APPLY-06). Each user holds their own.
+- **MCF session:** The per-user browser state captured after a verified MCF login and restored for apply automation and authenticated MCF links (REQ-APPLY-06). It includes cookies, IndexedDB, and the separately persisted sessionStorage needed by MCF.
 - **MCF** MyCareerFutures
 - **role:** A generic job title/domain (e.g. "Data Engineer"), not tied to any one user.
 - **track:** A user's role at a given seniority level. The unit search profiles, CVs, and match scores are organized by.
@@ -173,7 +173,7 @@ _apply status_
 - **REQ-APPLY-03** The apply run automates the single-step ("1-click") flow per queued application: load the post, click apply, select the assigned CV, advance, and submit the final review.
 - **REQ-APPLY-04** Each apply attempt records one of the apply statuses, distinct from a post's pipeline status or a lead's status/stage:
 - **REQ-APPLY-05** A post whose submission requires a multi-step questionnaire is detected, because submit fails on the expected 1-click flow, and recorded as `questionnaire_required` without the run attempting to complete it or aborting. The user completes it manually. Automating questionnaire flows is out of scope for `010`.
-- **REQ-APPLY-06** Apply automation operates against an already-authenticated `MCF` session supplied by the user. The UI provides a way to establish it: it redirects the user to MCF's Singpass-federated login page, the user logs in manually and exports the resulting session cookie, then uploads it back to the app through a dedicated upload dialog. Automating the login itself, including MFA or CAPTCHA handling, is out of scope for `010`. A session/authentication failure aborts the run.
+- **REQ-APPLY-06** Apply automation operates against an already-authenticated MCF session established through the in-app MCF connection flow. EasyMCF opens MCF's Singpass-federated login in an isolated Playwright context and displays the current Singpass QR and app link. The user completes Singpass approval manually. EasyMCF verifies the authenticated callback and account identity before persisting that user's browser state. Automating Singpass approval, MFA, or CAPTCHA handling is out of scope for `010`. A session or authentication failure aborts the run and requires reconnection.
 - **REQ-APPLY-07** The apply-button detection step is retried up to 5 times with a 5-second delay between attempts before being marked `unable_to_apply`. A single slow page load must not immediately fail the job.
 - **REQ-APPLY-08** A failure on one queued application does not stop the run from attempting the remaining queued applications, and each application's recorded outcome does not overwrite the outcomes already recorded for other applications.
 - **REQ-APPLY-09** A lead whose application records apply status `applied` automatically transitions its stage to `APPLIED` (REQ-CRM-02).

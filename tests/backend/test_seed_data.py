@@ -49,7 +49,7 @@ def test_two_users_with_distinct_data(conn):
 
 def test_seeded_mcf_connection_covers_both_branches(conn):
     connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 1").fetchone()
-    assert connected == ("valid", "mcf_session_1.json", "yayfalafels@gmail.com")
+    assert connected == ("missing", None, "yayfalafels@gmail.com")
     never_connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 2").fetchone()
     assert never_connected == ("missing", None, None)
     assert conn.execute("SELECT status, account_email FROM mcf_attempt WHERE user_id = 1").fetchone() == ("connected", "yayfalafels@gmail.com")

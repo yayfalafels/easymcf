@@ -479,6 +479,21 @@ def test_leads_render_compact_rows_for_early_stages_and_cards_for_active_stages(
     assert page.locator('[data-testid^="lead-latest-note-"]').count() >= 1
 
 
+def test_leads_table_and_expiry_cells_stay_within_the_column_at_desktop_and_mobile_widths(page, ui_app):
+    base_url, _ = ui_app
+    for width in (1280, 375):
+        page.set_viewport_size({"width": width, "height": 720})
+        page.goto(base_url + "/leads")
+        expiry_locator = page.locator('table.lead-table [data-testid^="lead-expiry-"]').first
+        expiry_locator.wait_for(state="visible")
+        column = page.locator('[data-testid="leads-column-TOAPPLY"]').bounding_box()
+        table = page.locator("table.lead-table").bounding_box()
+        expiry = expiry_locator.bounding_box()
+        assert column is not None and table is not None and expiry is not None
+        assert table["x"] + table["width"] <= column["x"] + column["width"] + 1
+        assert expiry["x"] + expiry["width"] <= column["x"] + column["width"] + 1
+
+
 def test_rows_sort_by_days_remaining_and_active_stages_by_last_contact(page, ui_app):
     base_url, db_path = ui_app
     early = _add_toapply_leads(db_path, 3, "sortdays")

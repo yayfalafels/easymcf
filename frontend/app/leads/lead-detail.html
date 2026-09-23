@@ -4,7 +4,7 @@
       <h2>{{detail.lead.position_title}}</h2>
       <p>{{detail.lead.stage}} / {{detail.lead.status}} <span ng-if="detail.lead.close_reason">({{detail.lead.close_reason}})</span></p></div>
     <div class="detail-actions">
-      <a ng-if="detail.hasPostUrl()" ng-href="{{detail.lead.url_ref}}" target="_blank" rel="noopener" data-testid="lead-detail-post-link">Open post</a>
+      <a ng-if="detail.hasPostUrl()" ng-href="{{detail.lead.url_ref}}" target="_blank" rel="noopener" mcf-link data-testid="lead-detail-post-link">Open post</a>
       <span ng-if="!detail.hasPostUrl()" class="post-link-unavailable" data-testid="lead-detail-post-unavailable">Open post unavailable</span>
       <label>Post URL <input type="text" ng-model="detail.lead.url_ref" placeholder="https://..." data-testid="lead-detail-field-url_ref"></label>
       <span ng-if="detail.lead.status === 'OPEN'">

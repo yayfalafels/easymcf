@@ -9,7 +9,7 @@
 - [2. Routing](#2-routing) — `FE-RTE-01..04`
 - [3. API client service](#3-api-client-service) — `FE-SVC-01..03a`
 - [4. Async run handling (REQ-FE-02, 010-user-interface.md's "Async run handling")](#4-async-run-handling-req-fe-02-010-user-interfacemds-async-run-handling) — `FE-RUN-01..03`
-- [5. Session status and the shared session panel](#5-session-status-and-the-shared-session-panel) — `FE-SVC-04`
+- [5. MCF connection state and shared controls](#5-mcf-connection-state-and-shared-controls) — `FE-SVC-04`
 - [6. Error and validation surfacing (REQ-FE-02)](#6-error-and-validation-surfacing-req-fe-02) — `FE-ERR-01..03`
 - [7. Per-screen controller/service map](#7-per-screen-controllerservice-map) — `FE-SCR-01`
 - [8. Testing hooks (supports `ARCH-TEST-05`, `ARCH-TEST-09`)](#8-testing-hooks-supports-arch-test-05-arch-test-09) — `FE-TEST-01..02`
@@ -63,14 +63,17 @@ frontend/
     core/
       api-client.service.js  # FE-SVC-01/02/03
       run-poller.service.js   # FE-RUN-01/02/03
-      session-status.service.js # FE-SVC-04
+      mcf-connect.service.js     # FE-SVC-04
       auth.service.js          # FE-AUTH-01
       auth.interceptor.js       # FE-AUTH-03
       error.service.js         # FE-ERR-01
       confirm-dialog.service.js # FE-ERR-03
       offer-dialog.service.js   # OfferDialog, the offer form modal (page 9, Lead Detail)
     shared/
-      nav-bar/                # sidebar + session badge + user section, FE-SCR row "shell"
+      nav-bar/                # sidebar + MCF icon + user section, FE-SCR row "shell"
+      mcf-nav-icon/           # status indicator and connection pop-up toggle
+      mcf-connect-modal/      # QR, confirmation, session state, Open, Disconnect
+      mcf-link/               # authenticated MCF links with native fallback
       user-menu/               # <user-menu> photo circle, upload, remove, log out (FE-AUTH-04)
       confirm-modal/           # <confirm-modal> directive backing confirm-dialog.service.js
       offer-modal/             # <offer-modal> directive backing offer-dialog.service.js
@@ -86,7 +89,6 @@ frontend/
     leads/                # screens 5–6 — leads.controller.js, leads.html, lead-detail.controller.js, lead-detail.html
     offers/                # screen 9 — offers.controller.js, offers.html
     applications/          # screen 7 — applications.controller.js, applications.html
-    automation/              # screen 8 — automation.controller.js, automation.html, session-panel/ (shared with the badge)
 ```
 
 **FE-APP-02** **One Angular module, `easymcfApp`, no per-feature submodules.** AngularJS submodules exist to let independent teams or independently-loaded bundles compose. `010` has one developer, one `<script>` load order, and no lazy loading, since there is no build step to split on, per `ARCH-RUN-06`. Splitting into eight feature modules would add eight registration points and eight places to get DI wiring wrong for zero runtime benefit at this scale. Folder-per-screen (above) gets the organizational benefit without the module-boundary ceremony.
@@ -127,10 +129,11 @@ frontend/
 01. `promoteManualPost(body)` — `API-EP-01`.
 02. `triggerSearchRun(trackId)` — `API-EP-04`.
 03. `triggerApplyRun()` — `API-EP-05`.
-04. `uploadSession(payload)` — `API-EP-06`.
-05. `health()` — `API-EP-07`, used only by `ARCH-TEST-04`'s readiness poll, never by application code.
-06. `signup(body)`, `signin(body)`, `signout()`, `me()`, and `authConfig()` — `API-EP-08..12`, called only by `AuthService`.
-07. `uploadPhoto(userId, file)` and `removePhoto(userId)` — `API-EP-15/16`, called only by `AuthService`. The photo itself loads through an `<img src>` bound to the user's `photo_url` (`API-EP-17`), never through `ApiClient`.
+04. `startMcfAttempt()`, `mcfAttemptQrUrl(id)`, `mcfAttemptQrLink(id)`, `confirmMcfAttempt(id, accept)`, and `cancelMcfAttempt(id)` — the MCF attempt endpoints.
+05. `openMcfSession(url)` — authenticated visible-browser launch or plain-link fallback.
+06. `health()` — `API-EP-07`, used only by `ARCH-TEST-04`'s readiness poll, never by application code.
+07. `signup(body)`, `signin(body)`, `signout()`, `me()`, and `authConfig()` — `API-EP-08..12`, called only by `AuthService`.
+08. `uploadPhoto(userId, file)` and `removePhoto(userId)` — `API-EP-15/16`, called only by `AuthService`. The photo itself loads through an `<img src>` bound to the user's `photo_url` (`API-EP-17`), never through `ApiClient`.
 
 `API-EP-02` and `API-EP-03` are retired (the apply queue is the set of open `TOAPPLY` leads), so no `queueApplications` or `dequeueApplication` method exists.
 
@@ -146,9 +149,9 @@ Naming them distinctly from the generic methods means a reader of a controller c
 
 **FE-RUN-03** **The "run in progress" indicator is a service-level singleton, not controller-scoped state.** The **user-interface doc** requires the badge area to show a run-in-progress indicator visible from any page, including pages that did not trigger the run. So `RunPoller`'s active-run state lives on the service, surviving navigation since Angular services are singletons for the app's lifetime, and the `nav-bar` shared component reads it directly, rather than the triggering controller broadcasting an event that a not-yet-instantiated nav controller would miss.
 
-## 5. Session status and the shared session panel
+## 5. MCF connection state and shared controls
 
-**FE-SVC-04** `SessionStatus` service holds the current `valid`/`expired`/`missing` state, backed by the first row of `ApiClient.list('mcf_session')`, the caller's single row, refreshed after `uploadSession` resolves and on each route change, a cheap operation since it is one row read. The **user-interface doc** is explicit that the top-right badge and Automation's Session tab are one component reached two ways, not two implementations. This is implemented as a single `<session-panel>` directive bound to the one `SessionStatus` service instance, rendered inline inside `automation.html`'s Session tab and rendered inside an overlay when the badge is clicked. There is no second directive or second service instance for the badge.
+**FE-SVC-04** `McfConnect` holds the latest attempt and current `valid`/`expired`/`missing` session in one singleton state object. It polls `mcf_attempt` and `mcf_session` every three seconds. `<mcf-nav-icon>` renders the state as red, amber, or green and toggles the single `<mcf-connect-modal>` overlay. The modal starts and cancels attempts, shows the current QR, confirms a first account, disconnects a session, and opens MCF home through `openMcfSession`. The `mcf-link` directive gives lead links the same authenticated launch behavior while valid and leaves native new-tab navigation untouched otherwise.
 
 ## 6. Error and validation surfacing (REQ-FE-02)
 
@@ -179,12 +182,14 @@ No screen implements its own modal markup. `ConfirmDialog.ask({message, confirmL
 | 5 | Leads                                 | `LeadsCtrl`                           | `ApiClient` (`lead`, `batch`, `createManualLead`), `ConfirmDialog`                                                       | single-lead stage transitions are generic `PUT /api/v1/lead/{id}` (`API-HOOK-01` is transparent, `FE-SVC-02`) and the `TOAPPLY` column's Apply and Drop are `ApiClient.batch('lead', rows)`; tab filters, layouts, and sorts are client-side on one `list('lead')` fetch, not one request per tab; the expiry-warning indicator is computed client-side from the fetched `deadline` field, not a separate API flag |
 | 6 | Lead Detail                            | `LeadDetailCtrl`                        | `ApiClient` (`lead`, `offer`, read-only `lead_event` per `FE-SVC-03a`), `ConfirmDialog`, `OfferDialog`                   | opened as a panel from Leads, `FE-RTE-02`; the Track drop-down reads the active tracks from `LeadsCtrl`'s `list('track')` fetch; a stage move to `OFFER` opens the offer dialog, and every action ends in `changed()`, which reloads the panel and the list |
 | 7 | Applications                             | `ApplicationsCtrl`                        | `ApiClient` (`lead` for the apply queue, `application`), `ApiClient.triggerApplyRun`, `RunPoller`, `ConfirmDialog`     | `API-EP-05`; a per-row drop is `ApiClient.update('lead', id, {stage: 'CLOSED', close_reason: 'dropped'})` |
-| 8 | Automation (Runs / Session)                | `AutomationCtrl`                            | `ApiClient.list('run_log')`, `SessionStatus`, `<session-panel>`, `ApiClient.uploadSession`                                 | `API-EP-06`; Runs tab is generic `GET`/`search` per `API-HOOK-04` |
+| 8 | MCF connection pop-up                     | `McfConnect`                                | `ApiClient` (`mcf_attempt`, `mcf_session`), `<mcf-nav-icon>`, `<mcf-connect-modal>`, `mcf-link`                            | QR login, account confirmation, status, disconnect, authenticated Open, and native fallback |
 | 9 | Offers | `OffersCtrl` | `ApiClient` (`offer`, `lead`), `OfferDialog` | history via `list('offer')` |
 | 10 | Sign in | `AuthCtrl` | `AuthService` | public route, `FE-RTE-03`; Google button is a plain link to `API-EP-13` |
 | 11 | Sign up | `AuthCtrl` | `AuthService` | public route; live password rule checklist, `FE-AUTH-05` |
 
 Lead creation has no user-facing promote method. The search process calls `POST /api/v1/lead` (`API-HOOK-01`) as a system caller, and the manual add on the Leads page (row 5) posts to `POST /api/v1/lead/manual` through `ApiClient.createManualLead`. `API-HOOK-01`'s invariant, that a `post_id` already promoted is rejected per the **data model**'s uniqueness rule, is enforced server-side on the `POST /api/v1/lead` call.
+
+`McfConnect` owns one polled state object for the latest attempt and current session. `<mcf-nav-icon>` renders the red, amber, or green status and toggles `<mcf-connect-modal>`. The modal renders the QR, account confirmation, current connection state, Open, and Disconnect controls. The `mcf-link` attribute intercepts MCF links only while the session is valid. Otherwise native `target="_blank"` navigation remains unchanged.
 
 ## 8. Testing hooks (supports `ARCH-TEST-05`, `ARCH-TEST-09`)
 

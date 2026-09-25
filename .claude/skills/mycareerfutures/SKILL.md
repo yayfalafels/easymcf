@@ -56,13 +56,15 @@ Selectors from `apply.py`, used against an already-authenticated session (a load
 
 | step | selector / signal |
 | --- | --- |
+| sign-in status | page banner's account control — the signed-in user's initials, replaced by literal text "Login" once the session has lapsed; the reliable, page-wide signal, reachable on any loaded page before ever polling for the apply button |
 | apply button | `button#job-details-apply-button` |
 | already-applied / closed detection | status text in `p[data-testid="job-apply-error"]` — "already"/"applied" → treat as success; "closed"/"no longer" → posting closed |
+| session-lapsed apply button | the button itself is also replaced by a "Login to Apply" prompt once signed out — a corroborating signal, not a separate check; the banner above is the one to test |
 | resume/CV cards | `div[data-testid="resume-card"]` → `a.resume-link` (title text) → its radio input |
 | advance after CV select | `button#application-details-save-button` |
 | final submit | `button#job-application-review__submit-button` |
 
-A failed final submit is *inferred* (not confirmed by an explicit questionnaire indicator) to mean the posting requires a multi-step questionnaire — see [easymcf-apply](../easymcf-apply/SKILL.md) for the full outcome state machine this feeds into.
+A failed final submit is *inferred* (not confirmed by an explicit questionnaire indicator) to mean the posting requires a multi-step questionnaire — see [easymcf-apply](../easymcf-apply/SKILL.md) for the full outcome state machine this feeds into. The sign-in-status banner is a run-level signal, not a per-lead outcome — see [easymcf-apply](../easymcf-apply/SKILL.md)'s session handling section for what happens when it fires.
 
 ## Markup drift is the normal failure mode
 

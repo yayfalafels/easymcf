@@ -26,6 +26,13 @@ class Conflict(ApiError):
     status, error = 409, "conflict"
 
 
+class RunInFlight(Conflict):
+    """A second search-run trigger for a user with one already running (ARCH-RUN-03)."""
+
+    def __init__(self, run_id: int):
+        super().__init__("a search run is already in progress", run_id=run_id)
+
+
 class Unauthenticated(ApiError):
     status, error = 401, "unauthenticated"
 

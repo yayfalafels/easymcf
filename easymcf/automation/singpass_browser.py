@@ -1,7 +1,7 @@
 """ARCH-BOT-02 — the SingpassBrowser seam, parallel to MCFBrowser.
 
 One interface, `fixture.py`/`live.py` behind it, selected by `MCF_MODE` (`ARCH-RUN-08`). The locator lists, waits,
-and decode pipeline below are lifted directly from `scripts/probe_mcf_singpass.py`, validated against the real
+and decode pipeline below are lifted directly from `.dev/scripts/probe_mcf_singpass.py`, validated against the real
 site across the probe's own live runs (17.PB.01, 17.PB.02) before being promoted into this production seam.
 """
 

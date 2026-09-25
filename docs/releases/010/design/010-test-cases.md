@@ -44,19 +44,19 @@ Every functional `REQ-*` (`REQ-SRCH-*`, `REQ-CRM-*`, `REQ-APPLY-*`, `REQ-PLAT-01
 
 Direct against `scripts/db_util.py` and a temp SQLite database (`STRAT-SILO-01`), no Flask process, no browser. This is the fastest signal. It validates schema, constraints, and dedup identity before any service or route exists on top of them.
 
-| id        | requirement(s)           | title                                                         |
-| --------- | ------------------------ | ------------------------------------------------------------- |
-| TC-DB-001 | ARCH-STO-02              | Schema applies cleanly from schema.sql                        |
-| TC-DB-002 | REQ-PLAT-02              | Round-trip insert/get for catalog tables                      |
-| TC-DB-003 | REQ-SRCH-05, REQ-SRCH-08 | Round-trip insert/get for FK-heavy tables                     |
-| TC-DB-004 | REQ-CRM-01               | UNIQUE constraint on lead (user_id, post_id)                  |
-| TC-DB-005 | ARCH-STO-07              | FK violation rejected                                         |
-| TC-DB-006 | ARCH-RUN-03              | run_log partial UNIQUE index blocks a user's same-type runs   |
-| TC-DB-007 | REQ-APPLY-02             | cv delete blocked while referenced                            |
-| TC-DB-008 | REQ-SRCH-05              | post.id dedup scheme                                          |
-| TC-DB-009 | ARCH-STO-03              | Stale schema_version refuses to start                         |
-| TC-DB-010 | REQ-CRM-02, REQ-CRM-10   | stage, close reason, and offer constraints                    |
-| TC-DB-011 | REQ-AUTH-01, 04, 06, 09  | account, session, ownership constraints                       |
+| id        | requirement(s)           | title                                                       |
+| --------- | ------------------------ | ----------------------------------------------------------- |
+| TC-DB-001 | ARCH-STO-02              | Schema applies cleanly from schema.sql                      |
+| TC-DB-002 | REQ-PLAT-02              | Round-trip insert/get for catalog tables                    |
+| TC-DB-003 | REQ-SRCH-05, REQ-SRCH-08 | Round-trip insert/get for FK-heavy tables                   |
+| TC-DB-004 | REQ-CRM-01               | UNIQUE constraint on lead (user_id, post_id)                |
+| TC-DB-005 | ARCH-STO-07              | FK violation rejected                                       |
+| TC-DB-006 | ARCH-RUN-03              | run_log partial UNIQUE index blocks a user's same-type runs |
+| TC-DB-007 | REQ-APPLY-02             | cv delete blocked while referenced                          |
+| TC-DB-008 | REQ-SRCH-05              | post.id dedup scheme                                        |
+| TC-DB-009 | ARCH-STO-03              | Stale schema_version refuses to start                       |
+| TC-DB-010 | REQ-CRM-02, REQ-CRM-10   | stage, close reason, and offer constraints                  |
+| TC-DB-011 | REQ-AUTH-01, 04, 06, 09  | account, session, ownership constraints                     |
 
 - **TC-DB-001** — `scripts/initdb.py` against a fresh temp file creates every table in the **data model** with no error. The meta `schema_version` row is set.
 - **TC-DB-002** — `db_util.py insert`/`get` on `role`, `track`, `search_profile`, `cv` each return the row unchanged. A follow-up `update`/`delete` round-trips too.
@@ -164,10 +164,10 @@ Flask's test client against a seeded temp database (`ARCH-TEST-03`, `STRAT-SILO-
 
 ## 3. Automation silo
 
-Service-layer calls (`easymcf/services/search.py`/`apply.py`) against the fixture `MCFBrowser` (`ARCH-BOT-02`, `STRAT-SILO-05`), with no HTTP request and no real browser chrome. Every one of REQ-APPLY-04's eight outcomes and REQ-SRCH-06's post-closed-during-detail-pass path is reachable here, per `STRAT-SILO-06`, before the mock e2e tier re-confirms the same scenario is reachable by clicking through the UI.
+Service-layer calls (`easymcf/services/search.py`/`apply.py`) against the fixture `MCFBrowser`/`ApplyBrowser` (`ARCH-BOT-02`, `STRAT-SILO-05`), with no HTTP request and no real browser chrome. Every one of REQ-APPLY-04's eight outcomes, REQ-SRCH-06's post-closed-during-detail-pass path, and the run-level signed-out-banner failure is reachable here, per `STRAT-SILO-06`, before the mock e2e tier re-confirms the same scenario is reachable by clicking through the UI.
 
 | id          | requirement(s)             | title                                                |
-| ----------- | --------------------------- | ---------------------------------------------------- |
+| ----------- | -------------------------- | ---------------------------------------------------- |
 | TC-AUTO-001 | REQ-SRCH-03                | Search pagination terminates                         |
 | TC-AUTO-002 | REQ-SRCH-05                | Dedup id prevents duplicate posts across runs        |
 | TC-AUTO-003 | REQ-SRCH-04                | Incremental persistence survives a mid-sweep failure |
@@ -186,6 +186,7 @@ Service-layer calls (`easymcf/services/search.py`/`apply.py`) against the fixtur
 | TC-AUTO-016 | REQ-APPLY-04               | Apply outcome: invalid_input                         |
 | TC-AUTO-017 | REQ-APPLY-07, ARCH-BOT-05  | Apply-button retry timing, overridable               |
 | TC-AUTO-018 | REQ-APPLY-02               | CV selection by substring match                      |
+| TC-AUTO-019 | REQ-APPLY-06               | Mid-batch signed-out banner aborts the run           |
 
 - **TC-AUTO-001** — The service-level search sweep against the fixture corpus's final empty page stops paginating rather than looping. This uses the `search/{keyword}_p{n}.html` empty-page fixture (`ARCH-TEST-04`).
 - **TC-AUTO-002** — Running the same search twice against overlapping fixture cards produces exactly one `post` row per card, keyed on `source`+`posting_reference`+`posted_date`.
@@ -205,6 +206,7 @@ Service-layer calls (`easymcf/services/search.py`/`apply.py`) against the fixtur
 - **TC-AUTO-016** — A `TOAPPLY` lead missing `jobid`/`url`/`cv_version` is rejected with `status='invalid_input'` before any browser action is attempted.
 - **TC-AUTO-017** — The default 5-retry/5-second-delay policy is exercised against the `unable_to_apply` fixture in production timing once, and against a shortened `APPLY_POLL_RETRIES`/`_DELAY_S` override for routine test runs, proving the retry loop and its terminal state without spending real wall-clock seconds each run.
 - **TC-AUTO-018** — The configured CV label matches the correct resume card by substring against the fixture's card titles, independent of card ordering. No match falls through to `cv_not_found` (`TC-AUTO-014`).
+- **TC-AUTO-019** — The fixture scenario where a later lead's posting page shows the signed-out banner, initials replaced by "Login," ends the batch as a run-level failure rather than a per-lead outcome. `mcf_session.status` is marked `expired`, the leads still queued behind it are left unattempted, and every lead already attempted earlier in the same run keeps its recorded outcome.
 
 ## 4. Frontend silo
 
@@ -229,7 +231,7 @@ Playwright drives the real AngularJS app served by a real `python -m easymcf` pr
 | TC-FE-015 | REQ-APPLY-11           | Applications — drop behind confirmation                    |
 | TC-FE-016 | REQ-APPLY-03           | Applications — run batch behind confirmation, async state  |
 | TC-FE-017 | REQ-APPLY-04           | Applications — results view per-outcome actions            |
-| TC-FE-018 | REQ-PLAT-03, REQ-FE-02 | Automation runs and global MCF connection pop-up          |
+| TC-FE-018 | REQ-PLAT-03, REQ-FE-02 | Automation runs and global MCF connection pop-up           |
 | TC-FE-019 | REQ-FE-02              | Cross-cutting — error surfacing and empty states           |
 | TC-FE-020 | REQ-CRM-10             | Offers — dialog, page history, and actions                 |
 | TC-FE-021 | REQ-CRM-09             | Leads — expected salary display and edit                   |
@@ -266,14 +268,14 @@ Playwright Chromium drives the real UI against the real Flask app against a seed
 | ---------- | -------------- | --------------------------------------------- |
 | TC-E2E-001 | REQ-FE-02      | Search-run golden path through the real UI    |
 | TC-E2E-002 | REQ-APPLY-03   | Apply-run golden path through the real UI     |
-| TC-E2E-003 | REQ-APPLY-04   | All eight apply outcomes reachable end-to-end |
+| TC-E2E-003 | REQ-APPLY-04   | All nine apply scenarios reachable end-to-end |
 | TC-E2E-004 | REQ-CRM-01     | System promotion and manual add end-to-end    |
 | TC-E2E-005 | REQ-APPLY-06   | Session establishment round-trip              |
 | TC-E2E-006 | ARCH-TEST-07   | Full-suite regression smoke                   |
 
 - **TC-E2E-001** — Trigger a search run from the real Posts screen against the fixture MCF corpus. The poll loop reaches `success` and results render with match scores. This confirms the backend-thread/frontend-poll wiring `STRAT-CASE-07` calls out as needing a mock-e2e case beyond the silos.
 - **TC-E2E-002** — Queue a lead from Leads, run the apply batch from Applications against the fixture apply corpus, and confirm the results view renders the real per-application outcome.
-- **TC-E2E-003** — Each of the eight `apply/{scenario}/` fixture directories is driven through the real Applications UI at least once, confirming the DOM-level result matches what `TC-AUTO-009..016` already proved at the service level.
+- **TC-E2E-003** — Each of the nine `apply/{scenario}/` fixture directories, the eight outcome codes plus the signed-out run-level failure, is driven through the real Applications UI at least once, confirming the DOM-level result matches what `TC-AUTO-009..016` and `TC-AUTO-019` already proved at the service level.
 - **TC-E2E-004** — A search run ends by promoting its qualifying posts, which appear on Leads at `TOAPPLY` and show `already a lead` on Posts. A second run over the same posts creates no second lead. A lead added through the manual form appears at `APPLIED`.
 - **TC-E2E-005** — "Log in to MCF" opens an ordinary, non-Playwright-automated, browser context per `ARCH-NET-03`. Uploading a fixture-shaped cookie payload through the dialog updates the real session-status badge.
 - **TC-E2E-006** — `python scripts/resetdb.py --seed && pytest` stays green from a clean reseed. This is the "anything, before reporting done" check every functional change is re-verified against.
@@ -283,25 +285,25 @@ Playwright Chromium drives the real UI against the real Flask app against a seed
 
 Accounts, sign-in, and per-user ownership (`STRAT-SILO-08`). Every case signs in through the real sign-in endpoint as a seeded account and never through a bypass. Google cases run against the stub identity provider. Two seeded users with distinct data exist in every database.
 
-| id          | requirement(s)     | title                                                        |
-| ----------- | ------------------ | ------------------------------------------------------------ |
-| TC-AUTH-001 | REQ-AUTH-01, 03    | Sign up, sign in, sign out, and current user round trip      |
-| TC-AUTH-002 | REQ-AUTH-02        | Password policy, each rule alone and both length boundaries  |
-| TC-AUTH-003 | REQ-AUTH-03        | Uniform sign-in failure and the sign-in rate limit           |
-| TC-AUTH-004 | REQ-AUTH-05, 09    | Session cookie flags, tampering, and lifetime boundary       |
-| TC-AUTH-005 | REQ-AUTH-05        | Protected routes answer 401, public routes stay open         |
-| TC-AUTH-006 | REQ-AUTH-04        | Google id token validation matrix                            |
-| TC-AUTH-007 | REQ-AUTH-04        | Google account linking matrix                                |
-| TC-AUTH-008 | REQ-AUTH-08        | Photo upload, replace, remove, and validation                |
-| TC-AUTH-009 | REQ-AUTH-06        | Ownership matrix over every registered resource              |
-| TC-AUTH-010 | REQ-AUTH-06        | Shared post visibility and read-only posts                   |
-| TC-AUTH-011 | REQ-CRM-01, 03, 04 | Lead copies its post fields and edits change the lead only   |
-| TC-AUTH-012 | REQ-AUTH-07        | Per-user runs, run guard, scheduler, and MCF session         |
+| id          | requirement(s)     | title                                                         |
+| ----------- | ------------------ | ------------------------------------------------------------- |
+| TC-AUTH-001 | REQ-AUTH-01, 03    | Sign up, sign in, sign out, and current user round trip       |
+| TC-AUTH-002 | REQ-AUTH-02        | Password policy, each rule alone and both length boundaries   |
+| TC-AUTH-003 | REQ-AUTH-03        | Uniform sign-in failure and the sign-in rate limit            |
+| TC-AUTH-004 | REQ-AUTH-05, 09    | Session cookie flags, tampering, and lifetime boundary        |
+| TC-AUTH-005 | REQ-AUTH-05        | Protected routes answer 401, public routes stay open          |
+| TC-AUTH-006 | REQ-AUTH-04        | Google id token validation matrix                             |
+| TC-AUTH-007 | REQ-AUTH-04        | Google account linking matrix                                 |
+| TC-AUTH-008 | REQ-AUTH-08        | Photo upload, replace, remove, and validation                 |
+| TC-AUTH-009 | REQ-AUTH-06        | Ownership matrix over every registered resource               |
+| TC-AUTH-010 | REQ-AUTH-06        | Shared post visibility and read-only posts                    |
+| TC-AUTH-011 | REQ-CRM-01, 03, 04 | Lead copies its post fields and edits change the lead only    |
+| TC-AUTH-012 | REQ-AUTH-07        | Per-user runs, run guard, scheduler, and MCF session          |
 | TC-AUTH-013 | REQ-AUTH-05, 08    | Route guard, redirect back, and the user section on each page |
-| TC-AUTH-014 | REQ-AUTH-01, 02    | Sign in and sign up forms and the password rule checklist    |
-| TC-AUTH-015 | REQ-AUTH-04, 08    | Google sign-in and photo persistence end to end              |
-| TC-AUTH-016 | REQ-AUTH-06        | Two signed-in users see only their own data end to end       |
-| TC-AUTH-017 | REQ-AUTH-09        | No password, token, or secret in the database, logs, or repo |
+| TC-AUTH-014 | REQ-AUTH-01, 02    | Sign in and sign up forms and the password rule checklist     |
+| TC-AUTH-015 | REQ-AUTH-04, 08    | Google sign-in and photo persistence end to end               |
+| TC-AUTH-016 | REQ-AUTH-06        | Two signed-in users see only their own data end to end        |
+| TC-AUTH-017 | REQ-AUTH-09        | No password, token, or secret in the database, logs, or repo  |
 
 - **TC-AUTH-001** — Sign up with a valid body returns `201`, a user object with no hash field, and a session cookie. Sign out returns `204` and the same cookie then answers `401` on `auth/me`. Sign in returns `200` and a new cookie.
 - **TC-AUTH-002** — A compliant 12 character password passes and the same password one character shorter fails with only `too_short`. A 128 character password passes and 129 fails with `too_long`. Removing each of the lowercase, uppercase, digit, and symbol classes in turn fails with exactly that code. A password containing the email local part fails `contains_identity`. A password failing three rules reports all three codes together.

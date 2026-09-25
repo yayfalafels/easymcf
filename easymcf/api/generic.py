@@ -35,6 +35,11 @@ class Resource:
     before_read: Callable | None = None   # (db) -> None
     batch_schema: dict | None = None      # per-row schema for a hook-backed batch of updates
     batch_fn: Callable | None = None      # (db, rows, uid) -> list of row ids, applied in one transaction
+    search_fn: Callable | None = None     # (db, uid, args) -> list[dict]; overrides the raw-column filter+select
+                                           # below for a search that must join across tables rather than filter the
+                                           # resource's own columns (a hook, same URL/verb, per the api design's
+                                           # generic-shaped-but-hook-backed classification — e.g. post's
+                                           # track-scoped, match-score-joined read, 10.EL.13's search.posts_for_track)
 
 
 def register(resource: Resource) -> None:
@@ -140,6 +145,8 @@ def search(table: str):
     resource, db = _resource(table, "search"), get_db()
     if resource.before_read:
         resource.before_read(db)
+    if resource.search_fn:
+        return jsonify(resource.search_fn(db, _uid(), request.args))
     columns = {r["name"] for r in db.execute(f"PRAGMA table_info({resource.table})")}
     clauses, params = [], {"uid": _uid()}
     for i, (key, value) in enumerate(request.args.items()):

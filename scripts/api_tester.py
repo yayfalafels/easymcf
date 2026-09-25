@@ -46,7 +46,6 @@ _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.dirname(_SCRIPTS_DIR)
 sys.path.insert(0, _SCRIPTS_DIR)
 sys.path.insert(0, _REPO_ROOT)
-load_dotenv()  # before Config() is built — ENV-CFG-03/07.02.03
 
 import _val_log  # noqa: E402
 from easymcf.config import Config  # noqa: E402
@@ -116,6 +115,31 @@ def _classify_response(case: dict, resp) -> tuple[str, object, object, str | Non
     return "PASS", None, None, None
 
 
+def _poll(session, base_url: str, case: dict, first_body: dict) -> tuple[str, object, object, str | None]:
+    """10.EL.25 — a case's optional `poll` block: trigger-and-poll support for
+    asynchronous work (a search run returns a `run_log.id` while its background
+    thread is still working — 010.10's `STRAT-TOOL-04` extension). `{id}` in
+    `poll.path` is filled from the triggering request's own JSON body. When the
+    polled body is a list, the `until` condition holds once any element
+    satisfies it, and that element becomes the final body compared against
+    `expected_final`."""
+    spec = case["poll"]
+    path = spec["path"].format(**first_body)
+    deadline = time.monotonic() + spec["timeout_s"]
+    while time.monotonic() < deadline:
+        resp = session.get(base_url + path, timeout=10)
+        body = resp.json()
+        candidates = body if isinstance(body, list) else [body]
+        for row in candidates:
+            if all(row.get(k) in v for k, v in spec["until"].items()):
+                expected_final = case.get("expected_final", {})
+                if all(row.get(k) == v for k, v in expected_final.items()):
+                    return "PASS", expected_final, row, None
+                return "FAIL", expected_final, row, None
+        time.sleep(1)
+    return "ERROR", spec["until"], None, f"poll of {path} timed out after {spec['timeout_s']}s"
+
+
 def _run_case(case: dict, pool: SessionPool) -> tuple[str, object, object, str | None]:
     """(outcome, expected, actual, detail) - a connection/timeout failure is
     ERROR, never FAIL, so an agent doesn't have to parse message text to tell
@@ -139,7 +163,10 @@ def _run_case(case: dict, pool: SessionPool) -> tuple[str, object, object, str |
     finally:
         for handle in handles:
             handle.close()
-    return _classify_response(case, resp)
+    outcome, expected, actual, detail = _classify_response(case, resp)
+    if outcome == "PASS" and case.get("poll"):
+        return _poll(session, pool.base_url, case, resp.json())
+    return outcome, expected, actual, detail
 
 
 def _report(case_name: str, outcome: str, expected: object, actual: object, detail: str | None) -> None:
@@ -193,6 +220,13 @@ def _ad_hoc(method: str, path: str, body_json: str | None) -> int:
 
 
 def main() -> int:
+    # Deferred from module scope (10.IS.05): tests/backend/test_api_tester_selftest.py imports
+    # this module to call _poll() directly, and a module-level load_dotenv() would silently
+    # re-populate os.environ with a developer's own .env — including real Google OAuth
+    # credentials — undoing tests/conftest.py's deliberate one-time scrub (ENV-CFG-03) for the
+    # rest of that pytest session. CLI/subprocess use (every other caller) is unaffected: this
+    # still runs before Config() is ever built, exactly as ENV-CFG-03/07.02.03 requires.
+    load_dotenv()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--case", help="path to a tests/backend/cases/*.json file")
     parser.add_argument("--name", default=None, help="run only this case (default: every case in --case's file)")

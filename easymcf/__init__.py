@@ -17,10 +17,10 @@ from .config import Config
 from .api import init_api
 from .api import mcf_attempt_routes, mcf_session_routes
 from .auth import google as auth_google, routes as auth_routes, sessions
-from .db.connection import schema_version
-from .services import mcf_connection
+from .db.connection import get_connection, schema_version
+from .services import mcf_connection, search
 
-SCHEMA_VERSION = 8  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
+SCHEMA_VERSION = 9  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")
@@ -37,6 +37,15 @@ def create_app(config: Config | None = None) -> Flask:
             "— run scripts/resetdb.py"
         )
     mcf_connection.reconcile_local_sessions(config)
+    # Interrupted runs (Workflow, "Interrupted runs" note): before the server accepts
+    # requests and before the scheduler starts, every `running` run_log row of every user
+    # becomes `failed`, or ARCH-RUN-03's partial unique index would refuse every later
+    # search by a user whose previous process died mid-run.
+    _startup_db = get_connection(config.db_path)
+    try:
+        search.reconcile_orphaned_runs(_startup_db)
+    finally:
+        _startup_db.close()
 
     # No Flask-managed static folder: the catch-all route below does that job
     # itself (ARCH-RUN-09), so /api/v1/* routes can't ever be shadowed by it.

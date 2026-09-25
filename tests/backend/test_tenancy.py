@@ -32,6 +32,7 @@ OWNER_SQL = {
              "AND pt.post_id NOT IN (SELECT post_id FROM lead WHERE user_id = 2) LIMIT 1"),
     "mcf_attempt": "SELECT id FROM mcf_attempt WHERE user_id = 1 LIMIT 1",
     "mcf_session": "SELECT id FROM mcf_session WHERE user_id = 1 LIMIT 1",
+    "run_log": "SELECT id FROM run_log WHERE user_id = 1 LIMIT 1",
 }
 # A valid update body per table, so the answer reflects ownership and not body validation.
 UPDATE_BODY = {"cv": {"label": "x"}, "post": {}}

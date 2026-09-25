@@ -1,0 +1,28 @@
+[
+  {
+    "name": "enable a schedule with an interval and next_run_at",
+    "method": "PUT",
+    "path": "/api/v1/search_schedule/1",
+    "body": {
+      "schedule_enabled": true,
+      "schedule_interval_hours": 12,
+      "next_run_at": "2026-10-01 08:00:00"
+    },
+    "expected_status": 200,
+    "expected_body": {
+      "track_id": 1,
+      "schedule_enabled": true,
+      "schedule_interval_hours": 12,
+      "next_run_at": "2026-10-01 08:00:00"
+    },
+    "as_user": "seed_a"
+  },
+  {
+    "name": "an interval below 1 is rejected",
+    "method": "PUT",
+    "path": "/api/v1/search_schedule/1",
+    "body": {"schedule_interval_hours": 0},
+    "expected_status": 400,
+    "as_user": "seed_a"
+  }
+]

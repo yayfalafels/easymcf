@@ -14,6 +14,7 @@ angular.module('easymcfApp').config(['$routeProvider', '$locationProvider', '$ht
       .when('/signup', { templateUrl: 'app/auth/signup.html', controller: 'AuthCtrl', controllerAs: 'vm', resolve: anonymous })
       .when('/tracks', { templateUrl: 'app/tracks/tracks.html', controller: 'TracksCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/tracks/:trackId/search', { templateUrl: 'app/tracks/search-profile.html', controller: 'SearchProfileCtrl', controllerAs: 'vm', resolve: guarded })
+      .when('/posts', { templateUrl: 'app/posts/posts.html', controller: 'PostsCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/cvs', { templateUrl: 'app/cvs/cvs.html', controller: 'CvsCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/leads', { templateUrl: 'app/leads/leads.html', controller: 'LeadsCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/offers', { templateUrl: 'app/offers/offers.html', controller: 'OffersCtrl', controllerAs: 'vm', resolve: guarded })

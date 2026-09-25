@@ -22,6 +22,8 @@ Both are gitignored (the venv contents, not the manifests) — invoke them as `e
 
 Rule of thumb from the examples that motivated this: "would this code/task still make sense to run against a live/production instance of the app?" — if yes (run the app, init/patch the DB, scrape/apply, CRUD), it's the **ops env**. If it's disposable scaffolding to get through *this* dev session (a debug probe, a mock-data generator, a scratch script answering "why is X broken") it's the **dev env**.
 
+The same operational-vs-throwaway split governs where a script's *file* lives, not just which venv runs it. `scripts/` is the permanent, git-tracked operational toolkit (`resetdb.py`, `db_util.py`, `api_tester.py`, `ui_tester.py`, `gen_test_data.py`, `envcheck.py`, `restart.sh`, `check_no_secrets.py` — things that still make sense against a real deployment). `.dev/scripts/` (gitignored, never committed) holds one-off probes and setup-verification checks written to get through a specific feature's development, such as `probe_mcf_singpass.py` or `check_gcp_oauth.py` — run with the dev env, kept locally for later reuse instead of deleted outright, but never part of the tracked toolkit.
+
 Both envs are created with plain `python3 -m venv <path>` — this machine's system Python already includes `ensurepip`, so `pip` is present in a freshly created venv with no extra bootstrap step. To (re)sync an env's packages with its `pyproject.toml` after editing dependencies:
 
 ```bash
@@ -40,11 +42,13 @@ No separate frontend install/build step — the AngularJS frontend is vendored (
 
 ```bash
 env/bin/python -m playwright install chromium          # once, or after a Playwright version bump
-env/bin/python -m easymcf &                              # starts the backend + serves the frontend
+MCF_MODE=fixture env/bin/python -m easymcf &             # starts the backend + serves the frontend
 curl -sf http://127.0.0.1:5000/api/v1/health             # confirm it's up
 # browser: http://127.0.0.1:5000
 kill %1                                                   # stop it when done
 ```
+
+`MCF_MODE=fixture` is explicit above, not left to `.env` — a bare `python -m easymcf` has none of `tests/conftest.py`'s defensive scrub, and this repo's `.env` may carry a human-confirmed `MCF_MODE=live` left in place from an earlier session (`010.10`'s `10.IS.09`: an agent's own manual smoke test silently made one real request against the live MCF site this way). A human deliberately browsing against live MCF data overrides this explicitly, on purpose, in that one invocation.
 
 Use the tracked restart helper for repeat local runs. It reads and exports `MCF_MODE` from `.env`, reads the configured port, refuses to kill a listener unless `/proc` identifies this repo's `python -m easymcf` process, and starts through the operational environment. The default preserves the database. `--reset-seed` performs the destructive clean-seed flow before starting.
 

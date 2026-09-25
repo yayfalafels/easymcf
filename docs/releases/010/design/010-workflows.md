@@ -145,7 +145,8 @@ flowchart TD
     C --> D[For each lead at TOAPPLY]
     D --> E[Load post URL]
     E -- fails --> F[post_unavailable]
-    E -- ok --> G[Poll apply button\nup to 5 retries, 5s delay, REQ-APPLY-07]
+    E -- ok, banner shows Login --> Z2[Abort whole run\nmcf_session marked expired, REQ-APPLY-06]
+    E -- ok, signed in --> G[Poll apply button\nup to 5 retries, 5s delay, REQ-APPLY-07]
     G -- found --> H[Click apply]
     G -- not found, page says already/applied --> H
     G -- not found, page says closed --> I[post_closed]
@@ -171,6 +172,7 @@ flowchart TD
 
 - A single application's failure never stops the batch and never overwrites another application's recorded outcome, per REQ-APPLY-08.
 - Questionnaire-required postings are deliberately left for the user to complete manually on MCF. They are not automated and not retried, per REQ-APPLY-05.
+- A signed-out banner is a run-level failure, not a per-lead one, distinct from `unable_to_apply`. MCF shows this on the posting page itself, initials replaced by "Login," rather than redirecting to a separate login page. The batch ends at the lead where it is found, `mcf_session` is marked expired, and the remaining queued leads are attempted only in a later run.
 
 ## 7. Apply-outcome → lead propagation
 

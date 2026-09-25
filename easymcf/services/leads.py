@@ -8,7 +8,8 @@ from .. import clock, tenancy
 from ..errors import Conflict, RecordNotFound, ValidationFailed
 
 STAGES = ("TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED")
-CLOSE_REASONS = ("offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed", "dropped")
+CLOSE_REASONS = ("offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed",
+                  "dropped", "track_not_matched")
 TRANSITIONS = {
     "TOAPPLY": {"APPLIED", "CLOSED"},
     "APPLIED": {"CALLBACK", "CLOSED"},

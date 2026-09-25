@@ -26,6 +26,7 @@ sys.path.insert(0, _SCRIPTS_DIR)
 from initdb import apply_schema  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import spawn_app, terminate_app  # noqa: E402
+from api_tester import _poll  # noqa: E402
 
 pytestmark = pytest.mark.backend
 
@@ -108,6 +109,42 @@ def test_an_unknown_as_user_is_an_error_not_a_failure(app_base_url_env):
     exit_code, records = _run_api_tester(app_base_url_env, "selftest_api_tester_bad_user.json", "13.TC.37.bad")
     assert records[0]["outcome"] == "ERROR" and "no_such_user" in records[0]["detail"]
     assert exit_code != 0
+
+
+# 10.EL.31 — oracle for the poll extension (10.EL.25), `_poll` called directly, no HTTP
+# server involved: expected outcomes hard-coded from the 010.10 tracker's Validation
+# utility extension section, never imported from api_tester.py itself.
+class _FakeResponse:
+    def __init__(self, body: dict):
+        self._body = body
+
+    def json(self):
+        return self._body
+
+
+class _FakeSession:
+    """Always answers the same body, regardless of path/kwargs — enough to drive _poll's
+    own loop without a real running app."""
+
+    def __init__(self, body: dict):
+        self._body = body
+
+    def get(self, _url, timeout=10):  # noqa: ARG002 — signature matches requests.Session.get
+        return _FakeResponse(self._body)
+
+
+def test_poll_reaching_terminal_success_classifies_pass():
+    case = {"poll": {"path": "/api/v1/run_log/{id}", "until": {"status": ["success", "partial", "failed"]},
+                      "timeout_s": 5}, "expected_final": {"status": "success"}}
+    outcome, expected, actual, detail = _poll(_FakeSession({"status": "success"}), "http://unused", case, {"id": 1})
+    assert outcome == "PASS" and actual == {"status": "success"} and detail is None
+
+
+def test_poll_that_never_reaches_terminal_classifies_error():
+    case = {"poll": {"path": "/api/v1/run_log/{id}", "until": {"status": ["success", "partial", "failed"]},
+                      "timeout_s": 0}, "expected_final": {"status": "success"}}
+    outcome, expected, actual, detail = _poll(_FakeSession({"status": "running"}), "http://unused", case, {"id": 1})
+    assert outcome == "ERROR" and actual is None and detail is not None
 
 
 def test_a_rejected_sign_in_is_an_error(app_base_url_env, tmp_path):

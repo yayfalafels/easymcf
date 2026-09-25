@@ -13,7 +13,7 @@ Any test or dev run of apply automation must run against local/seed data (REQ-DE
 
 ## Session handling (REQ-APPLY-06)
 
-No login automation. Apply runs against an already-authenticated session the user supplies (an exported cookie jar, per the prototype's `cookies_mcf.json` pattern). Validate that the session actually matches the target domain before proceeding; a session/authentication failure aborts the *whole run* (not a per-job failure) — there is no per-job fallback at this level.
+No login automation. Apply runs against an already-authenticated session the user supplies (an exported cookie jar, per the prototype's `cookies_mcf.json` pattern). Validate that the session actually matches the target domain before proceeding; a session/authentication failure aborts the *whole run* (not a per-job failure) — there is no per-job fallback at this level. A lapsed session is detected by the page banner's account control switching to "Login" in place of the signed-in user's initials, checked at each lead's posting-load step, not by a redirect to a separate login page — see the [mycareerfutures](../mycareerfutures/SKILL.md) skill's Apply flow table for the exact signal.
 
 ## Per-lead state machine
 

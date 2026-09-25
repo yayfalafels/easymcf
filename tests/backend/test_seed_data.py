@@ -109,7 +109,21 @@ def test_closed_vocabularies_are_complete(conn):
     assert LEAD_STAGES <= distinct(conn, "SELECT DISTINCT stage FROM lead")
     assert CLOSE_REASONS <= distinct(conn, "SELECT DISTINCT close_reason FROM lead WHERE status = 'CLOSED'")
     assert APPLICATION_STATUSES <= distinct(conn, "SELECT DISTINCT status FROM application")
-    assert RUN_STATUSES <= distinct(conn, "SELECT DISTINCT status FROM run_log")
+
+
+def test_run_log_seed_covers_every_status_before_any_reconciliation(isolated_db):
+    """10.IS.06 — the shared session `conn`/`db_path` no longer reliably shows a seeded
+    'running' run_log row once any other test in the same session has built an app: startup
+    reconciliation (easymcf/services/search.py::reconcile_orphaned_runs, wired into
+    create_app() by this milestone) flips every 'running' row to 'failed' before the server
+    accepts requests, and `client`/`app` (test_health.py, test_mcf_session_open.py) build a
+    real app against that same shared db. A dedicated, never-reconciled `isolated_db` is the
+    only db in this test session guaranteed to still show the seed's raw 'running' row."""
+    connection = sqlite3.connect(isolated_db)
+    try:
+        assert RUN_STATUSES <= distinct(connection, "SELECT DISTINCT status FROM run_log")
+    finally:
+        connection.close()
 
 
 def test_retry_pair_and_apply_failed_linkage(conn):

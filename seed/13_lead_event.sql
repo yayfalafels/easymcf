@@ -83,28 +83,32 @@ INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, o
 -- synthetic stage history
 INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (42, 14, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (43, 15, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (43, 14, 'stage_change', 'close_reason: None -> track_not_matched', 'TOAPPLY', 'CLOSED', '2026-09-21 07:01:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (44, 15, 'stage_change', NULL, 'TOAPPLY', 'APPLIED', '2026-09-21 07:01:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (44, 15, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
 -- synthetic stage history
 INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (45, 16, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
 -- synthetic stage history
 INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (46, 16, 'stage_change', NULL, 'TOAPPLY', 'APPLIED', '2026-09-21 07:01:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (47, 16, 'stage_change', NULL, 'APPLIED', 'CALLBACK', '2026-09-21 07:02:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (47, 17, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (48, 17, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (48, 17, 'stage_change', NULL, 'TOAPPLY', 'APPLIED', '2026-09-21 07:01:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (49, 17, 'stage_change', NULL, 'TOAPPLY', 'APPLIED', '2026-09-21 07:01:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (49, 17, 'stage_change', NULL, 'APPLIED', 'CALLBACK', '2026-09-21 07:02:00');
 -- synthetic stage history
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (50, 17, 'stage_change', 'close_reason: None -> rejected', 'APPLIED', 'CLOSED', '2026-09-21 07:02:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (50, 18, 'stage_change', 'promoted to TOAPPLY', NULL, 'TOAPPLY', '2026-09-21 07:00:00');
+-- synthetic stage history
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (51, 18, 'stage_change', NULL, 'TOAPPLY', 'APPLIED', '2026-09-21 07:01:00');
+-- synthetic stage history
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (52, 18, 'stage_change', 'close_reason: None -> rejected', 'APPLIED', 'CLOSED', '2026-09-21 07:02:00');
 -- second user note
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (51, 15, 'note_edited', 'note added', 'APPLIED', 'APPLIED', '2026-09-21 07:30:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (53, 16, 'note_edited', 'note added', 'APPLIED', 'APPLIED', '2026-09-21 07:30:00');
 -- second user note
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (52, 16, 'note_edited', 'note added', 'CALLBACK', 'CALLBACK', '2026-09-21 07:30:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (54, 17, 'note_edited', 'note added', 'CALLBACK', 'CALLBACK', '2026-09-21 07:30:00');
 -- synthetic event coverage
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (53, 1, 'field_edited', 'company_name: APAR TECHNOLOGIES PTE. LTD. -> Seed Co', 'TOAPPLY', 'TOAPPLY', '2026-09-21 07:31:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (55, 1, 'field_edited', 'company_name: APAR TECHNOLOGIES PTE. LTD. -> Seed Co', 'TOAPPLY', 'TOAPPLY', '2026-09-21 07:31:00');
 -- synthetic event coverage
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (54, 3, 'contact_logged', 'last_contact_date: None -> 2026-09-21', 'CALLBACK', 'CALLBACK', '2026-09-21 07:40:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (56, 3, 'contact_logged', 'last_contact_date: None -> 2026-09-21', 'CALLBACK', 'CALLBACK', '2026-09-21 07:40:00');
 -- synthetic event coverage
-INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (55, 3, 'deadline_changed', 'deadline: 2026-09-21 -> 2026-10-19', 'CALLBACK', 'CALLBACK', '2026-09-21 07:41:00');
+INSERT INTO lead_event (id, lead_id, event_type, detail, stage_from, stage_to, occurred_at) VALUES (57, 3, 'deadline_changed', 'deadline: 2026-09-21 -> 2026-10-19', 'CALLBACK', 'CALLBACK', '2026-09-21 07:41:00');

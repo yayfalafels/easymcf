@@ -13,6 +13,8 @@ angular.module('easymcfApp').factory('ApiClient', ['$http', '$q', 'ErrorService'
     list: function (table, params) { return call({ method: 'GET', url: base + table + '/search', params: params }); },
     create: function (table, body) { return call({ method: 'POST', url: base + table, data: body }); },
     createManualLead: function (body) { return call({ method: 'POST', url: base + 'lead/manual', data: body }); },
+    triggerSearchRun: function (trackId) { return call({ method: 'POST', url: base + 'runs/search', data: { track_id: trackId } }); },
+    promoteManualPost: function (body) { return call({ method: 'POST', url: base + 'posts/manual', data: body }); },
     batch: function (table, rows, describe) { return call({ method: 'POST', url: base + table + '/batch', data: { rows: rows } }, describe); },
     update: function (table, id, body) { return call({ method: 'PUT', url: base + table + '/' + id, data: body }); },
     remove: function (table, id) { return call({ method: 'DELETE', url: base + table + '/' + id }); },

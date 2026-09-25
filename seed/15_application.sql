@@ -19,4 +19,4 @@ INSERT INTO application (id, lead_id, cv_id, status, error_detail, attempted_at,
 -- synthetic retry pair
 INSERT INTO application (id, lead_id, cv_id, status, error_detail, attempted_at, run_id) VALUES (10, 3, 1, 'applied', NULL, '2026-09-21 09:02:00', 3);
 -- second user apply attempt
-INSERT INTO application (id, lead_id, cv_id, status, error_detail, attempted_at, run_id) VALUES (11, 15, 3, 'applied', NULL, '2026-09-21 11:01:00', 6);
+INSERT INTO application (id, lead_id, cv_id, status, error_detail, attempted_at, run_id) VALUES (11, 16, 3, 'applied', NULL, '2026-09-21 11:01:00', 6);

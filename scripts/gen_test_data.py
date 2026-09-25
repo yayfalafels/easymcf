@@ -30,7 +30,8 @@ ACCOUNTS = [
     {"id": 2, "name": "Sam Second", "email": "second.user@example.test", "password": "Seed-Password-2!", "salt": "seed-salt-2"},
 ]
 STAGES = ["TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
-CLOSE_REASONS = ["offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed", "dropped"]
+CLOSE_REASONS = ["offer_accepted", "rejected", "withdrawn", "expired", "cancelled", "duplicate", "apply_failed",
+                 "dropped", "track_not_matched"]
 APPLICATION_STATUSES = [
     "applied", "questionnaire_required", "cv_selector_error", "unable_to_apply",
     "post_unavailable", "cv_not_found", "post_closed", "invalid_input",
@@ -38,7 +39,8 @@ APPLICATION_STATUSES = [
 
 
 CLOSED_FROM = {"offer_accepted": "OFFER", "rejected": "APPLIED", "withdrawn": "APPLIED", "expired": "APPLIED",
-               "cancelled": "TOAPPLY", "duplicate": "TOAPPLY", "apply_failed": "TOAPPLY", "dropped": "TOAPPLY"}
+               "cancelled": "TOAPPLY", "duplicate": "TOAPPLY", "apply_failed": "TOAPPLY", "dropped": "TOAPPLY",
+               "track_not_matched": "TOAPPLY"}
 MANUAL_POST_ID = "manual-seed-1"
 
 
@@ -174,12 +176,12 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
         sql["search_schedule"] += insert("search_schedule", row, "synthetic schedule default")
 
     run_rows = [
-        {"id": 1, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 08:00:00", "ended_at": f"{anchor} 08:02:00", "status": "success", "outcome_counts": '{"new_posts": 3}', "error_detail": None},
-        {"id": 2, "run_type": "search", "user_id": 1, "track_id": 2, "started_at": f"{anchor} 08:03:00", "ended_at": f"{anchor} 08:05:00", "status": "partial", "outcome_counts": '{"new_posts": 1}', "error_detail": "one fixture detail page was unavailable"},
-        {"id": 3, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:00:00", "ended_at": f"{anchor} 09:03:00", "status": "success", "outcome_counts": '{"applied": 1}', "error_detail": None},
-        {"id": 4, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:04:00", "ended_at": f"{anchor} 09:05:00", "status": "failed", "outcome_counts": '{"failed": 1}', "error_detail": "synthetic failure fixture"},
-        {"id": 5, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 10:00:00", "ended_at": None, "status": "running", "outcome_counts": '{"new_posts": 0}', "error_detail": None},
-        {"id": 6, "run_type": "search", "user_id": 2, "track_id": 7, "started_at": f"{anchor} 11:00:00", "ended_at": f"{anchor} 11:02:00", "status": "success", "outcome_counts": '{"new_posts": 1}', "error_detail": None},
+        {"id": 1, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 08:00:00", "ended_at": f"{anchor} 08:02:00", "status": "success", "outcome_counts": '{"new_posts": 3}', "error_detail": None, "trigger_source": "manual"},
+        {"id": 2, "run_type": "search", "user_id": 1, "track_id": 2, "started_at": f"{anchor} 08:03:00", "ended_at": f"{anchor} 08:05:00", "status": "partial", "outcome_counts": '{"new_posts": 1}', "error_detail": "one fixture detail page was unavailable", "trigger_source": "manual"},
+        {"id": 3, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:00:00", "ended_at": f"{anchor} 09:03:00", "status": "success", "outcome_counts": '{"applied": 1}', "error_detail": None, "trigger_source": "manual"},
+        {"id": 4, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:04:00", "ended_at": f"{anchor} 09:05:00", "status": "failed", "outcome_counts": '{"failed": 1}', "error_detail": "synthetic failure fixture", "trigger_source": "manual"},
+        {"id": 5, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 10:00:00", "ended_at": None, "status": "running", "outcome_counts": '{"new_posts": 0}', "error_detail": None, "trigger_source": "manual"},
+        {"id": 6, "run_type": "search", "user_id": 2, "track_id": 7, "started_at": f"{anchor} 11:00:00", "ended_at": f"{anchor} 11:02:00", "status": "success", "outcome_counts": '{"new_posts": 1}', "error_detail": None, "trigger_source": "scheduled"},
     ]
     for row in run_rows:
         sql["run_log"] += insert("run_log", row, "synthetic run-log coverage")
@@ -188,7 +190,10 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     for index, stage in enumerate(STAGES[:-1], start=1):
         posts.append({"id": f"synthetic-{index}", "source": "Synthetic", "position_title": f"Seed {stage} role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-{index}", "posted_date": (anchor - timedelta(days=index)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.8})
     posts.append({"id": "synthetic-closed", "source": "Synthetic", "position_title": "Seed closed role", "company_name": "Synthetic Company", "url_ref": "https://www.mycareersfuture.gov.sg/job/synthetic-closed", "posted_date": (anchor - timedelta(days=10)).isoformat(), "salary_high": 10000, "is_open": 0, "closing_date": (anchor - timedelta(days=1)).isoformat(), "applicants": 0, "description": None, "score": 0.8})
-    while len(posts) < 13:
+    # padded so posts[0 .. len(STAGES)+len(CLOSE_REASONS)-2] always exists: the close-reason lead loop
+    # below consumes one post per non-`offer_accepted` reason, and a fixed "13" silently drifted onto
+    # the reserved synthetic-promote-* posts the last time a reason was added (10.IS.01).
+    while len(posts) < len(STAGES) + len(CLOSE_REASONS) - 1:
         index = len(posts) + 1
         posts.append({"id": f"synthetic-close-{index}", "source": "Synthetic", "position_title": "Seed close reason role", "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-close-{index}", "posted_date": (anchor - timedelta(days=index)).isoformat(), "salary_high": 10000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.8})
     for name, closing in (("future", anchor + timedelta(days=14)), ("nodate", None), ("past", anchor - timedelta(days=2))):

@@ -2,7 +2,7 @@
 
 ## Feature milestones
 
-The `seq` column present in earlier drafts of this table is dropped (per [010-issues.md](010-issues.md) ISS-01): it asserted a build order that contradicted the documents' own stated dependencies (architecture was sequenced before data model despite architecture's References section naming data model as an input it reads from). Each document's own Purpose/References section already states what it derives from and what derives from it — that is the authoritative ordering; `id` here is a stable identifier, not a sequence.
+The `seq` column determines the implementation order
 
 | id | release | seq | status   |   feature                                |
 | -- | ------- | --- | -------  | ---------------------------------------- |

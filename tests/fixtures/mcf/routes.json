@@ -1,0 +1,31 @@
+{
+  "_comment": "ARCH-TEST-04 fixture corpus manifest for easymcf/automation/fixture.py. 'search' keys are 'keyword|page'; 'detail' keys are the full detail URL. A keyword/page combination not listed here is served as a genuinely empty results page (fixture.py's own fallback) rather than an error, so the corpus only needs to cover the keywords/pages a case or oracle test actually exercises. The 'slow' scenario repeats every route from 'default' with a delay_ms added, so a run stays in flight long enough to collide with a second trigger (10.TC.05) or be killed mid-sweep (10.TC.13).",
+  "scenarios": {
+    "default": {
+      "search": {
+        "Data Analyst|0": {"file": "search/data_analyst_p0.html"},
+        "Data Analyst|1": {"file": "search/empty.html"},
+        "Data Engineer|0": {"file": "search/data_engineer_p0.html"},
+        "Data Engineer|1": {"file": "search/empty.html"}
+      },
+      "detail": {
+        "https://www.mycareersfuture.gov.sg/job/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": {"file": "detail/card_a_open.html"},
+        "https://www.mycareersfuture.gov.sg/job/b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {"file": "detail/card_b_open.html"},
+        "https://www.mycareersfuture.gov.sg/job/c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3": {"file": "detail/card_c_closed.html"}
+      }
+    },
+    "slow": {
+      "search": {
+        "Data Analyst|0": {"file": "search/data_analyst_p0.html", "delay_ms": 600},
+        "Data Analyst|1": {"file": "search/empty.html", "delay_ms": 200},
+        "Data Engineer|0": {"file": "search/data_engineer_p0.html", "delay_ms": 600},
+        "Data Engineer|1": {"file": "search/empty.html", "delay_ms": 200}
+      },
+      "detail": {
+        "https://www.mycareersfuture.gov.sg/job/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1": {"file": "detail/card_a_open.html", "delay_ms": 400},
+        "https://www.mycareersfuture.gov.sg/job/b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2": {"file": "detail/card_b_open.html", "delay_ms": 400},
+        "https://www.mycareersfuture.gov.sg/job/c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3": {"file": "detail/card_c_closed.html", "delay_ms": 400}
+      }
+    }
+  }
+}

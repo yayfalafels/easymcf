@@ -1,0 +1,43 @@
+<h1 data-testid="posts-heading">Posts</h1>
+<div class="lead-toolbar">
+  <label class="page-filter">Track
+    <select ng-model="vm.trackId" ng-change="vm.load()" data-testid="posts-track-select">
+      <option ng-repeat="t in vm.tracks" value="{{t.id}}">{{t.role_name}} / {{t.seniority}}</option>
+    </select>
+  </label>
+  <label class="page-filter">Maximum age (weeks)
+    <input type="number" min="1" ng-model="vm.maxAgeWeeks" ng-change="vm.load()" placeholder="track default" data-testid="posts-filter-max-age">
+  </label>
+  <button type="button" ng-click="vm.runSearch()" ng-disabled="vm.runner.active || !vm.trackId" data-testid="posts-run-search-btn">Run search</button>
+  <button type="button" ng-click="vm.addManual()" data-testid="posts-add-manual-btn">Add posting manually</button>
+</div>
+
+<p ng-if="vm.runner.active" data-testid="posts-run-status">{{vm.statusText()}}</p>
+<p class="field-error" ng-if="!vm.runner.active && (vm.runner.status === 'failed' || vm.runner.status === 'partial')" data-testid="posts-run-error">
+  {{vm.runner.errorDetail || ('Run ended: ' + vm.runner.status)}}
+</p>
+
+<table class="lead-table" data-testid="posts-results-table">
+  <thead>
+    <tr><th>Title</th><th>Company</th><th>Salary</th><th>Posted</th><th>Age (days)</th><th>Closing</th><th>Tags</th></tr>
+  </thead>
+  <tbody>
+    <tr ng-repeat="row in vm.results" data-testid="posts-row-{{row.id}}">
+      <td>
+        <strong ng-if="!row.url_ref">{{row.position_title}}</strong>
+        <strong ng-if="row.url_ref"><a ng-href="{{row.url_ref}}" target="_blank" rel="noopener" mcf-link>{{row.position_title}}</a></strong>
+      </td>
+      <td>{{row.company_name}}</td>
+      <td>{{row.salary_high ? ('S$ ' + row.salary_high) : '—'}}</td>
+      <td>{{row.posted_date}}</td>
+      <td>{{vm.age(row)}}</td>
+      <td>{{row.closing_date || '—'}}</td>
+      <td>
+        <span ng-if="row.src_method === 'manual'" data-testid="posts-row-{{row.id}}-manual-tag">manual</span>
+        <span ng-if="row.lead_id" data-testid="posts-row-{{row.id}}-lead-tag">already a lead</span>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<manual-post-modal></manual-post-modal>

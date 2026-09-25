@@ -282,7 +282,7 @@ def test_two_users_in_two_browser_contexts_see_only_their_own_data(browser, ui_a
         contexts.append(context)
         pages.append(page)
     a, b = pages
-    a_lead, b_lead = "lead-row-1", "lead-row-14"
+    a_lead, b_lead = "lead-row-1", "lead-row-15"
     assert a.locator(f'[data-testid="{a_lead}"]').count() == 1 and a.locator(f'[data-testid="{b_lead}"]').count() == 0
     b.wait_for_selector(f'[data-testid="{b_lead}"]')
     assert b.locator(f'[data-testid="{a_lead}"]').count() == 0

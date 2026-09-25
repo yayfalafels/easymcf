@@ -14,7 +14,7 @@ Run backend/scraping/apply/DB commands through the `env` operational venv, neste
 ```bash
 env/bin/python scripts/envcheck.py                          # preflight — catches an environment defect before it's misread as a code bug
 env/bin/python scripts/resetdb.py --seed                    # clean, seeded db every time — never carry state between checks
-env/bin/python -m easymcf &                                   # start
+MCF_MODE=fixture env/bin/python -m easymcf &                  # start — explicit, never inherited from .env (10.IS.09)
 curl -sf http://127.0.0.1:5000/api/v1/health                  # confirm it's up
 # ... exercise the golden path below, via the browser and/or scripts/api_tester.py ...
 kill %1                                                        # stop

@@ -8,9 +8,10 @@ from flask import current_app, g, jsonify, request
 
 from .. import clock
 from .. import tenancy
-from ..services import leads, mcf_connection, offers
+from ..errors import ValidationFailed
+from ..services import leads, mcf_connection, offers, search
 from .db import get_db
-from .generic import GENERIC, REGISTRY, Resource, _fetch, _validate, bp, register
+from .generic import GENERIC, REGISTRY, Resource, _fetch, _guarded, _insert, _scope_sql, _select, _serialize, _validate, bp, register
 
 READ_ONLY = frozenset({"get", "search"})
 _DATE = {"type": ["string", "null"], "pattern": r"^\d{4}-\d{2}-\d{2}$"}
@@ -28,6 +29,26 @@ _TRACK_PROPS = {
     "default_cv_id": {"type": ["integer", "null"]},
     "is_active": {"type": ["boolean", "integer"]},
 }
+
+
+def _create_track(db, body: dict) -> int:
+    """Workflow 1 — a new track also gets its default search_profile/search_schedule
+    rows, in the same transaction, so the data model's exactly-one-per-track holds from
+    the first moment (10.EL.08)."""
+    track_id = _guarded(_insert, db, REGISTRY["track"], body)
+    role_name = db.execute("SELECT name FROM role WHERE id = ?", (body["role_id"],)).fetchone()["name"]
+    db.execute(
+        "INSERT INTO search_profile (track_id, keywords, min_match_score, employment_type) "
+        "VALUES (?, ?, 0.3, 'Full Time')",
+        (track_id, role_name),
+    )
+    db.execute(
+        "INSERT INTO search_schedule (track_id, schedule_enabled, schedule_interval_hours) VALUES (?, 0, 24)",
+        (track_id,),
+    )
+    return track_id
+
+
 register(Resource(
     "track",
     create_schema={"type": "object", "properties": _TRACK_PROPS,
@@ -36,7 +57,7 @@ register(Resource(
     verbs=frozenset({"get", "search", "create", "update"}),
     bool_columns=("is_active",),
     select_sql="SELECT track.*, role.name AS role_name FROM track JOIN role ON role.id = track.role_id",
-    owned=_owner, parents=(("default_cv_id", "cv"),),
+    owned=_owner, parents=(("default_cv_id", "cv"),), create_fn=_create_track,
 ))
 register(Resource(
     "role",
@@ -78,8 +99,60 @@ register(Resource(
     verbs=frozenset({"get", "search", "create", "update"}), pk="track_id", bool_columns=("schedule_enabled",),
     parents=(("track_id", "track"),),
 ))
-# A post is shared and read-only to every user (REQ-AUTH-06). Only the search run and the manual entry endpoints write it.
-register(Resource("post", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY, bool_columns=("is_open",)))
+# A post is shared and read-only to every user (REQ-AUTH-06). Only the search run and the manual entry endpoints
+# write it. Its `search` verb is hook-backed (10.EL.13/search_fn, api design row 06): a bare column filter on the
+# `post` table alone cannot express "this track's posts with this pairing's match_score/search_match/lead_id",
+# since those columns live in post_track/match_score/lead, not on post itself.
+def _post_search(db, uid: int, args) -> list[dict]:
+    """With a track_id (api design row 06): the per-track joined read the Posts page needs.
+    Without one: the same plain tenancy-scoped listing the generic search() produced for
+    `post` before this hook existed (10.IS.08) — test_tenancy.py's own oracle cases call
+    GET /api/v1/post/search with no track_id and expect that bare shape back."""
+    track_id = args.get("track_id", type=int)
+    if track_id is not None:
+        return search.posts_for_track(db, uid, track_id, args.get("max_age_weeks", type=int))
+    resource = REGISTRY["post"]
+    sql = f"{_select(resource)} WHERE {_scope_sql(resource)} ORDER BY {resource.table}.{resource.pk}"
+    return [_serialize(resource, row) for row in db.execute(sql, {"uid": uid}).fetchall()]
+
+
+register(Resource(
+    "post", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY, bool_columns=("is_open",), search_fn=_post_search,
+))
+# run_log is written only by search.start_run/_run_search (and, later, the apply pipeline); this registers the
+# generic-shaped, tenancy-scoped GET /api/v1/run_log/{id}|search poll a triggered run's client uses (REQ-PLAT-03).
+register(Resource("run_log", create_schema=_ANY, update_schema=_ANY, verbs=READ_ONLY))
+
+_MANUAL_POST_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "track_id": {"type": "integer"}, "position_title": {"type": "string", "minLength": 1},
+        "company_name": {"type": "string", "minLength": 1}, "url_ref": {"type": ["string", "null"]},
+        "salary_high": {"type": ["integer", "null"]}, "posted_date": _DATE,
+    },
+    "required": ["track_id", "position_title", "company_name"],
+    "additionalProperties": False,
+}
+
+
+@bp.post("/runs/search")
+def trigger_search_run():
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body.get("track_id"), int):
+        raise ValidationFailed("track_id is required", field="track_id")
+    db, uid = get_db(), g.user_id
+    tenancy.require_visible(db, uid, "track", body["track_id"])
+    run = search.start_run(db, uid, body["track_id"], trigger_source="manual")
+    return jsonify(dict(run)), 201
+
+
+@bp.post("/posts/manual")
+def create_manual_post():
+    body = request.get_json(silent=True)
+    _validate(body, _MANUAL_POST_SCHEMA)
+    db, uid = get_db(), g.user_id
+    result = search.add_manual_post(db, uid, body["track_id"], body)
+    return jsonify(result), 201
 
 # mcf_attempt is written only through its own named endpoints (mcf_attempt_routes.py); this registers the
 # generic-shaped, tenancy-scoped GET /api/v1/mcf_attempt/search poll, run_log's own trigger-plus-generic-read split.

@@ -48,6 +48,11 @@ class Config:
     google_discovery_url: str = field(
         default_factory=lambda: os.environ.get("GOOGLE_DISCOVERY_URL", "https://accounts.google.com/.well-known/openid-configuration")
     )
+    # ARCH-RUN-07 (milestone 10) — search-run pacing, the scheduler tick, and the fixture-corpus scenario select.
+    search_page_delay_s: float = field(default_factory=lambda: float(os.environ.get("SEARCH_PAGE_DELAY_S", "1")))
+    scheduler_enabled: bool = field(default_factory=lambda: os.environ.get("SCHEDULER_ENABLED", "1") != "0")
+    scheduler_tick_s: float = field(default_factory=lambda: float(os.environ.get("SCHEDULER_TICK_S", "30")))
+    mcf_fixture_scenario: str = field(default_factory=lambda: os.environ.get("MCF_FIXTURE_SCENARIO", "default"))
 
     def __post_init__(self) -> None:
         if self.mcf_mode not in {"fixture", "live"}:

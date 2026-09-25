@@ -11,6 +11,34 @@
     "as_user": "seed_a"
   },
   {
+    "name": "the new track gets a default search profile (10.EL.08's create hook)",
+    "method": "GET",
+    "path": "/api/v1/search_profile/9",
+    "expected_status": 200,
+    "expected_body": {
+      "track_id": 9,
+      "keywords": "Data Engineer",
+      "min_salary": null,
+      "max_age_weeks": null,
+      "min_match_score": 0.3,
+      "employment_type": "Full Time"
+    },
+    "as_user": "seed_a"
+  },
+  {
+    "name": "the new track gets a default search schedule (10.EL.08's create hook)",
+    "method": "GET",
+    "path": "/api/v1/search_schedule/9",
+    "expected_status": 200,
+    "expected_body": {
+      "track_id": 9,
+      "schedule_enabled": false,
+      "schedule_interval_hours": 24,
+      "next_run_at": null
+    },
+    "as_user": "seed_a"
+  },
+  {
     "name": "edit a track",
     "method": "PUT",
     "path": "/api/v1/track/3",

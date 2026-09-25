@@ -11,12 +11,14 @@
 -- `mcf_session` (renamed from `session`, one row per user), `lead.user_id`, the lead's own
 -- `position_title`, `company_name`, and `url_ref`, and `run_log.user_id`.
 -- schema_version 8 (feature 17) adds `mcf_attempt` and `mcf_session.confirmed_account_email`/`confirmed_at`.
+-- schema_version 9 (milestone 10) adds `run_log.trigger_source` and `lead.close_reason`
+-- `track_not_matched` (see docs/releases/010/design/010-data-model.md, Schema versions).
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (8);
+INSERT INTO meta (schema_version) VALUES (9);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -86,7 +88,8 @@ CREATE TABLE run_log (
     ended_at TEXT,
     status TEXT NOT NULL CHECK (status IN ('running', 'success', 'partial', 'failed')),
     outcome_counts TEXT,
-    error_detail TEXT
+    error_detail TEXT,
+    trigger_source TEXT NOT NULL DEFAULT 'manual' CHECK (trigger_source IN ('manual', 'scheduled'))
 );
 CREATE INDEX idx_run_log_type_status ON run_log(run_type, status);
 CREATE INDEX idx_run_log_user_id ON run_log(user_id);
@@ -136,7 +139,7 @@ CREATE TABLE lead (
     track_id INTEGER NOT NULL REFERENCES track(id),
     status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
     stage TEXT NOT NULL CHECK (stage IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
-    close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped')),
+    close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped', 'track_not_matched')),
     position_title TEXT NOT NULL,
     company_name TEXT NOT NULL,
     url_ref TEXT CHECK (url_ref IS NULL OR url_ref GLOB 'http://*' OR url_ref GLOB 'https://*'),

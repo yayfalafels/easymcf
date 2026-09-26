@@ -1,0 +1,66 @@
+<section class="config-page applications-page" data-testid="applications-page">
+  <h1>Applications</h1>
+  <p>The apply queue is every open lead at TOAPPLY. A run applies to each on MCF with its effective CV.</p>
+
+  <div class="apply-session" data-testid="apply-session-status">
+    MCF session: <strong class="session-{{vm.sessionStatus()}}" data-testid="apply-session-value">{{vm.sessionStatus()}}</strong>
+    <button type="button" class="secondary" ng-if="!vm.sessionValid()" ng-click="vm.connect()" data-testid="apply-session-connect">Connect MCF</button>
+  </div>
+
+  <div class="apply-actions">
+    <button type="button" ng-click="vm.run()" ng-disabled="!!vm.runDisabledReason()" data-testid="apply-run-btn">Run apply batch ({{vm.runnable().length}})</button>
+    <span class="field-hint" ng-if="vm.runDisabledReason()" data-testid="apply-run-disabled-reason">{{vm.runDisabledReason()}}</span>
+    <a href="/cvs?from=applications" class="subtle-action" data-testid="apply-manage-cvs">Manage CVs</a>
+  </div>
+
+  <div class="apply-progress" ng-if="vm.runner.active" data-testid="apply-run-progress">
+    <p data-testid="apply-run-progress-text">{{vm.progress()}}</p>
+    <p class="field-hint" ng-if="vm.progressCounts()" data-testid="apply-run-progress-counts">{{vm.progressCounts()}}</p>
+  </div>
+
+  <p ng-if="vm.loading" data-testid="apply-queue-loading">Loading the queue...</p>
+  <p ng-if="!vm.loading && !vm.queue.length" data-testid="apply-queue-empty">No leads are waiting at TOAPPLY.</p>
+  <table class="lead-table apply-queue" ng-if="vm.queue.length" data-testid="apply-queue">
+    <thead><tr><th>Posting</th><th>Track</th><th>CV</th><th>Last attempt</th><th></th></tr></thead>
+    <tbody>
+      <tr ng-repeat="lead in vm.queue track by lead.id" data-testid="apply-row-{{lead.id}}" ng-class="{'apply-blocked': lead.apply_blocked}">
+        <td>
+          <a ng-if="lead.url_ref" ng-href="{{lead.url_ref}}" target="_blank" rel="noopener" mcf-link>{{lead.position_title}}</a>
+          <span ng-if="!lead.url_ref">{{lead.position_title}}</span>
+          <div class="field-hint">{{lead.company_name}}</div>
+        </td>
+        <td>{{vm.trackName(lead.track_id)}}</td>
+        <td>
+          <select ng-model="lead.cvChoice" ng-change="vm.overrideCv(lead)" ng-disabled="vm.runner.active" data-testid="apply-cv-{{lead.id}}">
+            <option value="">Track default{{lead.cv_id === null && lead.effective_cv_id ? ' (' + vm.cvLabel(lead.effective_cv_id) + ')' : ''}}</option>
+            <option ng-repeat="cv in vm.cvs" ng-if="cv.is_active || cv.id === lead.cv_id" value="{{cv.id}}">{{cv.label}}</option>
+          </select>
+          <div class="field-error" ng-if="lead.apply_blocked" data-testid="apply-blocked-{{lead.id}}">
+            Blocked: no MCF resume matched {{vm.cvLabel(lead.effective_cv_id)}}. Choose another CV to include it in the next run.
+          </div>
+        </td>
+        <td data-testid="apply-last-{{lead.id}}">
+          <span ng-if="lead.last_apply_status">{{lead.last_apply_status}}</span>
+          <span ng-if="!lead.last_apply_status" class="field-hint">never attempted</span>
+        </td>
+        <td><button type="button" class="danger" ng-click="vm.drop(lead)" ng-disabled="vm.runner.active" data-testid="apply-drop-{{lead.id}}">Drop</button></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="apply-results" ng-if="vm.resultRun && !vm.runner.active" data-testid="apply-results">
+    <h2>Run #{{vm.resultRun.id}}: <span data-testid="apply-results-status">{{vm.resultRun.status}}</span></h2>
+    <p class="field-error" ng-if="vm.resultRun.error_detail" data-testid="apply-results-error">{{vm.resultRun.error_detail}}</p>
+    <p ng-if="vm.results && !vm.results.length" data-testid="apply-results-empty">No lead was attempted in this run.</p>
+    <table class="lead-table" ng-if="vm.results.length">
+      <thead><tr><th>Posting</th><th>Outcome</th><th>Next action</th></tr></thead>
+      <tbody>
+        <tr ng-repeat="a in vm.results track by a.id" data-testid="apply-result-{{a.lead_id}}">
+          <td>{{a.lead.position_title}}<div class="field-hint">{{a.lead.company_name}}</div></td>
+          <td data-testid="apply-result-status-{{a.lead_id}}">{{a.status}}<div class="field-hint" ng-if="a.error_detail">{{a.error_detail}}</div></td>
+          <td data-testid="apply-result-action-{{a.lead_id}}">{{vm.OUTCOMES[a.status]}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,9 @@
+[
+  {
+    "name": "selftest — connection refused",
+    "method": "GET",
+    "path": "/api/v1/health",
+    "expected_status": 200,
+    "expected_body": { "status": "ok" }
+  }
+]

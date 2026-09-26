@@ -1,0 +1,67 @@
+[
+  {
+    "name": "attach an offer to an INTERVIEW lead",
+    "method": "POST",
+    "path": "/api/v1/offer",
+    "body": {
+      "lead_id": 4,
+      "offer_date": "2026-09-19",
+      "amount_sgd": 12500
+    },
+    "expected_status": 201
+  },
+  {
+    "name": "an offer for a lead that is not at INTERVIEW",
+    "method": "POST",
+    "path": "/api/v1/offer",
+    "body": {
+      "lead_id": 2,
+      "offer_date": "2026-09-19",
+      "amount_sgd": 12500
+    },
+    "expected_status": 409
+  },
+  {
+    "name": "an offer without an amount",
+    "method": "POST",
+    "path": "/api/v1/offer",
+    "body": {
+      "lead_id": 4,
+      "offer_date": "2026-09-19"
+    },
+    "expected_status": 400
+  },
+  {
+    "name": "edit an open offer",
+    "method": "PUT",
+    "path": "/api/v1/offer/4",
+    "body": {
+      "amount_sgd": 13000
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "accept the offer",
+    "method": "PUT",
+    "path": "/api/v1/offer/4",
+    "body": {
+      "status": "accepted"
+    },
+    "expected_status": 200
+  },
+  {
+    "name": "a final offer is read-only",
+    "method": "PUT",
+    "path": "/api/v1/offer/4",
+    "body": {
+      "amount_sgd": 1
+    },
+    "expected_status": 409
+  },
+  {
+    "name": "an offer is never deleted",
+    "method": "DELETE",
+    "path": "/api/v1/offer/4",
+    "expected_status": 404
+  }
+]

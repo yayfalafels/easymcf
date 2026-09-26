@@ -1,0 +1,22 @@
+[
+  {
+    "name": "11.TC.10 automation Runs tab lists seeded apply runs and expands one",
+    "route": "/automation",
+    "actions": [
+      {"op": "wait_for", "selector": "[data-testid=\"run-row-4\"]"},
+      {"op": "click", "selector": "[data-testid=\"run-row-4\"]"},
+      {"op": "wait_for", "selector": "[data-testid=\"run-app-6\"]"}
+    ],
+    "expect": [
+      {"op": "visible", "selector": "[data-testid=\"automation-tab-runs\"]"},
+      {"op": "text_equals", "selector": "[data-testid=\"run-type-3\"]", "value": "apply"},
+      {"op": "text_equals", "selector": "[data-testid=\"run-status-4\"]", "value": "failed"},
+      {"op": "text_equals", "selector": "[data-testid=\"run-counts-3\"]",
+       "value": "applied 1, cv_not_found 1, post_unavailable 1, questionnaire_required 1, unable_to_apply 1"},
+      {"op": "text_equals", "selector": "[data-testid=\"run-error-4\"]",
+       "value": "RuntimeError: synthetic worker failure after 1 of 1 queued leads"},
+      {"op": "count_equals", "selector": "[data-testid^=\"run-app-\"]", "value": 1}
+    ],
+    "as_user": "seed_a"
+  }
+]

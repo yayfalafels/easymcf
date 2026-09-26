@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<!-- 17.EL.14 fixture: the post-approval MCF dashboard. Carries the real captured account-menu markup shape
+     ACCOUNT_MENU_TRIGGER documents in probe_mcf_singpass.py: a button data-testid="initial-circle-container"
+     opening a dropdown-menu with a profile link, since 17.PB.02 found the dashboard's own visible text exposes
+     only a display name, never the account email, and the menu click is the step that reaches it. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>MyCareersFuture Dashboard</title></head>
+<body>
+  <nav>
+    <button data-testid="initial-circle-container" onclick="document.querySelector('[data-testid=dropdown-menu]').hidden = false">
+      <div data-testid="user-initials">TH</div>
+    </button>
+    <div data-testid="dropdown-menu" hidden>
+      <p data-testid="account-email">demo.user@example.test</p>
+      <a href="/profile" data-testid="profile-link" role="menuitem">My Profile</a>
+      <button type="button" data-testid="logout-button" onclick="window.location.href = 'https://www.mycareersfuture.gov.sg/'">Log out</button>
+    </div>
+  </nav>
+  <main><h1>Hello Demo User,</h1></main>
+</body>
+</html>

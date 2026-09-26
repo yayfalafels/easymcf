@@ -1,0 +1,3 @@
+[
+  {"name": "an unknown as_user is an error, not a failure", "as_user": "no_such_user", "method": "GET", "path": "/api/v1/auth/me", "expected_status": 200}
+]

@@ -1,0 +1,51 @@
+[
+  {
+    "name": "17.IS.29 — a reseeded user never appears connected without saved browser state",
+    "route": "/leads",
+    "actions": [
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "click", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-current-state\"]" }
+    ],
+    "expect": [
+      { "op": "attribute_equals", "selector": "[data-testid=\"mcf-status-dot\"]", "attribute": "class", "value": "mcf-status-dot mcf-status-red" },
+      { "op": "text_equals", "selector": "[data-testid=\"mcf-status\"]", "value": "Not connected" },
+      { "op": "visible", "selector": "[data-testid=\"mcf-connect\"]" },
+      { "op": "visible", "selector": "[data-testid=\"mcf-disconnect\"]", "value": false },
+      { "op": "visible", "selector": "[data-testid=\"mcf-open\"]", "value": false }
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "17.TC.05 — a never-connected user sees a red icon and the Connect MCF action, no history",
+    "route": "/leads",
+    "actions": [
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "click", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-current-state\"]" }
+    ],
+    "expect": [
+      { "op": "attribute_equals", "selector": "[data-testid=\"mcf-status-dot\"]", "attribute": "class", "value": "mcf-status-dot mcf-status-red" },
+      { "op": "visible", "selector": "[data-testid=\"mcf-connect\"]" },
+      { "op": "visible", "selector": "[data-testid=\"mcf-disconnect\"]", "value": false },
+      { "op": "count_equals", "selector": "[data-testid^=\"mcf-attempt-row-\"]", "value": 0 }
+    ],
+    "as_user": "seed_b"
+  },
+  {
+    "name": "17.TC.05 — Connect MCF opens the pop-up and reaches the QR step, an amber icon while it runs",
+    "route": "/leads",
+    "actions": [
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "click", "selector": "[data-testid=\"mcf-nav-icon\"]" },
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-connect\"]" },
+      { "op": "click", "selector": "[data-testid=\"mcf-connect\"]" },
+      { "op": "wait_for", "selector": "[data-testid=\"mcf-qr-image\"]", "timeout_ms": 120000 }
+    ],
+    "expect": [
+      { "op": "visible", "selector": "[data-testid=\"mcf-qr-image\"]" },
+      { "op": "attribute_equals", "selector": "[data-testid=\"mcf-status-dot\"]", "attribute": "class", "value": "mcf-status-dot mcf-status-amber" }
+    ],
+    "as_user": "seed_b"
+  }
+]

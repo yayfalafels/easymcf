@@ -1,0 +1,282 @@
+[
+  {
+    "name": "promote a post with a future closing date",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-future",
+      "track_id": 1
+    },
+    "expected_status": 201,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "promote a post without a closing date",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-nodate",
+      "track_id": 1
+    },
+    "expected_status": 201,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "promote a post with a past closing date",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-past",
+      "track_id": 1
+    },
+    "expected_status": 201,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "promote the same post again",
+    "method": "POST",
+    "path": "/api/v1/lead",
+    "body": {
+      "post_id": "synthetic-promote-future",
+      "track_id": 1
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "TOAPPLY to APPLIED",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "stage": "APPLIED"
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "APPLIED to CALLBACK",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "stage": "CALLBACK"
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "CALLBACK to INTERVIEW",
+    "method": "PUT",
+    "path": "/api/v1/lead/3",
+    "body": {
+      "stage": "INTERVIEW"
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "the dropped PROSPECT stage is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "stage": "PROSPECT"
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "skip-ahead is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "stage": "INTERVIEW"
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "backward move is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/5",
+    "body": {
+      "stage": "APPLIED"
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "closing without a reason",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "stage": "CLOSED"
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "OFFER through PUT is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/3",
+    "body": {
+      "stage": "OFFER"
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "closing a lead at OFFER is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/5",
+    "body": {
+      "stage": "CLOSED",
+      "close_reason": "withdrawn"
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "update the expected salary",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "expected_salary_sgd": 12000
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "a negative expected salary is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/1",
+    "body": {
+      "expected_salary_sgd": -1
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "INTERVIEW to CLOSED with a reason",
+    "method": "PUT",
+    "path": "/api/v1/lead/3",
+    "body": {
+      "stage": "CLOSED",
+      "close_reason": "withdrawn"
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "batch apply moves two leads",
+    "method": "POST",
+    "path": "/api/v1/lead/batch",
+    "body": {
+      "rows": [
+        {
+          "id": 18,
+          "stage": "APPLIED"
+        },
+        {
+          "id": 19,
+          "stage": "APPLIED"
+        }
+      ]
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "a batch with one illegal row is rejected",
+    "method": "POST",
+    "path": "/api/v1/lead/batch",
+    "body": {
+      "rows": [
+        {
+          "id": 18,
+          "stage": "CLOSED",
+          "close_reason": "cancelled"
+        },
+        {
+          "id": 6,
+          "stage": "APPLIED"
+        }
+      ]
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "batch drop closes a lead as dropped",
+    "method": "POST",
+    "path": "/api/v1/lead/batch",
+    "body": {
+      "rows": [
+        {
+          "id": 20,
+          "stage": "CLOSED",
+          "close_reason": "dropped"
+        }
+      ]
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "an empty batch is rejected",
+    "method": "POST",
+    "path": "/api/v1/lead/batch",
+    "body": {
+      "rows": []
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "a batch with a repeated id is rejected",
+    "method": "POST",
+    "path": "/api/v1/lead/batch",
+    "body": {
+      "rows": [
+        {
+          "id": 18,
+          "stage": "CALLBACK"
+        },
+        {
+          "id": 18,
+          "stage": "CALLBACK"
+        }
+      ]
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "re-assign a lead to another active track",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "track_id": 3
+    },
+    "expected_status": 200,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "re-assigning to an archived track is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "track_id": 2
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "re-assigning to an unknown track is rejected",
+    "method": "PUT",
+    "path": "/api/v1/lead/2",
+    "body": {
+      "track_id": 999
+    },
+    "expected_status": 400,
+    "as_user": "seed_a"
+  }
+]

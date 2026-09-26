@@ -1,0 +1,28 @@
+<h1 data-testid="offers-heading">Offers</h1>
+<div class="lead-toolbar">
+  <label class="page-filter">Status
+    <select ng-model="vm.status" ng-change="vm.load()" data-testid="offers-status-filter">
+      <option value="">All statuses</option>
+      <option ng-repeat="s in vm.statuses" value="{{s}}">{{s}}</option>
+    </select>
+  </label>
+  <button type="button" ng-click="vm.create()" data-testid="offer-new">New offer</button>
+</div>
+<table class="lead-table" data-testid="offers-table">
+  <thead><tr><th>Lead</th><th>Company</th><th>Offer date</th><th>Deadline</th><th>Amount (SGD)</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+    <tr ng-repeat="o in vm.offers" data-testid="offer-row-{{o.id}}">
+      <td>{{o.lead_title}}</td><td>{{o.lead_company}}</td><td>{{o.offer_date}}</td>
+      <td><input ng-if="o.status === 'open'" ng-model="o.deadline" data-testid="offer-edit-deadline-{{o.id}}"><span ng-if="o.status !== 'open'">{{o.deadline}}</span></td>
+      <td><input ng-if="o.status === 'open'" type="number" min="1" ng-model="o.amount_sgd" data-testid="offer-edit-amount-{{o.id}}"><span ng-if="o.status !== 'open'">{{o.amount_sgd}}</span></td>
+      <td data-testid="offer-status-{{o.id}}">{{o.status}}</td>
+      <td ng-if="o.status === 'open'">
+        <button ng-click="vm.save(o)" class="secondary" data-testid="offer-save-{{o.id}}">Save</button>
+        <button ng-click="vm.settle(o, 'accepted')" data-testid="offer-accept-{{o.id}}">Accept</button>
+        <button ng-click="vm.settle(o, 'rejected')" data-testid="offer-reject-{{o.id}}">Reject</button>
+        <button ng-click="vm.settle(o, 'withdrawn')" data-testid="offer-withdraw-{{o.id}}">Withdrawn</button>
+      </td>
+      <td ng-if="o.status !== 'open'"></td>
+    </tr>
+  </tbody>
+</table>

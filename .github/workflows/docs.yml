@@ -1,0 +1,54 @@
+# 18.EL.20 - build the MkDocs site and publish it to GitHub Pages on every push to main.
+# Documentation only: no app build, test, or release step, and it references no secret. A pull request into main
+# runs the build job alone as a check, and the deploy job runs only for main (18.IS.09).
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One group per ref: main deploys run one at a time, and a pull request build never displaces a queued deploy.
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: install dev-env manifest
+        run: |
+          python -c "import tomllib; print('\n'.join(tomllib.load(open('python-envs/dev-env/pyproject.toml','rb'))['project']['dependencies']))" > /tmp/docs-requirements.txt
+          pip install -r /tmp/docs-requirements.txt
+      - uses: actions/configure-pages@v6
+      - name: build site
+        env:
+          MKDOCS: mkdocs
+          PYTHON: python
+        run: scripts/build_docs.sh
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

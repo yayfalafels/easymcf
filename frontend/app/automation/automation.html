@@ -1,0 +1,36 @@
+<section class="config-page automation-page" data-testid="automation-page">
+  <h1>Automation</h1>
+  <nav class="tabs"><span class="tab active" data-testid="automation-tab-runs">Runs</span></nav>
+  <button type="button" class="secondary" ng-click="vm.refresh()" data-testid="runs-refresh">Refresh</button>
+  <p ng-if="vm.loading" data-testid="runs-loading">Loading runs...</p>
+  <p ng-if="!vm.loading && !vm.runs.length" data-testid="runs-empty">No runs yet.</p>
+  <table class="lead-table runs-table" ng-if="vm.runs.length" data-testid="runs-table">
+    <thead><tr><th>#</th><th>Type</th><th>Track</th><th>Started</th><th>Ended</th><th>Status</th><th>Outcomes</th></tr></thead>
+    <tbody ng-repeat="run in vm.runs track by run.id">
+      <tr class="run-row" ng-click="vm.toggle(run)" data-testid="run-row-{{run.id}}">
+        <td>{{run.id}}</td>
+        <td data-testid="run-type-{{run.id}}">{{run.run_type}}</td>
+        <td>{{vm.trackName(run.track_id)}}</td>
+        <td>{{run.started_at}}</td>
+        <td>{{run.ended_at}}</td>
+        <td data-testid="run-status-{{run.id}}"><span class="run-status run-status-{{run.status}}">{{run.status}}</span></td>
+        <td data-testid="run-counts-{{run.id}}">{{vm.countsText(run)}}</td>
+      </tr>
+      <tr ng-if="vm.expanded[run.id]" class="run-detail" data-testid="run-detail-{{run.id}}">
+        <td colspan="7">
+          <p class="field-error" ng-if="run.error_detail" data-testid="run-error-{{run.id}}">{{run.error_detail}}</p>
+          <p class="field-hint" ng-if="!run.error_detail">No run error. Trigger: {{run.trigger_source}}.</p>
+          <table ng-if="run.run_type === 'apply'" data-testid="run-apps-{{run.id}}">
+            <thead><tr><th>Lead</th><th>Outcome</th><th>Detail</th><th>At</th></tr></thead>
+            <tbody>
+              <tr ng-repeat="a in vm.apps[run.id] track by a.id" data-testid="run-app-{{a.id}}">
+                <td>{{vm.leadTitle(a.lead_id)}}</td><td>{{a.status}}</td><td>{{a.error_detail}}</td><td>{{a.attempted_at}}</td>
+              </tr>
+              <tr ng-if="vm.apps[run.id] && !vm.apps[run.id].length"><td colspan="4">No application rows.</td></tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</section>

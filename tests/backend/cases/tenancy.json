@@ -1,0 +1,10 @@
+[
+  {"name": "user A reads a lead of its own", "as_user": "seed_a", "method": "GET", "path": "/api/v1/lead/1", "expected_status": 200},
+  {"name": "user B cannot read it", "as_user": "seed_b", "method": "GET", "path": "/api/v1/lead/1", "expected_status": 404},
+  {"name": "user B cannot update it", "as_user": "seed_b", "method": "PUT", "path": "/api/v1/lead/1", "body": {"position_title": "x"}, "expected_status": 404},
+  {"name": "user B cannot add a note to it", "as_user": "seed_b", "method": "POST", "path": "/api/v1/lead_note", "body": {"lead_id": 1, "note": "x"}, "expected_status": 404},
+  {"name": "user B cannot read its notes", "as_user": "seed_b", "method": "GET", "path": "/api/v1/lead_note/search?lead_id=1", "expected_status": 200, "expected_body": []},
+  {"name": "user B cannot see track 1", "as_user": "seed_b", "method": "GET", "path": "/api/v1/track/1", "expected_status": 404},
+  {"name": "a body carrying user_id is refused", "as_user": "seed_a", "method": "POST", "path": "/api/v1/cv", "body": {"user_id": 2, "label": "Z"}, "expected_status": 400},
+  {"name": "an anonymous request is refused", "method": "GET", "path": "/api/v1/lead/1", "expected_status": 401}
+]

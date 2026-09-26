@@ -1,0 +1,28 @@
+[
+  {
+    "name": "create a manual post and promote it under a track",
+    "method": "POST",
+    "path": "/api/v1/posts/manual",
+    "body": {
+      "track_id": 3,
+      "position_title": "Freelance Data Engineer",
+      "company_name": "Manual Test Co",
+      "salary_high": 9500,
+      "posted_date": "2026-09-20"
+    },
+    "expected_status": 201,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "an archived track answers 409",
+    "method": "POST",
+    "path": "/api/v1/posts/manual",
+    "body": {
+      "track_id": 2,
+      "position_title": "Another Manual Role",
+      "company_name": "Manual Test Co"
+    },
+    "expected_status": 409,
+    "as_user": "seed_a"
+  }
+]

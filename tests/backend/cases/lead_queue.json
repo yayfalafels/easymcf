@@ -1,0 +1,8 @@
+[
+  {"name": "11.TC.02 the signed-in user's TOAPPLY queue", "method": "GET", "path": "/api/v1/lead/search?stage=TOAPPLY",
+   "expected_status": 200, "as_user": "seed_a"},
+  {"name": "11.TC.02 a per-lead CV override on a queued lead", "method": "PUT", "path": "/api/v1/lead/1",
+   "body": {"cv_id": 2}, "expected_status": 200, "as_user": "seed_a"},
+  {"name": "11.TC.02 another user's cv as an override answers 400 on the field", "method": "PUT", "path": "/api/v1/lead/1",
+   "body": {"cv_id": 3}, "expected_status": 400, "as_user": "seed_a"}
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "edit a search profile keyed on track_id",
+    "method": "PUT",
+    "path": "/api/v1/search_profile/1",
+    "body": {
+      "keywords": "Data Analyst, Business Analyst",
+      "min_salary": 8000,
+      "max_age_weeks": 6,
+      "min_match_score": 0.3,
+      "employment_type": "Full Time"
+    },
+    "expected_status": 200,
+    "expected_body": {
+      "track_id": 1,
+      "keywords": "Data Analyst, Business Analyst",
+      "min_salary": 8000,
+      "max_age_weeks": 6,
+      "min_match_score": 0.3,
+      "employment_type": "Full Time"
+    },
+    "as_user": "seed_a"
+  },
+  {
+    "name": "another user's track answers 404",
+    "method": "PUT",
+    "path": "/api/v1/search_profile/7",
+    "body": {"keywords": "Data Analyst"},
+    "expected_status": 404,
+    "as_user": "seed_a"
+  }
+]

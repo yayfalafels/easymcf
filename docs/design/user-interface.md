@@ -33,10 +33,10 @@ This document is the page inventory and UX behavior for the AngularJS frontend, 
 
 ## References
 
-- **workflows** [010-workflows.md](workflows.md): the business logic and process flows this page inventory drives.
-- **data model** [010-data-model.md](data-model.md): the entities every field or action on a page maps to.
-- **frontend app design** [010-frontend-app.md](frontend-app.md): elaborates this page inventory into the AngularJS module, routing, and controller structure and the API calls each page makes.
-- **prototype extraction** [010-prototype.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-prototype.md): the `jobsearch` prototype's observed run durations this UI's async-run handling accounts for.
+- **workflows** [workflows.md](workflows.md): the business logic and process flows this page inventory drives.
+- **data model** [data-model.md](data-model.md): the entities every field or action on a page maps to.
+- **frontend app design** [frontend-app.md](frontend-app.md): elaborates this page inventory into the AngularJS module, routing, and controller structure and the API calls each page makes.
+- **prototype extraction** [prototype.md](prototype.md): the `jobsearch` prototype's observed run durations this UI's async-run handling accounts for.
 
 ## Information architecture
 

@@ -40,16 +40,16 @@ Decisions carry an `ENV-*` id grouped `SETUP`/`CFG`/`SCRIPT`/`LOOP`/`TRBL`, mirr
 
 Every alias below is used bolded, unlinked, throughout the rest of this document instead of repeating the full link. Resolve it back to the row here.
 
-- **architecture doc** — [010-architecture.md](architecture.md) — `ARCH-RUN-01..10` fixes the runtime/process model and repo layout, `ARCH-STO-01..07` fixes storage, seed, and reset, `ARCH-BOT-01..05` fixes Playwright, `ARCH-TEST-01..09` fixes tier mechanics. This document does not restate any of these. It operationalizes them.
-- **test-strategy doc** — [010-test-strategy.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-test-strategy.md) — `STRAT-SILO-01..07` names the helper scripts (`db_util.py`, `api_tester.py`) and the frontend silo this document gives install/run instructions for. `STRAT-LOOP`, the agent's silo-aware build→test→debug table, is what section 5 below adds a preflight/install layer beneath.
-- **requirements doc** — [010-01-requirements.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-01-requirements.md) — REQ-DEV-01..05, the requirement this whole document satisfies.
-- **api doc** — [010-api.md](api.md) — `API-EP-07 GET /api/v1/health`, the readiness probe section 4 polls.
-- **frontend-app doc** — [010-frontend-app.md](frontend-app.md) — the sibling design doc, elaborated under the same milestone-06 grouping this document belongs to.
+- **architecture doc** — [architecture.md](architecture.md) — `ARCH-RUN-01..10` fixes the runtime/process model and repo layout, `ARCH-STO-01..07` fixes storage, seed, and reset, `ARCH-BOT-01..05` fixes Playwright, `ARCH-TEST-01..09` fixes tier mechanics. This document does not restate any of these. It operationalizes them.
+- **test-strategy doc** — 010-test-strategy.md — `STRAT-SILO-01..07` names the helper scripts (`db_util.py`, `api_tester.py`) and the frontend silo this document gives install/run instructions for. `STRAT-LOOP`, the agent's silo-aware build→test→debug table, is what section 5 below adds a preflight/install layer beneath.
+- **requirements doc** — [requirements.md](requirements.md) — REQ-DEV-01..05, the requirement this whole document satisfies.
+- **api doc** — [api.md](api.md) — `API-EP-07 GET /api/v1/health`, the readiness probe section 4 polls.
+- **frontend-app doc** — [frontend-app.md](frontend-app.md) — the sibling design doc, elaborated under the same milestone-06 grouping this document belongs to.
 - `CLAUDE.md` — the two-venv hard rule, `.dev/dev-env` and `env`, both nested inside the repo at the repo root, that this document's install section maps onto `ARCH-RUN-05`. Kept unaliased below since it is already short and never linked, being a root-level file with no relative path to carry.
-- **infra-navigation skill** — [local-infra-navigation](https://github.com/yayfalafels/easymcf/blob/main/.claude/skills/local-infra-navigation/SKILL.md) — scaffold skill this document is written to fill in. Once milestone 07 is implemented, its content should be copied forward from here rather than re-derived.
-- **deploy-cycle skill** — [deploy-and-validation-cycle](https://github.com/yayfalafels/easymcf/blob/main/.claude/skills/deploy-and-validation-cycle/SKILL.md) — same scaffold status as the infra-navigation skill. It is the golden-path checklist this document's automated loop, section 5, is meant to make redundant, tier by tier.
+- **infra-navigation skill** — local-infra-navigation — scaffold skill this document is written to fill in. Once milestone 07 is implemented, its content should be copied forward from here rather than re-derived.
+- **deploy-cycle skill** — deploy-and-validation-cycle — same scaffold status as the infra-navigation skill. It is the golden-path checklist this document's automated loop, section 5, is meant to make redundant, tier by tier.
 - `python-envs/dev-env/pyproject.toml`, `python-envs/ops-env/pyproject.toml` — the manifests section 1 fixes the target dependency contents of. Kept unaliased since these are plain file paths, not linked docs.
-- **local-dev-env tracker** — [010.07-local-dev-env.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/features/010.07-local-dev-env.md) — the feature tracker whose `07.05` task breakdown produces the artifacts this document's bootstrap sequence assumes already exist.
+- **local-dev-env tracker** — 010.07-local-dev-env.md — the feature tracker whose `07.05` task breakdown produces the artifacts this document's bootstrap sequence assumes already exist.
 
 ## Guiding constraint
 

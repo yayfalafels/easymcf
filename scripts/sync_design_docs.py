@@ -4,11 +4,12 @@
 `.dev/dev-env/bin/python scripts/sync_design_docs.py [--check]`
 
 The release is `extra.design_release` in mkdocs.yml. Each doc in DESIGN_DOCS is copied from
-`docs/releases/<release>/design/<release>-<name>.md` to `docs/design/<name>.md` with a source line after its H1
-title and its relative links rewritten for the site: a link to another synced doc points at its published name,
-and every other relative link points at the file on GitHub. A relative link whose target does not exist fails
-the sync. The default mode writes the pages and removes any other .md file in docs/design/. `--check` compares
-instead, and fails when docs/design/ is stale, which scripts/build_docs.sh runs before every build.
+`docs/releases/<release>/design/<release>-<source>.md` to `docs/design/<name>.md`, so the published design
+section keeps no release prefix and no link back to the release folder. Relative links are rewritten: a link to
+another synced doc points at its published name, with a release file name in its link text renamed to match, and
+a link to anything else becomes its plain link text. A relative link whose target does not exist fails the sync.
+The default mode writes the pages and removes any other .md file in docs/design/. `--check` compares instead,
+and fails when docs/design/ is stale, which scripts/build_docs.sh runs before every build.
 """
 
 from __future__ import annotations
@@ -23,10 +24,13 @@ import yaml
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(_SCRIPTS_DIR)
 DESIGN_DIR = os.path.join(REPO_ROOT, "docs", "design")
-DESIGN_DOCS = ["architecture", "data-model", "api", "workflows", "user-interface", "frontend-app", "development-env"]
-REPO_BLOB = "https://github.com/yayfalafels/easymcf/blob/main/"
-REPO_TREE = "https://github.com/yayfalafels/easymcf/tree/main/"
-LINK = re.compile(r"(\]\(|\b(?:src|href)=\")([^)\"\s]+)")
+# published name -> source file suffix, after the `<release>-` prefix
+DESIGN_DOCS = {
+    "requirements": "01-requirements", "architecture": "architecture", "data-model": "data-model", "api": "api",
+    "workflows": "workflows", "user-interface": "user-interface", "frontend-app": "frontend-app",
+    "development-env": "development-env", "prototype": "prototype",
+}
+LINK = re.compile(r"\[([^\]]*)\]\(([^)\s]+)\)")
 EXTERNAL = re.compile(r"^(#|[a-z][a-z0-9+.-]*:|/)", re.I)
 
 
@@ -43,39 +47,40 @@ def current_release() -> str:
 
 
 def source_path(release: str, name: str) -> str:
-    return os.path.join(REPO_ROOT, "docs", "releases", release, "design", f"{release}-{name}.md")
+    return os.path.join(REPO_ROOT, "docs", "releases", release, "design", f"{release}-{DESIGN_DOCS[name]}.md")
 
 
-def rewrite_target(target: str, source: str, published: dict[str, str], errors: list[str]) -> str:
+def rewrite_link(match: re.Match, source: str, published: dict[str, str], release: str, errors: list[str]) -> str:
+    text, target = match.group(1), match.group(2)
     if EXTERNAL.match(target):
-        return target
+        return match.group(0)
     path, _, anchor = target.partition("#")
-    suffix = f"#{anchor}" if anchor else ""
     resolved = os.path.normpath(os.path.join(os.path.dirname(source), path))
-    if resolved in published:
-        return published[resolved] + suffix
     if not os.path.exists(resolved):
         errors.append(f"{os.path.relpath(source, REPO_ROOT)}: link target not found: {target}")
-        return target
-    base = REPO_TREE if os.path.isdir(resolved) else REPO_BLOB
-    return base + os.path.relpath(resolved, REPO_ROOT).replace(os.sep, "/") + suffix
+        return match.group(0)
+    if resolved not in published:
+        return text  # outside the design section: the reference name stays, the link goes
+    name = published[resolved]
+    for suffix in DESIGN_DOCS.values():  # a release file name in the link text takes the published name
+        text = text.replace(f"{release}-{suffix}.md", DESIGN_DOCS_BY_SUFFIX[suffix] + ".md")
+    return f"[{text}]({name}{'#' + anchor if anchor else ''})"
+
+
+DESIGN_DOCS_BY_SUFFIX = {suffix: name for name, suffix in DESIGN_DOCS.items()}
 
 
 def build_page(release: str, name: str, published: dict[str, str], errors: list[str]) -> str:
     source = source_path(release, name)
     with open(source, encoding="utf-8") as handle:
         lines = handle.read().split("\n")
-    rel_source = os.path.relpath(source, REPO_ROOT).replace(os.sep, "/")
-    out, in_fence, titled = [], False, False
+    out, in_fence = [], False
     for line in lines:
         if line.lstrip().startswith("```"):
             in_fence = not in_fence
         if not in_fence:
-            line = LINK.sub(lambda m: m.group(1) + rewrite_target(m.group(2), source, published, errors), line)
+            line = LINK.sub(lambda m: rewrite_link(m, source, published, release, errors), line)
         out.append(line)
-        if not titled and line.startswith("# "):
-            out += ["", f"Release `{release}` design. Source: [{rel_source}]({REPO_BLOB}{rel_source})."]
-            titled = True
     return "\n".join(out)
 
 

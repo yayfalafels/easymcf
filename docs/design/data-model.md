@@ -32,9 +32,9 @@ Entities and relationships for the SQLite database (REQ-PLAT-02), derived from t
 
 ## References
 
-- **workflows**: [010-workflows.md](workflows.md) — the process steps each entity and field below exists to support.
-- **prototype extraction**: [010-prototype.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-prototype.md) — the `cv_select()` substring-match mechanics the `cv` entity's label is matched against.
-- **architecture**: [010-architecture.md](architecture.md) — `ARCH-STO-02/03` for the recreate-don't-migrate rule the Schema versions table below records, and `ARCH-SCHED-01..06` for the runtime behind the `search_schedule` table and `run_log.trigger_source`.
+- **workflows**: [workflows.md](workflows.md) — the process steps each entity and field below exists to support.
+- **prototype extraction**: [prototype.md](prototype.md) — the `cv_select()` substring-match mechanics the `cv` entity's label is matched against.
+- **architecture**: [architecture.md](architecture.md) — `ARCH-STO-02/03` for the recreate-don't-migrate rule the Schema versions table below records, and `ARCH-SCHED-01..06` for the runtime behind the `search_schedule` table and `run_log.trigger_source`.
 
 ## Entity-relationship overview
 

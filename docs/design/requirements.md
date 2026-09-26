@@ -38,11 +38,11 @@ Job seekers who run the system on their own machine and each hold their own acco
 
 ## References
 
-- **release roadmap**: [release-roadmap.md](../../release-roadmap.md), [010-release.md](../010-release.md) — easymcf scope, feature table, and stated aim to avoid `mcfpipe`'s pre-MVP infrastructure investment.
-- **prototype extraction**: [010-prototype.md](010-prototype.md) — implementation-level extraction from `jobsearch` and `mcfpipe`, sufficient for most of this document and the design stage. Use this first.
+- **release roadmap**: release-roadmap.md, 010-release.md — easymcf scope, feature table, and stated aim to avoid `mcfpipe`'s pre-MVP infrastructure investment.
+- **prototype extraction**: [prototype.md](prototype.md) — implementation-level extraction from `jobsearch` and `mcfpipe`, sufficient for most of this document and the design stage. Use this first.
 - **jobsearch prototype**: `jobsearch/` — the working prototype this release formalizes and re-platforms onto a local Python API + SQLite + AngularJS stack. Go to source directly for detail beyond what the **prototype extraction** captures: `agent.py`, `database.py`, `mcf_profile.py`, `match.py`/`text.py`, `apply.py`, `gsheet/applicationtrackingapp.gs`.
 - **mcfpipe reference**: `mcfpipe/` — an earlier, more ambitious rebuild of the same product. Its data model and API design are worth reusing. Its cloud infrastructure pivot to a serverless, NoSQL, multi-tier VPC, IaC, and full CI/CD setup, undertaken before the functional product worked reliably, is the specific mistake release `010` is scoped to avoid. Go to source directly for detail beyond what the **prototype extraction** captures: `docs/data_model.md`, `docs/database_api.md`, `docs/architecture.md`, `docs/enhancements.md`.
-- **API reference**: [010-api.md](010-api.md) — the concrete backend endpoint surface, including the per-entity CRUD/hook/named classification.
+- **API reference**: [api.md](api.md) — the concrete backend endpoint surface, including the per-entity CRUD/hook/named classification.
 
 ## Glossary
 

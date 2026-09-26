@@ -34,14 +34,14 @@ The concrete backend API surface: every endpoint, its request/response shape, an
 
 ## References
 
-- **requirements**: [010-01-requirements.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-01-requirements.md) — REQ-PLAT-01 (the generic-CRUD default this elaborates), REQ-CRM-01..08 and REQ-APPLY-01..11 (the invariants behind every hook and named endpoint below)
-- **architecture design**: [010-architecture.md](architecture.md) — `ARCH-RUN-09/10` (the one-process topology and `/api/v1` prefix these endpoints are mounted under), `ARCH-RUN-03` (the run-in-flight guard `API-EP-04`/`05` cite), `ARCH-AUTH-01..10` (the session, ownership, and Google flow decisions the account endpoints and the ownership rule implement), `ARCH-BOT-05` (the apply-retry env-var override `API-EP-05` cites)
-- **data model**: [010-data-model.md](data-model.md) — the entity/field definitions this surface reads and writes. Field lists aren't repeated here beyond what an example needs
-- **workflows**: [010-workflows.md](workflows.md) — Workflow 4 (promote), 5 (lead lifecycle), 6 (apply queue/run/drop), 7 (apply-outcome propagation), 8 (session) — the process logic each hook or named endpoint implements
-- **frontend app design**: [010-frontend-app.md](frontend-app.md) — the AngularJS `ApiClient` service that wraps every endpoint below. Consult it for how a screen calls this surface, rather than for the surface's own definition
-- **issues log**: [010-issues.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/010-issues.md) — ISS-02 (generic CRUD vs. lead state-machine rules), the audit finding this document resolves
-- **user interface design**: [010-user-interface.md](user-interface.md) — the screens and controls that call each endpoint below
-- **backend-api skill**: [.claude/skills/easymcf-backend-api/SKILL.md](https://github.com/yayfalafels/easymcf/blob/main/.claude/skills/easymcf-backend-api/SKILL.md) — the agent-facing skill that points here for anything beyond the generic CRUD pattern
+- **requirements**: [requirements.md](requirements.md) — REQ-PLAT-01 (the generic-CRUD default this elaborates), REQ-CRM-01..08 and REQ-APPLY-01..11 (the invariants behind every hook and named endpoint below)
+- **architecture design**: [architecture.md](architecture.md) — `ARCH-RUN-09/10` (the one-process topology and `/api/v1` prefix these endpoints are mounted under), `ARCH-RUN-03` (the run-in-flight guard `API-EP-04`/`05` cite), `ARCH-AUTH-01..10` (the session, ownership, and Google flow decisions the account endpoints and the ownership rule implement), `ARCH-BOT-05` (the apply-retry env-var override `API-EP-05` cites)
+- **data model**: [data-model.md](data-model.md) — the entity/field definitions this surface reads and writes. Field lists aren't repeated here beyond what an example needs
+- **workflows**: [workflows.md](workflows.md) — Workflow 4 (promote), 5 (lead lifecycle), 6 (apply queue/run/drop), 7 (apply-outcome propagation), 8 (session) — the process logic each hook or named endpoint implements
+- **frontend app design**: [frontend-app.md](frontend-app.md) — the AngularJS `ApiClient` service that wraps every endpoint below. Consult it for how a screen calls this surface, rather than for the surface's own definition
+- **issues log**: 010-issues.md — ISS-02 (generic CRUD vs. lead state-machine rules), the audit finding this document resolves
+- **user interface design**: [user-interface.md](user-interface.md) — the screens and controls that call each endpoint below
+- **backend-api skill**: .claude/skills/easymcf-backend-api/SKILL.md — the agent-facing skill that points here for anything beyond the generic CRUD pattern
 
 Decisions carry an `API-*` id (grouped `CAT` classification, `HOOK` per-table hook behavior, `EP` named endpoint), mirroring the `REQ-*`/`ARCH-*` grouping convention.
 

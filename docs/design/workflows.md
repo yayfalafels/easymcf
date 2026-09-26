@@ -24,10 +24,10 @@ Read the **requirements** doc first for the requirement IDs, `REQ-*`, referenced
 
 ## References
 
-- **requirements** [010-01-requirements.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-01-requirements.md): the `REQ-*` ids referenced throughout this document.
-- **data model** [010-data-model.md](data-model.md): entities and schema, derived from the workflows below.
-- **user interface** [010-user-interface.md](user-interface.md): pages and UX, derived from the workflows below.
-- **prototype extraction** [010-prototype.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-prototype.md): the `jobsearch`/`mcfpipe` mechanics these workflows carry forward or correct.
+- **requirements** [requirements.md](requirements.md): the `REQ-*` ids referenced throughout this document.
+- **data model** [data-model.md](data-model.md): entities and schema, derived from the workflows below.
+- **user interface** [user-interface.md](user-interface.md): pages and UX, derived from the workflows below.
+- **prototype extraction** [prototype.md](prototype.md): the `jobsearch`/`mcfpipe` mechanics these workflows carry forward or correct.
 
 ## Design decisions 
 

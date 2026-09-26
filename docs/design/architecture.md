@@ -31,19 +31,19 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, 
 
 ## References
 
-- **requirements**: [010-01-requirements.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-01-requirements.md) — REQ-PLAT-01..04, REQ-FE-01..02, REQ-DEV-01..05 are the requirements this document operationalizes.
-- **release roadmap**: [release-roadmap.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/release-roadmap.md) — the feature table fixing python/AngularJS/SQLite/local, and the `mcfpipe` lesson that bounds how much infrastructure `010` is allowed to build.
-- **prototype extraction**: [010-prototype.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-prototype.md) — `jobsearch`'s runtime dependencies and local-env pain points (Selenium + matching chromedriver, Playwright Chromium, `cookies_mcf.json`, hardcoded Windows paths, `recommission.py`).
-- **data model**: [010-data-model.md](data-model.md) — the tables the storage section below is concrete about.
-- **test strategy**: [010-test-strategy.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-test-strategy.md) — written after this document's first version. `ARCH-TEST-09` confirms its `STRAT-SILO-07` proposal (the `tests/frontend/` silo) back into this document's repo layout and tier table.
-- **API reference**: [010-api.md](api.md) — elaborates `ARCH-RUN-10`'s endpoint surface into the full generic/hook/named classification and named-endpoint catalog, so that detail lives there instead of bloating this document.
-- **frontend app design**: [010-frontend-app.md](frontend-app.md) — elaborates `ARCH-RUN-06/09`'s frontend decisions and `ARCH-TEST-05/09`'s Playwright tiers into the AngularJS module/routing/API-client structure and the `data-testid` convention those tiers assert against.
-- **development env runbook**: [010-development-env.md](development-env.md) — the concrete install/config/script/agent-loop runbook that implements this document and the **test strategy** as an actual, executable environment. It is the direct input to milestone 07.
+- **requirements**: [requirements.md](requirements.md) — REQ-PLAT-01..04, REQ-FE-01..02, REQ-DEV-01..05 are the requirements this document operationalizes.
+- **release roadmap**: release-roadmap.md — the feature table fixing python/AngularJS/SQLite/local, and the `mcfpipe` lesson that bounds how much infrastructure `010` is allowed to build.
+- **prototype extraction**: [prototype.md](prototype.md) — `jobsearch`'s runtime dependencies and local-env pain points (Selenium + matching chromedriver, Playwright Chromium, `cookies_mcf.json`, hardcoded Windows paths, `recommission.py`).
+- **data model**: [data-model.md](data-model.md) — the tables the storage section below is concrete about.
+- **test strategy**: 010-test-strategy.md — written after this document's first version. `ARCH-TEST-09` confirms its `STRAT-SILO-07` proposal (the `tests/frontend/` silo) back into this document's repo layout and tier table.
+- **API reference**: [api.md](api.md) — elaborates `ARCH-RUN-10`'s endpoint surface into the full generic/hook/named classification and named-endpoint catalog, so that detail lives there instead of bloating this document.
+- **frontend app design**: [frontend-app.md](frontend-app.md) — elaborates `ARCH-RUN-06/09`'s frontend decisions and `ARCH-TEST-05/09`'s Playwright tiers into the AngularJS module/routing/API-client structure and the `data-testid` convention those tiers assert against.
+- **development env runbook**: [development-env.md](development-env.md) — the concrete install/config/script/agent-loop runbook that implements this document and the **test strategy** as an actual, executable environment. It is the direct input to milestone 07.
 - **local-infra skills**: `.claude/skills/local-infra-navigation/SKILL.md`, `.claude/skills/deploy-and-validation-cycle/SKILL.md` — both are scaffolds explicitly waiting on this document plus milestone 07/08. They are the intended destination for the run/reset/test commands defined here.
-- **workflows**: [010-workflows.md](workflows.md) — the process logic behind every `ARCH-*` decision that touches a run or a state transition.
-- **user interface design**: [010-user-interface.md](user-interface.md) — what the user sees, referenced wherever an `ARCH-*` decision has a visible UI effect.
-- **backend-api skill**: [.claude/skills/easymcf-backend-api/SKILL.md](https://github.com/yayfalafels/easymcf/blob/main/.claude/skills/easymcf-backend-api/SKILL.md) — the agent-facing skill covering the generic CRUD endpoint shapes.
-- **playwright skill**: [.claude/skills/playwright/SKILL.md](https://github.com/yayfalafels/easymcf/blob/main/.claude/skills/playwright/SKILL.md) — explicit-wait and locator patterns that carry over from the prototype's Selenium usage.
+- **workflows**: [workflows.md](workflows.md) — the process logic behind every `ARCH-*` decision that touches a run or a state transition.
+- **user interface design**: [user-interface.md](user-interface.md) — what the user sees, referenced wherever an `ARCH-*` decision has a visible UI effect.
+- **backend-api skill**: .claude/skills/easymcf-backend-api/SKILL.md — the agent-facing skill covering the generic CRUD endpoint shapes.
+- **playwright skill**: .claude/skills/playwright/SKILL.md — explicit-wait and locator patterns that carry over from the prototype's Selenium usage.
 - **project instructions**: `CLAUDE.md` (repo root) — the project's own boundaries on live-site access, secrets, and the two-venv rule.
 
 ## Guiding constraint

@@ -38,11 +38,11 @@ Decisions carry an `FE-*` id grouped `APP`/`RTE`/`SVC`/`RUN`/`ERR`/`SCR`/`TEST`,
 
 ## References
 
-- **user-interface doc**: [010-user-interface.md](user-interface.md) — the page inventory, navigation structure, and cross-cutting UX patterns, async run handling, error surfacing, confirmation modals, empty states, this document implements one-to-one.
-- **api doc**: [010-api.md](api.md) — the generic CRUD shapes, per-entity CAT-01/02/03 classification, and the `API-EP-01..07` named-endpoint catalog the API-client service (section 3) wraps.
-- **architecture doc**: [010-architecture.md](architecture.md) — `ARCH-RUN-06` fixes no node/npm, vendored `angular.min.js`, no build step. `ARCH-RUN-09` fixes that Flask serves `frontend/` at `/`, with `index.html` returned for unmatched non-`/api` paths. This is what makes HTML5-mode routing possible without a rewrite proxy. `ARCH-RUN-10` fixes the `/api/v1` prefix. `ARCH-TEST-05`/`ARCH-TEST-09` fix the two Playwright tiers this document's `data-testid` convention exists to support.
-- **workflows doc**: [010-workflows.md](workflows.md) — workflow numbers cited per screen below, for the process logic each controller drives.
-- **data model**: [010-data-model.md](data-model.md) — the entity/field definitions, `lead_event` included, that the API-client service and per-screen data reads are checked against.
+- **user-interface doc**: [user-interface.md](user-interface.md) — the page inventory, navigation structure, and cross-cutting UX patterns, async run handling, error surfacing, confirmation modals, empty states, this document implements one-to-one.
+- **api doc**: [api.md](api.md) — the generic CRUD shapes, per-entity CAT-01/02/03 classification, and the `API-EP-01..07` named-endpoint catalog the API-client service (section 3) wraps.
+- **architecture doc**: [architecture.md](architecture.md) — `ARCH-RUN-06` fixes no node/npm, vendored `angular.min.js`, no build step. `ARCH-RUN-09` fixes that Flask serves `frontend/` at `/`, with `index.html` returned for unmatched non-`/api` paths. This is what makes HTML5-mode routing possible without a rewrite proxy. `ARCH-RUN-10` fixes the `/api/v1` prefix. `ARCH-TEST-05`/`ARCH-TEST-09` fix the two Playwright tiers this document's `data-testid` convention exists to support.
+- **workflows doc**: [workflows.md](workflows.md) — workflow numbers cited per screen below, for the process logic each controller drives.
+- **data model**: [data-model.md](data-model.md) — the entity/field definitions, `lead_event` included, that the API-client service and per-screen data reads are checked against.
 - **frontend skill**: `.claude/skills/easymcf-frontend/SKILL.md` — the AngularJS framework commitment, which is not a migration target for `010`, and the screen list this elaborates.
 - **AngularJS style guide**: [github.com/mgechev/angularjs-style-guide](https://github.com/mgechev/angularjs-style-guide) — the one-component-per-file convention `FE-APP-03` commits to, per the **frontend skill**'s framework reference.
 

@@ -15,6 +15,7 @@ developer-guide/test.md
 developer-guide/debug.md
 developer-guide/docs-site.md
 developer-guide/design-orientation.md
+design/requirements.md
 design/architecture.md
 design/data-model.md
 design/api.md
@@ -22,3 +23,4 @@ design/workflows.md
 design/user-interface.md
 design/frontend-app.md
 design/development-env.md
+design/prototype.md

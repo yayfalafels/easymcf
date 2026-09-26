@@ -3,6 +3,7 @@ site_description: Job search and application automation for MyCareersFuture, Sin
 site_url: https://yayfalafels.github.io/easymcf/
 repo_url: https://github.com/yayfalafels/easymcf
 repo_name: yayfalafels/easymcf
+copyright: Easy MCF 0.1.0 · design release 010
 docs_dir: docs
 site_dir: site
 use_directory_urls: false
@@ -80,6 +81,7 @@ nav:
       - Docs site: developer-guide/docs-site.md
       - Design orientation: developer-guide/design-orientation.md
   - Design:
+      - Requirements: design/requirements.md
       - Architecture: design/architecture.md
       - Data model: design/data-model.md
       - API reference: design/api.md
@@ -87,3 +89,4 @@ nav:
       - User interface: design/user-interface.md
       - Frontend app: design/frontend-app.md
       - Development environment: design/development-env.md
+      - Prototype extraction: design/prototype.md

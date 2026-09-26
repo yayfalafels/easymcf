@@ -1,7 +1,5 @@
 # Easy MCF POC Local - User Interface
 
-Release `010` design. Source: [docs/releases/010/design/010-user-interface.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-user-interface.md).
-
 ## Contents
 
 - [Purpose](#purpose)

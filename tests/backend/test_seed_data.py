@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from datetime import date, timedelta
 
@@ -49,10 +50,10 @@ def test_two_users_with_distinct_data(conn):
 
 def test_seeded_mcf_connection_covers_both_branches(conn):
     connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 1").fetchone()
-    assert connected == ("missing", None, "yayfalafels@gmail.com")
+    assert connected == ("missing", None, "demo.user@example.test")
     never_connected = conn.execute("SELECT status, cookie_ref, confirmed_account_email FROM mcf_session WHERE user_id = 2").fetchone()
     assert never_connected == ("missing", None, None)
-    assert conn.execute("SELECT status, account_email FROM mcf_attempt WHERE user_id = 1").fetchone() == ("connected", "yayfalafels@gmail.com")
+    assert conn.execute("SELECT status, account_email FROM mcf_attempt WHERE user_id = 1").fetchone() == ("connected", "demo.user@example.test")
     assert conn.execute("SELECT status, error_code FROM mcf_attempt WHERE user_id = 2").fetchone() == ("failed", "SingpassTimeoutError")
 
 
@@ -146,7 +147,7 @@ def test_event_type_enumeration_is_complete(conn):
 
 def test_seeded_user_identity(conn):
     assert conn.execute("SELECT name, email FROM user ORDER BY id").fetchall() == [
-        ("Taylor Hickem", "yayfalafels@gmail.com"), ("Sam Second", "second.user@example.test")]
+        ("Demo User", "demo.user@example.test"), ("Sam Second", "second.user@example.test")]
 
 
 def test_seeded_roles_and_tracks(conn):
@@ -211,7 +212,7 @@ def test_rolling_deadline_27_and_29_days(isolated_client, isolated_db, fixed_clo
     conn.commit()
     fixed_clock("2026-10-11T07:00:00")  # after the session the fixture opened at real time has expired
     assert isolated_client.get("/api/v1/auth/me").status_code == 401
-    isolated_client.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"})
+    isolated_client.post("/api/v1/auth/signin", json={"email": "demo.user@example.test", "password": "Seed-Password-1!"})
     leads = {l["id"]: l for l in isolated_client.get("/api/v1/lead/search").get_json()}
     assert leads[1]["status"] == "OPEN"
     assert leads[2]["status"] == "CLOSED" and leads[2]["close_reason"] == "expired"
@@ -423,3 +424,13 @@ def test_every_seeded_cv_has_a_delete_guard_reference(conn):
     assert conn.execute("SELECT COUNT(*) FROM track WHERE default_cv_id = 2").fetchone()[0] == 0
     assert conn.execute("SELECT COUNT(*) FROM application WHERE cv_id = 2").fetchone()[0] >= 1
     assert conn.execute("SELECT COUNT(*) FROM lead WHERE cv_id = 2").fetchone()[0] == 1
+
+
+def test_tracked_seed_holds_identity_tokens():
+    """18.TC.36: the tracked seed carries user 1's identity as tokens, and no rendered identity value."""
+    seed_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "seed")
+    for name in ("02_user.sql", "16_mcf_session.sql", "17_mcf_attempt.sql"):
+        text = open(os.path.join(seed_dir, name), encoding="utf-8").read()
+        assert "{{INITIAL_USER_EMAIL}}" in text, name
+        assert "demo.user@example.test" not in text, name
+    assert "{{INITIAL_USER_NAME}}" in open(os.path.join(seed_dir, "02_user.sql"), encoding="utf-8").read()

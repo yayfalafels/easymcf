@@ -13,8 +13,8 @@
     "expected_status": 200,
     "expected_body": {
       "id": 1,
-      "name": "Taylor Hickem",
-      "email": "yayfalafels@gmail.com",
+      "name": "Demo User",
+      "email": "demo.user@example.test",
       "photo_url": null,
       "auth_methods": [
         "password"
@@ -49,7 +49,7 @@
     "method": "POST",
     "path": "/api/v1/auth/signin",
     "body": {
-      "email": "yayfalafels@gmail.com",
+      "email": "demo.user@example.test",
       "password": "Seed-Password-1!"
     },
     "expected_status": 200,

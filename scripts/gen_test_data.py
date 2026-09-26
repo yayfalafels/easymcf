@@ -17,6 +17,9 @@ sys.path.insert(0, ROOT := os.path.dirname(os.path.dirname(os.path.abspath(__fil
 
 from easymcf.db.connection import get_connection
 
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+from render_seed import PUBLIC_DEFAULTS, render_text  # noqa: E402
+
 SOURCE_DIR = os.path.join(ROOT, "test-data")
 SCHEMA_PATH = os.path.join(ROOT, "easymcf", "db", "schema.sql")
 TABLES = [
@@ -26,8 +29,9 @@ TABLES = [
 ]
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 32768, 8, 1
 # Fake local test credentials (TESTDATA-GEN user table). Never a production store.
+# User 1's identity is a {{TOKEN}} that scripts/render_seed.py fills from .env when the seed is applied (18.EL.01).
 ACCOUNTS = [
-    {"id": 1, "name": "Taylor Hickem", "email": "yayfalafels@gmail.com", "password": "Seed-Password-1!", "salt": "seed-salt-1"},
+    {"id": 1, "name": "{{INITIAL_USER_NAME}}", "email": "{{INITIAL_USER_EMAIL}}", "password": "Seed-Password-1!", "salt": "seed-salt-1"},
     {"id": 2, "name": "Sam Second", "email": "second.user@example.test", "password": "Seed-Password-2!", "salt": "seed-salt-2"},
 ]
 STAGES = ["TOAPPLY", "APPLIED", "CALLBACK", "INTERVIEW", "OFFER", "CLOSED"]
@@ -393,7 +397,7 @@ def validate(sql_by_table: dict[str, str]) -> None:
             conn.executescript(handle.read())
         for table in TABLES:
             try:
-                conn.executescript(sql_by_table[table])
+                conn.executescript(render_text(sql_by_table[table], PUBLIC_DEFAULTS, table))  # 18.IS.01
             except sqlite3.Error as exc:
                 raise RuntimeError(f"seed validation failed in {table}: {exc}") from exc
         mismatched = conn.execute("SELECT COUNT(*) FROM lead JOIN track ON track.id = lead.track_id WHERE lead.user_id != track.user_id").fetchone()[0]

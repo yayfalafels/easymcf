@@ -19,6 +19,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 from tests.support import images  # noqa: E402
@@ -32,7 +33,7 @@ STRONG = "Correct-Horse-9!"
 def ui_app(tmp_path_factory):
     db_path = str(tmp_path_factory.mktemp("easymcf-auth-ui-db") / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     photos = str(tmp_path_factory.mktemp("easymcf-auth-ui-photos"))
     secrets = str(tmp_path_factory.mktemp("easymcf-auth-ui-secrets"))
     proc, base_url = spawn_app(db_path, extra_env={"PHOTO_DIR": photos, "SECRETS_DIR": secrets})
@@ -62,7 +63,7 @@ def _wait(page, testid, state="visible", timeout=10_000):
     page.locator(f'[data-testid="{testid}"]').wait_for(state=state, timeout=timeout)
 
 
-def _login(page, base_url, email="yayfalafels@gmail.com", password="Seed-Password-1!", route="/signin"):
+def _login(page, base_url, email="demo.user@example.test", password="Seed-Password-1!", route="/signin"):
     page.goto(base_url + route)
     _wait(page, "signin-submit")
     page.fill('[data-testid="signin-email"]', email)
@@ -81,7 +82,7 @@ def test_signed_out_visit_redirects_to_sign_in_and_returns_after(fresh, ui_app, 
     fresh.goto(base_url + route)
     _wait(fresh, "signin-submit")
     assert _path(fresh) == "/signin" and parse_qs(urlparse(fresh.url).query)["next"] == [route]
-    fresh.fill('[data-testid="signin-email"]', "yayfalafels@gmail.com")
+    fresh.fill('[data-testid="signin-email"]', "demo.user@example.test")
     fresh.fill('[data-testid="signin-password"]', "Seed-Password-1!")
     fresh.click('[data-testid="signin-submit"]')
     fresh.wait_for_function(f"location.pathname === '{route}'")
@@ -174,7 +175,7 @@ def test_a_duplicate_email_shows_its_message_next_to_the_field(fresh, ui_app):
     fresh.goto(base_url + "/signup")
     _wait(fresh, "signup-submit")
     fresh.fill('[data-testid="signup-name"]', "Someone Else")
-    fresh.fill('[data-testid="signup-email"]', "YAYFALAFELS@gmail.com")
+    fresh.fill('[data-testid="signup-email"]', "DEMO.USER@example.test")
     fresh.fill('[data-testid="signup-password"]', STRONG)
     fresh.click('[data-testid="signup-submit"]')
     _wait(fresh, "signup-field-error")
@@ -190,7 +191,7 @@ def test_the_user_section_appears_once_on_every_signed_in_page(fresh, ui_app, ro
     fresh.goto(base_url + route)
     _wait(fresh, "user-avatar")
     assert fresh.locator('[data-testid="user-section"]').count() == 1
-    assert fresh.locator('[data-testid="user-initials"]').inner_text() == "TH"
+    assert fresh.locator('[data-testid="user-initials"]').inner_text() == "DU"
 
 
 def test_the_sign_in_pages_have_no_user_section_or_nav_links(fresh, ui_app):
@@ -263,7 +264,7 @@ def test_a_session_that_ends_mid_use_returns_to_sign_in_and_back(fresh, ui_app):
     fresh.click('[data-testid="nav-tracks"]')
     _wait(fresh, "signin-submit")
     assert _path(fresh) == "/signin" and parse_qs(urlparse(fresh.url).query)["next"] == ["/tracks"]
-    fresh.fill('[data-testid="signin-email"]', "yayfalafels@gmail.com")
+    fresh.fill('[data-testid="signin-email"]', "demo.user@example.test")
     fresh.fill('[data-testid="signin-password"]', "Seed-Password-1!")
     fresh.click('[data-testid="signin-submit"]')
     fresh.wait_for_function("location.pathname === '/tracks'")

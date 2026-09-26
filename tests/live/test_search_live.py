@@ -15,6 +15,7 @@ general live tier `ARCH-TEST-06` describes.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 
@@ -25,7 +26,8 @@ from easymcf.config import Config
 
 pytestmark = pytest.mark.live
 
-SEED_A = {"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"}
+_USERS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "support", "users.json")
+SEED_A = json.load(open(_USERS_PATH, encoding="utf-8"))["seed_a"]  # 18.EL.09, one source for seeded credentials
 # A first real run against "Data Analyst" found 24 cards / 22 new posts on page 1 alone — the
 # detail pass (one page load per post, paced by search_page_delay_s) genuinely needs several
 # minutes for a batch that size, not the fixture corpus's handful of postings.

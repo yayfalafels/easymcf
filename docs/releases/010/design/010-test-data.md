@@ -112,8 +112,10 @@ No source file. The prototype predates any user concept, one installation, one p
 
 | id | `id` | `name`         | `email`                    | password                | holds                             |
 | -- | ---- | -------------- | -------------------------- | ----------------------- | --------------------------------- |
-| 01 | 1    | Taylor Hickem  | yayfalafels@gmail.com      | `Seed-Password-1!`      | every migrated row below          |
+| 01 | 1    | Demo User      | demo.user@example.test     | `Seed-Password-1!`      | every migrated row below          |
 | 02 | 2    | Sam Second     | second.user@example.test   | `Seed-Password-2!`      | the synthetic ownership fixtures  |
+
+User 1's name and email are written to `seed/*.sql` as the tokens `{{INITIAL_USER_NAME}}` and `{{INITIAL_USER_EMAIL}}`. The table shows the public defaults they render to. `scripts/render_seed.py` fills them from `INITIAL_USER_NAME` and `INITIAL_USER_EMAIL` in `.env` when `scripts/resetdb.py --seed` applies the seed, and uses the public defaults when those are unset. The test suite always applies the public defaults.
 
 `password_hash` is written in Werkzeug's scrypt format by calling `hashlib.scrypt` with a fixed per-user salt, so two generations are byte-identical and `check_password_hash` verifies the fake passwords above. Both passwords satisfy the password policy and are fake local test credentials, and a seeded database is never a production store. `google_sub` and `photo_ref` are `NULL`, so Google cases create their own linked identities through the stub provider. `created_at` is set relative to load time. Every migrated `track`, `cv`, `lead`, `run_log`, and `mcf_session` row below carries `user_id=1`, and the second user's synthetic rows carry `user_id=2` (`TESTDATA-MAP-09`).
 
@@ -289,7 +291,7 @@ No source data. Real MCF session cookies are explicitly out of scope to ever hol
 
 Both modes share every mapping rule in section 4. `seed` mode simply caps how many rows of each kind are emitted, enough to hit every enum value once or twice, where `sample` mode emits everything the source data supports.
 
-**TESTDATA-GEN-02** Entry point: `scripts/gen_test_data.py`, with a thin bash wrapper `scripts/gen_test_data.sh`, matching the existing `scripts/initdb.py`/`scripts/resetdb.py` naming from the **architecture doc**'s repo layout, that activates `env` and invokes it. Per CLAUDE.md, generating database seed/sample data is an operational-lifecycle task, "DB init/seed," not a one-time/throwaway dev task, so it belongs in `env`, never an ad hoc venv.
+**TESTDATA-GEN-02** Entry point: `scripts/gen_test_data.py`, with a thin bash wrapper `scripts/gen_test_data.sh`, matching the existing `scripts/initdb.py`/`scripts/resetdb.py` naming from the **architecture doc**'s repo layout, that activates `env` and invokes it. The generated seed keeps user 1's identity as `{{...}}` tokens. The generator's own load check renders them with the public defaults from `scripts/render_seed.py`, and `scripts/resetdb.py --seed` renders them from `.env` when it applies the seed. Per CLAUDE.md, generating database seed/sample data is an operational-lifecycle task, "DB init/seed," not a one-time/throwaway dev task, so it belongs in `env`, never an ad hoc venv.
 
 ```
 scripts/gen_test_data.py --mode seed --out seed/ --rand-seed 42

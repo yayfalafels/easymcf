@@ -22,6 +22,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _SCRIPTS_DIR)
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import browser, page  # noqa: E402,F401
 
@@ -37,6 +38,10 @@ for _key in ("GCP_OAUTH_CLIENT_ID", "GCP_OAUTH_TEST_EMAIL", "GCP_OAUTH_SECRET_FI
 # the same reason as the block above — every non-live test tier forces fixture mode itself regardless (ARCH-RUN-08),
 # so this is defense in depth, not the only thing standing between the suite and a real MCF/Singpass request.
 os.environ.pop("MCF_MODE", None)
+
+# 18.EL.07: the seeded identity comes from PUBLIC_DEFAULTS, passed to every apply_seed call, never from .env.
+for _key in ("INITIAL_USER_NAME", "INITIAL_USER_EMAIL"):
+    os.environ.pop(_key, None)
 
 # `browser`/`page` (ARCH-TEST-04/09) are registered exactly once, here at the
 # top level, deliberately — 07.IS.06. Registering them separately in both
@@ -59,7 +64,7 @@ def db_path(tmp_path_factory):
     """
     path = str(tmp_path_factory.mktemp("easymcf-db") / "easymcf.db")
     apply_schema(path)
-    apply_seed(path)
+    apply_seed(path, PUBLIC_DEFAULTS)
 
     scratch = {"DB_PATH": path, "SECRETS_DIR": str(tmp_path_factory.mktemp("easymcf-secrets")),
                "PHOTO_DIR": str(tmp_path_factory.mktemp("easymcf-photos"))}
@@ -164,7 +169,7 @@ def fixed_clock():
 def isolated_db(tmp_path):
     path = str(tmp_path / "easymcf.db")
     apply_schema(path)
-    apply_seed(path)
+    apply_seed(path, PUBLIC_DEFAULTS)
     return path
 
 

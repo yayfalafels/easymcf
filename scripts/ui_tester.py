@@ -37,6 +37,7 @@ sys.path.insert(0, _REPO_ROOT)
 
 import _val_log  # noqa: E402
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import spawn_app, terminate_app  # noqa: E402
 
@@ -175,7 +176,7 @@ def _case_batch(case_path: str, name: str | None, api_mode: str, api_fixtures: s
     db_dir = tempfile.mkdtemp(prefix="easymcf-ui-tester-")
     db_path = os.path.join(db_dir, "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path)
     log_path = _val_log.log_path("ui_tester", label)
     try:
@@ -202,7 +203,7 @@ def _ad_hoc(route: str, selector: str) -> int:
     db_dir = tempfile.mkdtemp(prefix="easymcf-ui-tester-")
     db_path = os.path.join(db_dir, "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path)
     try:
         with sync_playwright() as p:

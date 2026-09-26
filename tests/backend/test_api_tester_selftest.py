@@ -24,6 +24,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _SCRIPTS_DIR)
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import spawn_app, terminate_app  # noqa: E402
 from api_tester import _poll  # noqa: E402
@@ -44,7 +45,7 @@ def app_base_url_env(tmp_path_factory):
     session-scoped, since this fixture is only used within this file."""
     db_path = str(tmp_path_factory.mktemp("easymcf-api-tester-selftest-db") / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path)
     port = base_url.rsplit(":", 1)[-1]
     env = os.environ.copy()
@@ -151,7 +152,7 @@ def test_a_rejected_sign_in_is_an_error(app_base_url_env, tmp_path):
     case = tmp_path / "wrong_password.json"
     case.write_text(json.dumps([{"name": "x", "as_user": "seed_a", "method": "GET", "path": "/api/v1/auth/me", "expected_status": 200}]))
     users = tmp_path / "users.json"
-    users.write_text(json.dumps({"seed_a": {"email": "yayfalafels@gmail.com", "password": "Not-The-Password-1!"}}))
+    users.write_text(json.dumps({"seed_a": {"email": "demo.user@example.test", "password": "Not-The-Password-1!"}}))
     exit_code, records = _run_api_tester({**app_base_url_env, "EASYMCF_TEST_USERS": str(users)}, str(case), "13.TC.37.rejected")
     assert records[0]["outcome"] == "ERROR" and "returned 401" in records[0]["detail"]
     assert exit_code != 0

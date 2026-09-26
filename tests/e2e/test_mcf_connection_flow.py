@@ -19,12 +19,13 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 
 pytestmark = pytest.mark.e2e
 
-FOUND_EMAIL = "yayfalafels@gmail.com"  # tests/fixtures/singpass/profile.html's own captured value
+FOUND_EMAIL = "demo.user@example.test"  # tests/fixtures/singpass/profile.html's own captured value
 
 
 def _rows(db_path, sql, *args):
@@ -40,7 +41,7 @@ def _rows(db_path, sql, *args):
 def app(tmp_path):
     db_path = str(tmp_path / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path, extra_env={"SECRETS_DIR": str(tmp_path / "secrets")})
     try:
         yield base_url, db_path

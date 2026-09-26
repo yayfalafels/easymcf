@@ -20,6 +20,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, _SCRIPTS_DIR)
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import spawn_app, terminate_app  # noqa: E402
 
@@ -32,7 +33,7 @@ from tests._browser_support import spawn_app, terminate_app  # noqa: E402
 def app_base_url(tmp_path_factory):
     db_path = str(tmp_path_factory.mktemp("easymcf-frontend-db") / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path)
     try:
         yield base_url

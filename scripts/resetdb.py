@@ -3,7 +3,8 @@
 
 `python scripts/resetdb.py [--seed]`: delete the file at `DB_PATH`
 if present, apply `easymcf/db/schema.sql`, then apply `seed/*.sql` if
-`--seed` is passed. This is the single command that recovers from a
+`--seed` is passed, with user 1's identity tokens rendered from `.env` by
+`scripts/render_seed.py` (18.EL.04). This is the single command that recovers from a
 `schema_version` mismatch or a corrupted dev scratch db — never hand-edit
 `data/easymcf.db`.
 """
@@ -11,7 +12,6 @@ if present, apply `easymcf/db/schema.sql`, then apply `seed/*.sql` if
 from __future__ import annotations
 
 import argparse
-import glob
 import os
 import sqlite3
 import sys
@@ -26,19 +26,22 @@ load_dotenv()  # before Config() is built — ENV-CFG-03/07.02.03
 
 from easymcf.config import Config  # noqa: E402
 from initdb import apply_schema  # noqa: E402
+from render_seed import render_seed, values_from_env  # noqa: E402
 
-_SEED_DIR = os.path.join(_REPO_ROOT, "seed")
 
+def apply_seed(db_path: str, values: dict[str, str] | None = None) -> list[str]:
+    """Apply every rendered seed/*.sql file, sorted, in one transaction each. Returns files applied.
 
-def apply_seed(db_path: str) -> list[str]:
-    """Apply every seed/*.sql file, sorted, in one transaction each. Returns files applied."""
+    `values` fills the identity tokens. None reads them from `.env`, falling back to the public defaults.
+    """
+    if values is None:
+        values, _ = values_from_env()
     applied = []
     conn = sqlite3.connect(db_path)
     try:
-        for seed_file in sorted(glob.glob(os.path.join(_SEED_DIR, "*.sql"))):
-            with open(seed_file, "r", encoding="utf-8") as f:
-                conn.executescript(f.read())
-            applied.append(os.path.relpath(seed_file, _REPO_ROOT))
+        for name, text in render_seed(values):
+            conn.executescript(text)
+            applied.append(os.path.join("seed", name))
         conn.commit()
     finally:
         conn.close()
@@ -60,12 +63,13 @@ def main() -> int:
         print(f"[PASS] schema applied — {db_path}")
 
         if args.seed:
-            applied = apply_seed(db_path)
+            values, source = values_from_env()
+            applied = apply_seed(db_path, values)
             if applied:
-                print(f"[PASS] seed applied — {', '.join(applied)}")
+                print(f"[PASS] seed applied — {', '.join(applied)}, identity from {source}")
             else:
                 print("[PASS] seed applied — no seed/*.sql files found")
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, ValueError) as exc:
         print(f"[FAIL] reset error: {exc}", file=sys.stderr)
         return 1
 

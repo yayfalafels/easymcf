@@ -19,6 +19,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.frontend
 def ui_app(tmp_path_factory):
     db_path = str(tmp_path_factory.mktemp("easymcf-offers-db") / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     proc, base_url = spawn_app(db_path)
     try:
         yield base_url, db_path

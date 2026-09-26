@@ -20,6 +20,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import sign_in, spawn_app, terminate_app  # noqa: E402
 
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.e2e
 def _apply_stack(tmp_path, scenario: str):
     db_path = str(tmp_path / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     secrets = tmp_path / "secrets"
     secrets.mkdir()
     (secrets / "mcf_session_1.json").write_text(json.dumps({"cookies": [], "origins": []}))

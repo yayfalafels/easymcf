@@ -4,7 +4,7 @@
    "expect": [{"op": "url_path_equals", "value": "/signin"}]},
   {"name": "selftest - as_user signs the browser in", "as_user": "seed_a", "route": "/leads",
    "actions": [{"op": "wait_for", "selector": "[data-testid=\"user-avatar\"]"}],
-   "expect": [{"op": "text_equals", "selector": "[data-testid=\"user-initials\"]", "value": "TH"},
+   "expect": [{"op": "text_equals", "selector": "[data-testid=\"user-initials\"]", "value": "DU"},
               {"op": "url_path_equals", "value": "/leads"}]},
   {"name": "selftest - a different as_user is a different account", "as_user": "seed_b", "route": "/leads",
    "actions": [{"op": "wait_for", "selector": "[data-testid=\"user-avatar\"]"}],

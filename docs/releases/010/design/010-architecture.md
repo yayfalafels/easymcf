@@ -32,7 +32,7 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, 
 ## References
 
 - **requirements**: [010-01-requirements.md](010-01-requirements.md) — REQ-PLAT-01..04, REQ-FE-01..02, REQ-DEV-01..05 are the requirements this document operationalizes.
-- **release roadmap**: [release-roadmap.md](../release-roadmap.md) — the feature table fixing python/AngularJS/SQLite/local, and the `mcfpipe` lesson that bounds how much infrastructure `010` is allowed to build.
+- **release roadmap**: [release-roadmap.md](../../release-roadmap.md) — the feature table fixing python/AngularJS/SQLite/local, and the `mcfpipe` lesson that bounds how much infrastructure `010` is allowed to build.
 - **prototype extraction**: [010-prototype.md](010-prototype.md) — `jobsearch`'s runtime dependencies and local-env pain points (Selenium + matching chromedriver, Playwright Chromium, `cookies_mcf.json`, hardcoded Windows paths, `recommission.py`).
 - **data model**: [010-data-model.md](010-data-model.md) — the tables the storage section below is concrete about.
 - **test strategy**: [010-test-strategy.md](010-test-strategy.md) — written after this document's first version. `ARCH-TEST-09` confirms its `STRAT-SILO-07` proposal (the `tests/frontend/` silo) back into this document's repo layout and tier table.
@@ -42,8 +42,8 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, 
 - **local-infra skills**: `.claude/skills/local-infra-navigation/SKILL.md`, `.claude/skills/deploy-and-validation-cycle/SKILL.md` — both are scaffolds explicitly waiting on this document plus milestone 07/08. They are the intended destination for the run/reset/test commands defined here.
 - **workflows**: [010-workflows.md](010-workflows.md) — the process logic behind every `ARCH-*` decision that touches a run or a state transition.
 - **user interface design**: [010-user-interface.md](010-user-interface.md) — what the user sees, referenced wherever an `ARCH-*` decision has a visible UI effect.
-- **backend-api skill**: [.claude/skills/easymcf-backend-api/SKILL.md](../../../.claude/skills/easymcf-backend-api/SKILL.md) — the agent-facing skill covering the generic CRUD endpoint shapes.
-- **playwright skill**: [.claude/skills/playwright/SKILL.md](../../../.claude/skills/playwright/SKILL.md) — explicit-wait and locator patterns that carry over from the prototype's Selenium usage.
+- **backend-api skill**: [.claude/skills/easymcf-backend-api/SKILL.md](../../../../.claude/skills/easymcf-backend-api/SKILL.md) — the agent-facing skill covering the generic CRUD endpoint shapes.
+- **playwright skill**: [.claude/skills/playwright/SKILL.md](../../../../.claude/skills/playwright/SKILL.md) — explicit-wait and locator patterns that carry over from the prototype's Selenium usage.
 - **project instructions**: `CLAUDE.md` (repo root) — the project's own boundaries on live-site access, secrets, and the two-venv rule.
 
 ## Guiding constraint

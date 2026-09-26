@@ -7,7 +7,9 @@ Real secrets (the Google client secret file, the cookie signing key, and any EXT
 session cookie or id token) are searched for in every tracked file, the database, and every file in .dev/logs/.
 The fake seed passwords appear by design in the seed generator, tests/support/users.json, the design documents,
 and in pytest tracebacks that echo test source, so they are searched for in the database only, where a plain
-password would mean a hash was never written. No matched value is ever printed.
+password would mean a hash was never written. The seeded identity from `.env`, INITIAL_USER_NAME and
+INITIAL_USER_EMAIL, is searched for case-insensitively in every tracked file (18.EL.06). No matched value is ever
+printed.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ import os
 import subprocess
 import sys
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(_SCRIPTS_DIR)
@@ -49,13 +51,22 @@ def test_passwords() -> list[bytes]:
     return [u["password"].encode() for u in users.values()]
 
 
-def scan(paths: list[str], needles: list[bytes], label: str) -> int:
+def identity_values() -> list[bytes]:
+    """The .env seed identity, lowercased, when set to a real value. An unfilled `%%...%%` value is skipped."""
+    env = dotenv_values(os.path.join(ROOT, ".env"))
+    values = [(env.get(name) or "").strip() for name in ("INITIAL_USER_NAME", "INITIAL_USER_EMAIL")]
+    return [v.lower().encode() for v in values if v and not v.startswith("%%")]
+
+
+def scan(paths: list[str], needles: list[bytes], label: str, ignore_case: bool = False) -> int:
     failed = 0
     for path in paths:
         if not os.path.isfile(path):
             continue
         with open(path, "rb") as handle:
             data = handle.read()
+        if ignore_case:
+            data = data.lower()
         if any(needle in data for needle in needles):
             print(f"[FAIL] {label} found in {os.path.relpath(path, ROOT)}")
             failed = 1
@@ -70,6 +81,7 @@ def main() -> int:
     stored += glob.glob(os.path.join(ROOT, ".dev", "logs", "*"))
     failed = scan(tracked + stored, real_secrets(sys.argv[1:]), "secret")
     failed |= scan(stored[:1], test_passwords(), "test password")
+    failed |= scan(tracked, identity_values(), ".env identity value", ignore_case=True)
     print("[FAIL] forbidden values found" if failed else "[PASS] no forbidden value found")
     return failed
 

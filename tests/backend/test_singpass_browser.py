@@ -17,7 +17,7 @@ from easymcf.config import Config
 pytestmark = pytest.mark.backend
 
 KNOWN_QR_LINK = "https://app.singpass.gov.sg/qrlogin?swk_qr_ref=fixture-qr-ref-001"
-KNOWN_ACCOUNT_EMAIL = "yayfalafels@gmail.com"
+KNOWN_ACCOUNT_EMAIL = "demo.user@example.test"
 
 
 @pytest.fixture()

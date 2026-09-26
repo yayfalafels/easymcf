@@ -27,7 +27,7 @@ def _run(db, sql, *args):
 # 13.TC.56 - promotion copies four values once and later post changes never reach the lead
 def test_promotion_copies_title_company_and_url_and_computes_the_deadline(isolated_client, isolated_db, fixed_clock):
     fixed_clock("2026-09-21T07:00:00")
-    isolated_client.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"})
+    isolated_client.post("/api/v1/auth/signin", json={"email": "demo.user@example.test", "password": "Seed-Password-1!"})
     post = _q(isolated_db, "SELECT position_title, company_name, url_ref, closing_date FROM post WHERE id = 'synthetic-promote-future'")[0]
     created = isolated_client.post("/api/v1/lead", json={"post_id": "synthetic-promote-future", "track_id": 1})
     assert created.status_code == 201

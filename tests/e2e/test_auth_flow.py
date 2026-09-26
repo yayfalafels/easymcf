@@ -20,6 +20,7 @@ sys.path.insert(0, _REPO_ROOT)
 sys.path.insert(0, os.path.join(_REPO_ROOT, "scripts"))
 
 from initdb import apply_schema  # noqa: E402
+from render_seed import PUBLIC_DEFAULTS  # noqa: E402
 from resetdb import apply_seed  # noqa: E402
 from tests._browser_support import _free_port, sign_in, spawn_app, terminate_app  # noqa: E402
 from tests.support import stub_oidc  # noqa: E402
@@ -33,7 +34,7 @@ def google_ui(tmp_path_factory):
     root = tmp_path_factory.mktemp("easymcf-google-ui")
     db_path = str(root / "easymcf.db")
     apply_schema(db_path)
-    apply_seed(db_path)
+    apply_seed(db_path, PUBLIC_DEFAULTS)
     secret = root / "gcp_oauth_client_secret"
     secret.write_text("stub-client-secret\n")
     secret.chmod(0o600)

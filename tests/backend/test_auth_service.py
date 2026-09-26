@@ -105,7 +105,7 @@ def test_database_holds_a_digest_and_not_a_usable_cookie(db, config):
 
 
 def test_cookie_attributes(anon):
-    response = anon.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"})
+    response = anon.post("/api/v1/auth/signin", json={"email": "demo.user@example.test", "password": "Seed-Password-1!"})
     header = response.headers["Set-Cookie"]
     assert header.startswith("easymcf_session=") and "HttpOnly" in header and "SameSite=Lax" in header and "Path=/" in header
 
@@ -124,7 +124,7 @@ def test_rate_limit_boundary(config, fixed_clock):
 
 
 def test_sixth_attempt_over_http_is_429_even_with_the_right_password(anon):
-    creds = {"email": "yayfalafels@gmail.com", "password": "Wrong-Password-1!"}
+    creds = {"email": "demo.user@example.test", "password": "Wrong-Password-1!"}
     for _ in range(5):
         assert anon.post("/api/v1/auth/signin", json=creds).status_code == 401
     refused = anon.post("/api/v1/auth/signin", json={**creds, "password": "Seed-Password-1!"})
@@ -152,8 +152,8 @@ def test_sign_up_sign_out_sign_in_round_trip(anon, db):
 
 
 def test_duplicate_email_ignores_case(anon):
-    assert anon.post("/api/v1/auth/signup", json={**SIGNUP, "email": "YAYFALAFELS@gmail.com"}).status_code == 409
-    assert anon.post("/api/v1/auth/signup", json={**SIGNUP, "email": "yayfalafels@gmail.com"}).get_json()["field"] == "email"
+    assert anon.post("/api/v1/auth/signup", json={**SIGNUP, "email": "DEMO.USER@example.test"}).status_code == 409
+    assert anon.post("/api/v1/auth/signup", json={**SIGNUP, "email": "demo.user@example.test"}).get_json()["field"] == "email"
 
 
 def test_sign_up_validation(anon):
@@ -165,7 +165,7 @@ def test_sign_up_validation(anon):
 
 
 def test_failures_share_one_status_and_body(anon):
-    wrong = anon.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Wrong-Password-1!"})
+    wrong = anon.post("/api/v1/auth/signin", json={"email": "demo.user@example.test", "password": "Wrong-Password-1!"})
     unknown = anon.post("/api/v1/auth/signin", json={"email": "nobody@example.test", "password": "Wrong-Password-1!"})
     assert wrong.status_code == unknown.status_code == 401
     assert wrong.get_json() == unknown.get_json() == {"error": "invalid_credentials", "message": "Email or password is incorrect."}
@@ -192,7 +192,7 @@ def test_protected_routes_need_a_session_and_public_routes_do_not(anon):
 
 
 def test_cross_site_write_is_refused(anon):
-    anon.post("/api/v1/auth/signin", json={"email": "yayfalafels@gmail.com", "password": "Seed-Password-1!"})
+    anon.post("/api/v1/auth/signin", json={"email": "demo.user@example.test", "password": "Seed-Password-1!"})
     client = anon
     refused = client.post("/api/v1/auth/signout", headers={"Origin": "http://evil.example"})
     assert refused.status_code == 403 and refused.get_json()["error"] == "forbidden_origin"

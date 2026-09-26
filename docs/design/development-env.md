@@ -1,7 +1,5 @@
 # Easy MCF POC Local - Development Environment
 
-Release `010` design. Source: [docs/releases/010/design/010-development-env.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-development-env.md).
-
 ## Contents
 
 - [Purpose](#purpose)

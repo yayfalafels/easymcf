@@ -1,7 +1,5 @@
 # Easy MCF POC Local - Frontend App Design
 
-Release `010` design. Source: [docs/releases/010/design/010-frontend-app.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-frontend-app.md).
-
 ## Contents
 
 - [Purpose](#purpose)

@@ -1,7 +1,5 @@
 # Easy MCF POC Local - API Reference
 
-Release `010` design. Source: [docs/releases/010/design/010-api.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-api.md).
-
 ## Contents
 
 - [Purpose](#purpose)

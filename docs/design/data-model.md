@@ -1,7 +1,5 @@
 # Easy MCF POC Local - Data Model
 
-Release `010` design. Source: [docs/releases/010/design/010-data-model.md](https://github.com/yayfalafels/easymcf/blob/main/docs/releases/010/design/010-data-model.md).
-
 ## Contents
 
 - [Purpose](#purpose)

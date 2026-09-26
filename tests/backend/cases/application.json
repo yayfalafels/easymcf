@@ -1,0 +1,6 @@
+[
+  {"name": "11.TC.07 the application read after a run", "method": "GET", "path": "/api/v1/application/search",
+   "expected_status": 200, "as_user": "seed_a"},
+  {"name": "11.TC.13 another user's application is not visible", "method": "GET", "path": "/api/v1/application/1",
+   "expected_status": 404, "as_user": "seed_b"}
+]

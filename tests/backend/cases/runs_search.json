@@ -1,0 +1,53 @@
+[
+  {
+    "name": "trigger a search run for track 3",
+    "method": "POST",
+    "path": "/api/v1/runs/search",
+    "body": {"track_id": 3},
+    "expected_status": 201,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "a second trigger by the same user while the first is in flight returns 409",
+    "method": "POST",
+    "path": "/api/v1/runs/search",
+    "body": {"track_id": 3},
+    "expected_status": 409,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "a trigger by another user in the same state starts normally",
+    "method": "POST",
+    "path": "/api/v1/runs/search",
+    "body": {"track_id": 7},
+    "expected_status": 201,
+    "as_user": "seed_b",
+    "poll": {"path": "/api/v1/run_log/{id}", "until": {"status": ["success", "partial", "failed"]}, "timeout_s": 30},
+    "expected_final": {"status": "success"}
+  },
+  {
+    "name": "poll track 3's triggered run to a terminal outcome",
+    "method": "GET",
+    "path": "/api/v1/run_log/7",
+    "expected_status": 200,
+    "as_user": "seed_a",
+    "poll": {"path": "/api/v1/run_log/7", "until": {"status": ["success", "partial", "failed"]}, "timeout_s": 30},
+    "expected_final": {"status": "success"}
+  },
+  {
+    "name": "an unknown track answers 404",
+    "method": "POST",
+    "path": "/api/v1/runs/search",
+    "body": {"track_id": 9999},
+    "expected_status": 404,
+    "as_user": "seed_a"
+  },
+  {
+    "name": "an archived track answers 409",
+    "method": "POST",
+    "path": "/api/v1/runs/search",
+    "body": {"track_id": 2},
+    "expected_status": 409,
+    "as_user": "seed_a"
+  }
+]

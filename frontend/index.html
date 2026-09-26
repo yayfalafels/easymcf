@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!-- ng-app root (FE-APP-01, ENV-SETUP-06). Load order: vendor -> app -> routes,
+     per FE-APP-03. No build step (ARCH-RUN-06) — every script is listed here
+     explicitly, nothing is bundled or minified by this project's own tooling. -->
+<html lang="en" ng-app="easymcfApp">
+<head>
+  <meta charset="utf-8">
+  <!-- required by ngRoute's html5Mode(true) (FE-RTE-01) — Angular throws
+       $location:nobase and never bootstraps without it. -->
+  <base href="/">
+  <title>Easy MCF</title>
+  <link rel="stylesheet" href="app/app.css">
+</head>
+<body>
+  <nav-bar></nav-bar>
+  <confirm-modal></confirm-modal>
+  <div ng-view></div>
+  <offer-modal></offer-modal>
+  <mcf-connect-modal></mcf-connect-modal>
+
+  <script src="vendor/angular.min.js"></script>
+  <script src="vendor/angular-route.min.js"></script>
+  <script src="app/app.module.js"></script>
+  <script src="app/core/error.service.js"></script>
+  <script src="app/core/api-client.service.js"></script>
+  <script src="app/core/auth.service.js"></script>
+  <script src="app/core/auth.interceptor.js"></script>
+  <script src="app/core/confirm-dialog.service.js"></script>
+  <script src="app/core/offer-dialog.service.js"></script>
+  <script src="app/core/run-poller.service.js?v=run-types"></script>
+  <script src="app/core/manual-post-dialog.service.js"></script>
+  <script src="app/core/mcf-connect.service.js"></script>
+  <script src="app/shared/user-menu/user-menu.directive.js"></script>
+  <script src="app/shared/nav-bar/nav-bar.directive.js"></script>
+  <script src="app/shared/confirm-modal/confirm-modal.directive.js"></script>
+  <script src="app/shared/offer-modal/offer-modal.directive.js"></script>
+  <script src="app/shared/manual-post-modal/manual-post-modal.directive.js"></script>
+  <script src="app/shared/mcf-nav-icon/mcf-nav-icon.directive.js"></script>
+  <script src="app/shared/mcf-link/mcf-link.directive.js"></script>
+  <script src="app/shared/mcf-connect-modal/mcf-connect-modal.directive.js"></script>
+  <script src="app/auth/auth.controller.js"></script>
+  <script src="app/tracks/tracks.controller.js?v=cv-retire"></script>
+  <script src="app/tracks/search-profile.controller.js"></script>
+  <script src="app/cvs/cvs.controller.js?v=cv-retire"></script>
+  <script src="app/leads/leads.controller.js?v=manual-lead-endpoint"></script>
+  <script src="app/leads/lead-detail.controller.js"></script>
+  <script src="app/offers/offers.controller.js"></script>
+  <script src="app/applications/applications.controller.js"></script>
+  <script src="app/automation/automation.controller.js"></script>
+  <script src="app/posts/posts.controller.js"></script>
+  <script src="app/app.routes.js"></script>
+</body>
+</html>

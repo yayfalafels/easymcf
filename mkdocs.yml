@@ -1,0 +1,92 @@
+site_name: Easy MCF
+site_description: Job search and application automation for MyCareersFuture, Singapore
+site_url: https://yayfalafels.github.io/easymcf/
+repo_url: https://github.com/yayfalafels/easymcf
+repo_name: yayfalafels/easymcf
+copyright: Easy MCF 0.1.0 · design release 010
+docs_dir: docs
+site_dir: site
+use_directory_urls: false
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/brightness-7, name: Switch to dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/brightness-4, name: Switch to light mode}
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style heading ids, so the design docs' anchors resolve on the site and on GitHub (18.IS.05)
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+# Publication is opt-in per page: everything under docs/ is excluded except the paths re-included below.
+exclude_docs: |
+  /*
+  !/index.md
+  !/assets/
+  !/user-guide/
+  !/developer-guide/
+  !/design/
+
+extra:
+  design_release: "010"  # the release scripts/sync_design_docs.py copies into docs/design/
+
+nav:
+  - Home: index.md
+  - User guide:
+      - Getting started: user-guide/index.md
+      - Sign in and your account: user-guide/account.md
+      - Connect MCF: user-guide/mcf-connection.md
+      - Tracks and search profiles: user-guide/tracks.md
+      - Run a search: user-guide/search.md
+      - Lead pipeline: user-guide/leads.md
+      - CVs: user-guide/cvs.md
+      - Apply queue: user-guide/apply.md
+      - Run history: user-guide/runs.md
+  - Developer guide:
+      - Install: developer-guide/index.md
+      - Configure: developer-guide/configure.md
+      - Run the app: developer-guide/run.md
+      - Test: developer-guide/test.md
+      - Debug: developer-guide/debug.md
+      - Docs site: developer-guide/docs-site.md
+      - Design orientation: developer-guide/design-orientation.md
+  - Design:
+      - Requirements: design/requirements.md
+      - Architecture: design/architecture.md
+      - Data model: design/data-model.md
+      - API reference: design/api.md
+      - Workflows: design/workflows.md
+      - User interface: design/user-interface.md
+      - Frontend app: design/frontend-app.md
+      - Development environment: design/development-env.md
+      - Prototype extraction: design/prototype.md

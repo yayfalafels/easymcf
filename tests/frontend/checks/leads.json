@@ -1,0 +1,129 @@
+[
+  {
+    "name": "leads page renders six tabs",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"leads-tab-toapply\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "count_equals",
+        "selector": "[data-testid^=\"leads-tab-\"]",
+        "value": 6
+      }
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "lead detail opens from a row",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "click",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-detail\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"lead-detail-field-deadline\"]",
+        "value": true
+      },
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"lead-detail-field-position_title\"]",
+        "value": true
+      }
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "lead card title is a post link",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-title-link-1\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "visible",
+        "selector": "[data-testid=\"lead-title-link-1\"]",
+        "value": true
+      }
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "lead detail heading shows the lead's own title",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "click",
+        "selector": "[data-testid=\"lead-row-1\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-detail\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "text_equals",
+        "selector": "[data-testid=\"lead-detail\"] h2",
+        "value": "GEN AI ENGINEER"
+      }
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "lead detail activity shows the manual add stage",
+    "route": "/leads",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"leads-tab-applied\"]"
+      },
+      {
+        "op": "click",
+        "selector": "[data-testid=\"leads-tab-applied\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-row-2\"]"
+      },
+      {
+        "op": "click",
+        "selector": "[data-testid=\"lead-row-2\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"lead-detail-activity-stage\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "text_equals",
+        "selector": "[data-testid=\"lead-detail-activity-stage\"]",
+        "value": "new \u2192 APPLIED"
+      }
+    ],
+    "as_user": "seed_a"
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "name": "offers page lists the offer history",
+    "route": "/offers",
+    "actions": [
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"offers-table\"]"
+      },
+      {
+        "op": "wait_for",
+        "selector": "[data-testid=\"offer-row-1\"]"
+      }
+    ],
+    "expect": [
+      {
+        "op": "count_equals",
+        "selector": "[data-testid^=\"offer-row-\"]",
+        "value": 3
+      },
+      {
+        "op": "text_equals",
+        "selector": "[data-testid=\"offer-status-3\"]",
+        "value": "accepted"
+      }
+    ]
+  }
+]

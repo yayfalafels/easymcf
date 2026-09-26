@@ -1,0 +1,16 @@
+<section class="config-page" ng-if="vm.profile && vm.schedule" data-testid="search-profile-page">
+  <button type="button" class="secondary" ng-click="vm.back()">Back to tracks</button>
+  <h1>Search configuration</h1>
+  <p>{{vm.track.role_name}} / {{vm.track.seniority}}</p>
+  <form class="config-form" ng-submit="vm.save()">
+    <label>Keywords <input required ng-model="vm.profile.keywords" data-testid="profile-keywords"></label>
+    <label>Minimum salary <input type="number" min="0" ng-model="vm.profile.min_salary" data-testid="profile-min-salary"></label>
+    <label>Maximum age (weeks) <input type="number" min="1" ng-model="vm.profile.max_age_weeks" data-testid="profile-max-age"></label>
+    <label>Minimum match score <input type="number" min="0" max="1" step="0.05" ng-model="vm.profile.min_match_score" data-testid="profile-min-score"></label>
+    <label>Employment type <input required ng-model="vm.profile.employment_type" data-testid="profile-employment-type"></label>
+    <label class="archive-toggle"><input type="checkbox" ng-model="vm.schedule.schedule_enabled" data-testid="profile-schedule-enabled"> Enable schedule</label>
+    <label>Repeat every (hours) <input type="number" min="1" ng-model="vm.schedule.schedule_interval_hours" data-testid="profile-schedule-interval"></label>
+    <button type="submit" data-testid="profile-save">Save configuration</button>
+    <span ng-if="vm.fieldError" data-testid="profile-field-error">{{vm.fieldError.message}}</span>
+  </form>
+</section>

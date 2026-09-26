@@ -1,0 +1,16 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Fixture Posting | MyCareersFuture</title></head>
+<body>
+<header><a href="/">MyCareersFuture</a> <button type="button" data-testid="initial-circle-container">TH</button></header>
+<main>
+  <h1 data-testid="job-details-info-job-title">Fixture Data Engineer</h1>
+  <div id="apply-slot"></div>
+  <script>
+    // The fixture browser calls this on the poll the manifest names, so a late-rendering apply button is deterministic.
+    window.__revealApply = function () {
+      document.getElementById('apply-slot').innerHTML =
+        '<button id="job-details-apply-button" type="button" onclick="location.href = location.pathname + \'/apply\'">Apply now</button>';
+    };
+  </script>
+</main>
+</body></html>

@@ -1,0 +1,73 @@
+---
+name: mycareerfutures
+description: Site-structure knowledge for mycareersfuture.gov.sg (MCF) — search URL scheme, job-card and profile-page markup, posting lifecycle, and the apply-flow DOM. Use when writing, reading, or debugging any code that scrapes, parses, or automates MCF pages, or when a scraper/apply run starts producing unexpected empty results (possible markup drift).
+---
+
+# MyCareersFuture (MCF) site structure
+
+Domain knowledge about the target site, extracted from the `jobsearch` prototype (`agent.py`, `mcf_profile.py`, `apply.py`). This is knowledge about the *site*, independent of easymcf's own implementation — see [easymcf-jobs-pipeline](../easymcf-jobs-pipeline/SKILL.md) and [easymcf-apply](../easymcf-apply/SKILL.md) for how this project uses it.
+
+## Hard rule
+
+Never issue a request against the live `mycareersfuture.gov.sg` domain from an automated dev/test session. Development and tests run against seed/local fixture data (REQ-DEV-03). Only run live against MCF when the user explicitly asks to do so interactively, and never write live responses into fixture/seed data as if they were synthetic.
+
+## Search results page
+
+URL scheme (`JobSearchWebsite.jobsearch_URLquery()`):
+
+```
+search?search={keyword}&salary={level}&employmentType=Full%20Time&sort=new_posting_date&page={n}
+```
+
+Paginate `page=0,1,2,...` until a page returns zero search-hit cards. The results header, `[data-testid="search-results-page-label"]`, reads "N of M jobs found based on your filters" (N matches the filters, M is the keyword's total), which is useful for checking a scrape's hit count.
+
+Per-card fields and selectors (`get_jobRecord_fromcard`):
+
+| field | selector |
+| --- | --- |
+| `position_title` | `span[data-testid="job-card__job-title"]` |
+| `company_name` | `p[data-testid="company-hire-info"]` |
+| `posted_date` | `span[data-cy="job-card-date-info"]` — text like "Posted today/yesterday/N days ago"; parse to an actual date, don't store the raw string |
+| `salaryHigh` | top figure from a `$`-containing span under `[data-testid="salary-range"]` |
+| `urlid` | slug from the card's `<a href>`, with the `/job/` prefix and any query string stripped |
+| card container | elements whose `id` starts with `job-card-`, except recommended cards (below) |
+
+**Recommended cards are not search hits.** When a search has few hits, MCF fills the list with "Recommended based on your skills & job applications" cards, interleaved with the hits in the same `div[data-testid="card-list"]`. So neither the container nor the position in the list separates them. The card element's own `data-testid` does: `white-job-card-N` is a hit, and `green-job-card-N` is a recommendation, which also contains a `div[data-testid="render-more-jobs"]` label. Skip a card when either marker is present (`easymcf/automation/parsing.py`, `_is_recommended`). A second, independent signal sits on the card's own link: a hit's `href` carries `event=Search` and a recommendation's carries `event=SuggestedJob` — useful as a corroborating check when the `data-testid` prefix convention itself is what has drifted. Confirmed against a live capture in 10.IS.17 and reconfirmed live for keyword "gen ai" on 2026-09-26 (8 hits, 20 recommendations, an exact match against the `render-more-jobs` label count).
+
+Cards render client-side — a plain HTTP GET without JS execution will not see them; a real (or headless) browser render is required, which is why this project uses Playwright (see [playwright](../playwright/SKILL.md)) rather than `requests` alone for this page.
+
+## Deterministic posting id
+
+`jobid = f"{source}-{urlid[-32:]}-{posted_date}"`, source hardcoded `"MyCareerFutures"`. This is the identifier used for de-duplication — never a database auto-increment. See [webscraping](../webscraping/SKILL.md) for why a stable, content-derived id matters more generally.
+
+## Posting detail page
+
+Fetched as a distinct second pass, one page load per posting (`update_job_profiles`). Fields (`FIELD_CONFIG`, a declarative tag/attribute/keyword lookup — brittle to markup changes by design, hence the drift risk below):
+
+- `is_open` — checked first. The expiry-date field containing the word "Closed" means the posting is closed; if closed, stop here and treat the posting as inactive rather than scraping the remaining fields.
+- `mcf_ref` — MCF's own reference code for the posting.
+- `closing_date` — format `%d %b %Y`.
+- `applicants` — integer count.
+- `industry_classification`.
+- `description` — full text body.
+- `years_experience` exists in the prototype's field config but was never populated — do not treat its presence in old code as evidence the field is reliably scrapable.
+
+## Apply flow (single-step "1-click")
+
+Selectors from `apply.py`, used against an already-authenticated session (a loaded cookie jar) — this project never automates login:
+
+| step | selector / signal |
+| --- | --- |
+| sign-in status | page banner's account control — the signed-in user's initials, replaced by literal text "Login" once the session has lapsed; the reliable, page-wide signal, reachable on any loaded page before ever polling for the apply button |
+| apply button | `button#job-details-apply-button` |
+| already-applied / closed detection | status text in `p[data-testid="job-apply-error"]` — "already"/"applied" → treat as success; "closed"/"no longer" → posting closed |
+| session-lapsed apply button | the button itself is also replaced by a "Login to Apply" prompt once signed out — a corroborating signal, not a separate check; the banner above is the one to test |
+| resume/CV cards | `div[data-testid="resume-card"]` → `a.resume-link` (title text) → its radio input |
+| advance after CV select | `button#application-details-save-button` |
+| final submit | `button#job-application-review__submit-button` |
+
+A failed final submit is *inferred* (not confirmed by an explicit questionnaire indicator) to mean the posting requires a multi-step questionnaire — see [easymcf-apply](../easymcf-apply/SKILL.md) for the full outcome state machine this feeds into. The sign-in-status banner is a run-level signal, not a per-lead outcome — see [easymcf-apply](../easymcf-apply/SKILL.md)'s session handling section for what happens when it fires.
+
+## Markup drift is the normal failure mode
+
+MCF's page markup changes over time without notice; the prototype's `recommission.py` exists purely to catch this (six sequential smoke checks: load browser → load search page → find cards → parse a card → parse a profile page → run screening). If a scraper or apply run starts returning zero/empty results where seed-data tests still pass, suspect drift against the selectors above before suspecting the scraping logic itself — check the *current* live DOM (manually, or via a user-run one-off session) against this table rather than guessing.

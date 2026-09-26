@@ -1,0 +1,10 @@
+<h1 data-testid="signin-heading">Sign in</h1>
+<form class="auth-form" ng-submit="vm.signin()" data-testid="signin-form">
+  <p class="auth-error" ng-if="vm.error" data-testid="signin-error">{{vm.error}}</p>
+  <label>Email <input type="email" ng-model="vm.form.email" autocomplete="username" required data-testid="signin-email"></label>
+  <label>Password <input type="password" ng-model="vm.form.password" autocomplete="current-password" required data-testid="signin-password"></label>
+  <span class="field-error" ng-if="vm.fieldError" data-testid="signin-field-error">{{vm.fieldError.message}}</span>
+  <button type="submit" data-testid="signin-submit">Sign in</button>
+  <a class="google-button" ng-if="vm.config.google_enabled" ng-href="{{vm.googleUrl}}" target="_self" data-testid="signin-google">Continue with Google</a>
+  <p>No account yet? <a href="/signup" data-testid="signin-to-signup">Create account</a></p>
+</form>

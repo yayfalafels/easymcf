@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write"
+    ],
+    "ask": [
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git branch -D*)",
+      "Bash(cat *.env*)",
+      "Bash(cat *.secrets*)",
+      "Bash(cat *cookies_mcf*)",
+      "Read(./.env)",
+      "Read(./.secrets)",
+      "Read(**/cookies_mcf.json)",
+      "Edit(./.env)",
+      "Edit(./.secrets)",
+      "Write(./.env)",
+      "Write(./.secrets)"
+    ]
+  }
+}

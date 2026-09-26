@@ -1,0 +1,4 @@
+[
+  {"name": "11.TC.03 drop a queued lead", "method": "PUT", "path": "/api/v1/lead/20",
+   "body": {"stage": "CLOSED", "close_reason": "dropped"}, "expected_status": 200, "as_user": "seed_a"}
+]

@@ -5,12 +5,23 @@ __pycache__/
 
 # local files
 .dev
+easymcf.code-workspace
 
 # local env variables
 .env
 
 # credentials
 .secrets
+*client-secret.json
+
+# dev scratch SQLite database (ARCH-STO-01) — never committed, regenerated via scripts/resetdb.py
+data/
+
+# real personal job-search history (source data for scripts/gen_test_data.py) — never commit
+test-data/
+
+# personal Claude Code overrides (project-scoped .claude/settings.json is committed)
+.claude/settings.local.json
 
 # C extensions
 *.so

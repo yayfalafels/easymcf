@@ -1,0 +1,36 @@
+{
+  "_comment": "ARCH-TEST-04 apply corpus. Scenario per posting URL: MCF_FIXTURE_SCENARIO naming a scenario, else routes, else an apply-fixture-<scenario> last path segment, else default_scenario. A null step aborts that request. expect records each branch's outcome and browser boundary for the oracle, with APPLY_POLL_RETRIES=2.",
+  "default_scenario": "success",
+  "routes": {
+    "https://www.mycareersfuture.gov.sg/job/information-technology/gen-ai-engineer-apar-technologies-771e413d7bc340c16dfeac6ba88503ff": "success",
+    "https://www.mycareersfuture.gov.sg/job/synthetic-apply-queued": "questionnaire"
+  },
+  "scenarios": {
+    "success":          {"posting": "_shared/posting.html", "apply": "_shared/apply.html", "review": "_shared/review.html",
+                         "expect": {"status": "applied", "polls": 1, "cv_selections": 1, "submits": 1}},
+    "already_applied":  {"posting": "already_applied/posting.html",
+                         "expect": {"status": "applied", "polls": 1, "cv_selections": 0, "submits": 0}},
+    "questionnaire":    {"posting": "_shared/posting.html", "apply": "_shared/apply.html", "review": "questionnaire/review.html",
+                         "expect": {"status": "questionnaire_required", "polls": 1, "cv_selections": 1, "submits": 1}},
+    "selector_error":   {"posting": "_shared/posting.html", "apply": "selector_error/apply.html",
+                         "expect": {"status": "cv_selector_error", "polls": 1, "cv_selections": 1, "submits": 0}},
+    "poll_exhausted":   {"posting": "poll_exhausted/posting.html",
+                         "expect": {"status": "unable_to_apply", "polls": 2, "cv_selections": 0, "submits": 0}},
+    "post_unavailable": {"posting": null,
+                         "expect": {"status": "post_unavailable", "polls": 0, "cv_selections": 0, "submits": 0}},
+    "cv_not_found":     {"posting": "_shared/posting.html", "apply": "cv_not_found/apply.html",
+                         "expect": {"status": "cv_not_found", "polls": 1, "cv_selections": 1, "submits": 0}},
+    "post_closed":      {"posting": "post_closed/posting.html",
+                         "expect": {"status": "post_closed", "polls": 1, "cv_selections": 0, "submits": 0}},
+    "signed_out":       {"posting": "signed_out/posting.html",
+                         "expect": {"status": null, "polls": 0, "cv_selections": 0, "submits": 0}},
+    "button_late":      {"posting": "button_late/posting.html", "apply": "_shared/apply.html", "review": "_shared/review.html",
+                         "reveal_after_polls": 2,
+                         "expect": {"status": "applied", "polls": 2, "cv_selections": 1, "submits": 1}},
+    "submit_unconfirmed": {"posting": "_shared/posting.html", "apply": "_shared/apply.html", "review": "submit_unconfirmed/review.html",
+                         "expect": {"status": "questionnaire_required", "polls": 1, "cv_selections": 1, "submits": 1}},
+    "slow":             {"posting": "_shared/posting.html", "apply": "_shared/apply.html", "review": "_shared/review.html",
+                         "delay_ms": 3000,
+                         "expect": {"status": "applied", "polls": 1, "cv_selections": 1, "submits": 1}}
+  }
+}

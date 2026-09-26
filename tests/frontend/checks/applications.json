@@ -1,0 +1,44 @@
+[
+  {
+    "name": "11.TC.08 applications page renders the queue, CV override, drop, session, and Run",
+    "route": "/applications",
+    "actions": [{"op": "wait_for", "selector": "[data-testid=\"apply-queue\"]"}],
+    "expect": [
+      {"op": "count_equals", "selector": "[data-testid^=\"apply-row-\"]", "value": 2},
+      {"op": "visible", "selector": "[data-testid=\"apply-row-1\"]"},
+      {"op": "visible", "selector": "[data-testid=\"apply-row-20\"]"},
+      {"op": "visible", "selector": "[data-testid=\"apply-cv-1\"]"},
+      {"op": "visible", "selector": "[data-testid=\"apply-drop-20\"]"},
+      {"op": "text_equals", "selector": "[data-testid=\"apply-last-1\"]", "value": "cv_selector_error"},
+      {"op": "text_equals", "selector": "[data-testid=\"apply-session-value\"]", "value": "missing"},
+      {"op": "visible", "selector": "[data-testid=\"apply-session-connect\"]"},
+      {"op": "attribute_equals", "selector": "[data-testid=\"apply-run-btn\"]", "attribute": "disabled", "value": "disabled"},
+      {"op": "text_equals", "selector": "[data-testid=\"apply-run-disabled-reason\"]",
+       "value": "Connect your MCF session first: the run needs a signed-in MCF session."},
+      {"op": "visible", "selector": "[data-testid=\"apply-manage-cvs\"]"}
+    ],
+    "as_user": "seed_a"
+  },
+  {
+    "name": "11.TC.08 a blocked cv_not_found lead is flagged",
+    "route": "/applications",
+    "actions": [{"op": "wait_for", "selector": "[data-testid=\"apply-row-15\"]"}],
+    "expect": [
+      {"op": "visible", "selector": "[data-testid=\"apply-blocked-15\"]"},
+      {"op": "attribute_equals", "selector": "[data-testid=\"apply-run-btn\"]", "attribute": "disabled", "value": "disabled"},
+      {"op": "text_equals", "selector": "[data-testid=\"apply-run-disabled-reason\"]",
+       "value": "Connect your MCF session first: the run needs a signed-in MCF session."}
+    ],
+    "as_user": "seed_b"
+  },
+  {
+    "name": "11.TC.08 nav links to Applications and Automation",
+    "route": "/leads",
+    "actions": [{"op": "wait_for", "selector": "[data-testid=\"nav-applications\"]"}],
+    "expect": [
+      {"op": "visible", "selector": "[data-testid=\"nav-applications\"]"},
+      {"op": "visible", "selector": "[data-testid=\"nav-automation\"]"}
+    ],
+    "as_user": "seed_a"
+  }
+]

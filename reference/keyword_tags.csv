@@ -1,0 +1,1024 @@
+group,tag,score
+consultant,workshop,1
+consultant,workflow,1
+consultant,whiteboard,1
+consultant,white paper,1
+consultant,webinar,1
+consultant,value proposition,1
+consultant,train the trainer,1
+consultant,testing,1
+consultant,teaching,1
+consultant,systems thinking,1
+consultant,systems,1
+consultant,systemic change,1
+consultant,system requirement,1
+consultant,system design,1
+consultant,strategic insight,1
+consultant,storytelling,1
+consultant,speaking,1
+consultant,solution vision,1
+consultant,sdlc,1
+consultant,scrum,1
+consultant,scientific,1
+consultant,root cause analysis,1
+consultant,root cause,1
+consultant,roadblock,1
+consultant,risk mitigation,1
+consultant,reverse engineer,1
+consultant,research,1
+consultant,rca,1
+consultant,prototype,1
+consultant,proof of concept,1
+consultant,product improvement,1
+consultant,process improvement,1
+consultant,process flow,1
+consultant,problem analysis,1
+consultant,pilot phase,1
+consultant,performance analysis,1
+consultant,operation botleneck,1
+consultant,non-conformance,1
+consultant,narrative,1
+consultant,model,1
+consultant,milestones,1
+consultant,mentor,1
+consultant,lean start-up,1
+consultant,kpi,1
+consultant,journal article,1
+consultant,insights,1
+consultant,innovation,1
+consultant,incident tracking,1
+consultant,hypothesis testing,1
+consultant,guideline,1
+consultant,gtm strategy,1
+consultant,functional specifications,1
+consultant,functional specification,1
+consultant,failure analysis,1
+consultant,entrepreneur,1
+consultant,educate,1
+consultant,digital marketing,1
+consultant,design thinking,1
+consultant,defect management,1
+consultant,data-driven,1
+consultant,data model,1
+consultant,customer segmentation,1
+consultant,customer complaint,1
+consultant,crm,1
+consultant,continuous improvement,1
+consultant,consulting,1
+consultant,complex projects,1
+consultant,complex,1
+consultant,coaching,1
+consultant,coach,1
+consultant,ci/cd pipeline,1
+consultant,ci/cd,1
+consultant,business strategy,1
+consultant,business requirement,1
+consultant,business process reengineering,1
+consultant,business intelligence,1
+consultant,business analyst,1
+consultant,business analysis,1
+consultant,business acumen,1
+consultant,blog article,1
+consultant,analytics,1
+consultant,agile,1
+consultant,a/b testing,1
+consultant,5 whys,1
+consultant,troubleshoot,1
+consultant,investigation,1
+consultant,impact assessment,1
+consultant,reports,1
+consultant,feasibility study,1
+consultant,deep dive,1
+consultant,tracking,1
+consultant,pricing,1
+consultant,best practices,1
+consultant,r&d,1
+consultant,risk,1
+consultant,minimum viable product,1
+consultant,risk analysis,1
+consultant,market growth,1
+consultant,process transformation,1
+consultant,flowchart,1
+consultant,sprint,1
+consultant,wireframe,0
+consultant,user acceptance test,0
+consultant,startup,0
+consultant,public policy,0
+consultant,project management institute,0
+consultant,product management,0
+consultant,patent,0
+consultant,networking,0
+consultant,net revenue management,0
+consultant,master in project management,0
+consultant,kanban,0
+consultant,it vendors,0
+consultant,digitalization roadmap,0
+consultant,conflict management,0
+consultant,client-facing,0
+consultant,client services,0
+consultant,client onboarding,0
+consultant,client business scenario,0
+consultant,certified scrum master,0
+consultant,account management,0
+consultant,user behavior,0
+consultant,XP,-1
+consultant,viewpoint,-1
+consultant,TDD,-1
+consultant,siemens teamcenter,-1
+consultant,sales,-1
+consultant,ros,-1
+consultant,product lifecycle management,-1
+consultant,enovia,-1
+consultant,customer relationship management,-1
+consultant,customer conversion,-1
+consultant,customer,-1
+consultant,business development,-1
+consultant,BDD,-1
+consultant,acceleration program,-1
+data analyst,visualize data,1
+data analyst,visualization,1
+data analyst,trends,1
+data analyst,tableau,1
+data analyst,statistical tools,1
+data analyst,statistical methods,1
+data analyst,statistical analysis,1
+data analyst,statistical,1
+data analyst,query,1
+data analyst,powerbi,1
+data analyst,power bi,1
+data analyst,patterns,1
+data analyst,pandas,1
+data analyst,numpy,1
+data analyst,modeling,1
+data analyst,large data sets,1
+data analyst,interpret patterns,1
+data analyst,insight,1
+data analyst,google analytics,1
+data analyst,forecasting,1
+data analyst,experiments,1
+data analyst,experiment,1
+data analyst,excel,1
+data analyst,data visualization,1
+data analyst,data reports,1
+data analyst,data modelling,1
+data analyst,data mining,1
+data analyst,data manipulation,1
+data analyst,data analytics,1
+data analyst,data analysis pipeline,1
+data analyst,data analysis,1
+data analyst,dashboard,1
+data analyst,coding,1
+data analyst,business analytics,1
+data analyst,build model,1
+data analyst,bi,1
+data analyst,automated reports,1
+data analyst,analyze data,1
+data analyst,analysis,1
+data analyst,quicksight,1
+data analyst,transactions,1
+data analyst,numbers,1
+data analyst,jupyter,1
+data analyst,holistics,1
+data analyst,powerquery,1
+data analyst,data accuracy,1
+data analyst,star schema,1
+data analyst,qlik,0
+data analyst,olap,0
+data analyst,minitab,0
+data analyst,AWS DevOps Engineer Professional,0
+data analyst,AWS Developer,0
+data analyst,sas,0
+data analyst,oltp,0
+data analyst,product analytics,0
+data analyst,zeppelin,0
+data analyst,knime,0
+data analyst,TOGAF Certified,-1
+data analyst,MS-900 M365 Fundamentals,-1
+data analyst,microstrategy,-1
+data analyst,microsoft ssis,-1
+data analyst,ITIL v4 Foundation,-1
+data analyst,Azure DevOps Engineer Expert,-1
+data analyst,AZ-204 Azure Developer,-1
+data analyst,alteryx,-1
+data analyst,qlikview,-1
+data analyst,bods,-1
+data engineer,unstructured data,1
+data engineer,sql,1
+data engineer,sensors,1
+data engineer,postgresql,1
+data engineer,parsing,1
+data engineer,microsoft sql server,1
+data engineer,lambda,1
+data engineer,jira,1
+data engineer,google sheets,1
+data engineer,etl pipeline,1
+data engineer,etl,1
+data engineer,db pipeline,1
+data engineer,dataset,1
+data engineer,database,1
+data engineer,data warehousing,1
+data engineer,data warehouse,1
+data engineer,data storage,1
+data engineer,data processing,1
+data engineer,data pipeline,1
+data engineer,data migration,1
+data engineer,data integration,1
+data engineer,data engineering,1
+data engineer,data collection,1
+data engineer,data cleaning,1
+data engineer,aws,1
+data engineer,amazon web services,1
+data engineer,data clensing,1
+data engineer,data tokenisation,1
+data engineer,data cleansing,1
+data engineer,rdbms,1
+data engineer,mysql,1
+data engineer,elt,1
+data engineer,sql server,1
+data engineer,data structures,1
+data engineer,data transformation,1
+data engineer,data extraction,1
+data engineer,profiling,1
+data engineer,data wrangling,1
+data engineer,web crawler,0
+data engineer,system qualification test,0
+data engineer,system integration,0
+data engineer,saas,0
+data engineer,oracle database,0
+data engineer,kafka,0
+data engineer,hive,0
+data engineer,hdfs,0
+data engineer,hadoop,0
+data engineer,google cloud,0
+data engineer,docker,0
+data engineer,database engine,0
+data engineer,database design,0
+data engineer,bigquery,0
+data engineer,big data,0
+data engineer,azure,0
+data engineer,data lake,0
+data engineer,s3,1
+data engineer,ec2,1
+data engineer,cube,0
+data engineer,data integrity,0
+data engineer,talend,0
+data engineer,data governance,0
+data engineer,luigi,0
+data engineer,gcp,0
+data engineer,parquet,0
+data engineer,data architecture,0
+data engineer,stream processing,0
+data engineer,data dictionary,0
+data engineer,data mart,0
+data engineer,engine connectors,0
+data engineer,data management,0
+data engineer,oozie,0
+data engineer,data schema,0
+data engineer,mapreduce,0
+data engineer,yarn,-1
+data engineer,web server configurations,-1
+data engineer,teradata,-1
+data engineer,spark,-1
+data engineer,scala,-1
+data engineer,redhat,-1
+data engineer,pyspark,-1
+data engineer,pig,-1
+data engineer,oracle 12c,-1
+data engineer,oracle,-1
+data engineer,nosql,-1
+data engineer,mpp database,-1
+data engineer,map reduce,-1
+data engineer,kubernetes,-1
+data engineer,informatica,-1
+data engineer,impala,-1
+data engineer,hortonworks,-1
+data engineer,hbase,-1
+data engineer,graphdb,-1
+data engineer,data synapse gridserver,-1
+data engineer,data flow studio,-1
+data engineer,cloudera,-1
+data engineer,airflow,-1
+data engineer,glue,0
+data engineer,step function,0
+data engineer,athena,-1
+data engineer,macie,-1
+data engineer,sagemaker,-1
+data engineer,flink,-1
+data engineer,druid,-1
+data engineer,authentication,-1
+data engineer,data center,-1
+data engineer,dynamodb,-1
+data engineer,redshift,-1
+data engineer,hana,-1
+data engineer,k8s,-1
+data engineer,service oriented architecture,-1
+data engineer,mainframe,-1
+data engineer,middleware,-1
+data engineer,mongodb,-1
+data engineer,storm,-1
+data engineer,certified aws cloud architect,-1
+data engineer,qliksense,-1
+data engineer,sqoop,-1
+data engineer,databricks,-1
+data engineer,messaging queue,-1
+data engineer,azure data factory,-1
+data engineer,abbyy,-1
+data engineer,uipath,-1
+data engineer,server administrator,-1
+data engineer,presto,-1
+data engineer,trino,-1
+data engineer,clickhouse,-1
+data engineer,concurrency,-1
+data engineer,distributed architecture,-1
+data engineer,data privacy,0
+data engineer,distributed systems,-1
+data engineer,architecture,-1
+data engineer,npm,-1
+data engineer,mlops,-1
+data engineer,im8 regulation,-1
+data engineer,storage capacity,-1
+data engineer,system infrastructure,-1
+data engineer,disk quota,-1
+data engineer,ulimit,-1
+data engineer,pam authentication,-1
+data engineer,security patch,-1
+data engineer,apache ambari,-1
+data engineer,flume,-1
+data engineer,os administration,-1
+data engineer,ssas,-1
+data engineer,nifi,-1
+data engineer,elastisearch,-1
+data engineer,system architecture,-1
+data engineer,collibra,-1
+data engineer,graph database,-1
+data engineer,obiee,-1
+data scientist,time series,1
+data scientist,text mining,1
+data scientist,supervised learning,1
+data scientist,statistics,1
+data scientist,spectrum analysis,1
+data scientist,simulation,1
+data scientist,segmentation,1
+data scientist,scikitlearn,1
+data scientist,scikit-learn,1
+data scientist,regression,1
+data scientist,reconstruction,1
+data scientist,random forest,1
+data scientist,probability,1
+data scientist,predictive model,1
+data scientist,predictive analytics,1
+data scientist,prediction,1
+data scientist,pattern recognition,1
+data scientist,optimization,1
+data scientist,noise detection,1
+data scientist,nltk,1
+data scientist,ML/AI,1
+data scientist,matplotlib,1
+data scientist,mathematical modeling,1
+data scientist,machine learning,1
+data scientist,linear regression,1
+data scientist,linear algebra,1
+data scientist,feature engineering,1
+data scientist,fault detection,1
+data scientist,discrimination,1
+data scientist,decision tree,1
+data scientist,data science,1
+data scientist,data modeling,1
+data scientist,clustering,1
+data scientist,classification,1
+data scientist,algorithms,1
+data scientist,algorithm,1
+data scientist,ai/ml,1
+data scientist,models,1
+data scientist,matlab,1
+data scientist,predictive modeling,1
+data scientist,ml model,1
+data scientist,text analysis,1
+data scientist,network,1
+data scientist,graph,1
+data scientist,k-means,1
+data scientist,ensemble methods,1
+data scientist,statistical model,1
+data scientist,regular expression,1
+data scientist,hypothesis,1
+data scientist,multivariate linear regression,1
+data scientist,differential calculus,1
+data scientist,integral calculus,1
+data scientist,unsupervised learning,0
+data scientist,tensorflow,0
+data scientist,reinforcement learning,0
+data scientist,opencv,0
+data scientist,nlp,0
+data scientist,natural language processing,0
+data scientist,machine vision,0
+data scientist,keras,0
+data scientist,image,0
+data scientist,human computer interaction,0
+data scientist,deep learning,0
+data scientist,artificial intelligence,0
+data scientist,ai algorithm,0
+data scientist,ai,0
+data scientist,sparse dataset,0
+data scientist,deep reinforcement learning,0
+data scientist,bayesian learning,0
+data scientist,neural networks,0
+data scientist,model compression,0
+data scientist,econometrics,0
+data scientist,speech recognition,-1
+data scientist,pytorch,-1
+data scientist,personalized search,-1
+data scientist,computer vision,-1
+data scientist,computational linguistics,0
+data scientist,stata,-1
+data scientist,recommendation system,-1
+data scientist,ocr,-1
+data scientist,dnn/cnn,-1
+data scientist,caffe,-1
+data scientist,tensorrt,-1
+data scientist,cuda,-1
+data scientist,multi-task learning,-1
+data scientist,spacy,-1
+data scientist,huggingface,-1
+finance,subledger,1
+finance,general ledger,1
+finance,cost allocation,1
+finance,reconciliation,0
+finance,macroeconomics,0
+finance,investment decision,0
+finance,accounting,0
+finance,financial statements,0
+finance,retirement,0
+finance,var,-1
+finance,trading,-1
+finance,trader,-1
+finance,settlement,-1
+finance,payment product,-1
+finance,middle office,-1
+finance,market risk,-1
+finance,iso8583,-1
+finance,icbs,-1
+finance,fixed income,-1
+finance,fintech,1
+finance,financial services,1
+finance,financial markets,-1
+finance,fi/co,-1
+finance,derivatives,-1
+finance,commodities,-1
+finance,cash management,-1
+finance,capital markets,-1
+finance,billing,-1
+finance,banking,1
+finance,back office,1
+finance,actuary,-1
+finance,accounting practices,-1
+finance,money laundering,-1
+finance,treasury,-1
+it consultant,rpa technology,0
+it consultant,it policies,0
+it consultant,workday,-1
+it consultant,webmethods,-1
+it consultant,watir,-1
+it consultant,vue,-1
+it consultant,tomcat,-1
+it consultant,tfs,-1
+it consultant,syspro,-1
+it consultant,superset,-1
+it consultant,silk,-1
+it consultant,servicenow,-1
+it consultant,salesforce,-1
+it consultant,sahi,-1
+it consultant,redux,-1
+it consultant,redash,-1
+it consultant,react,-1
+it consultant,nvidia rapids,-1
+it consultant,nvidia nemo,-1
+it consultant,netsuite,-1
+it consultant,muleoft,-1
+it consultant,maven,-1
+it consultant,jenkins,-1
+it consultant,jboss,-1
+it consultant,itil,-1
+it consultant,it risk,-1
+it consultant,identity access management,-1
+it consultant,golang,-1
+it consultant,es6,-1
+it consultant,digital rights management,-1
+it consultant,db2,-1
+it consultant,data security,-1
+it consultant,data loss protection,-1
+it consultant,cyber security risk,-1
+it consultant,cyber security,-1
+it consultant,biml,-1
+it consultant,bash,-1
+it consultant,artifactory,-1
+it consultant,apache ignite,-1
+it consultant,ant,-1
+it consultant,ansible,-1
+it consultant,angular,-1
+it consultant,sharepoint,-1
+language,mandarin,-1
+manager,people management,0
+manufacturing,water,1
+manufacturing,technology transfer,1
+manufacturing,ss506,1
+manufacturing,single line diagram,1
+manufacturing,safety incidents,1
+manufacturing,safety,1
+manufacturing,raw materials,1
+manufacturing,raw material,1
+manufacturing,pssr,1
+manufacturing,production process,1
+manufacturing,production costs,1
+manufacturing,product quality,1
+manufacturing,process performance,1
+manufacturing,process development,1
+manufacturing,process control,1
+manufacturing,plc,1
+manufacturing,plant safety,1
+manufacturing,oem,1
+manufacturing,manufacturing process,1
+manufacturing,manufacturing order management,1
+manufacturing,manufacturing equipment,1
+manufacturing,manufacturing,1
+manufacturing,management of change,1
+manufacturing,labview,1
+manufacturing,lab test methods,1
+manufacturing,lab analysis,1
+manufacturing,instrumentation,1
+manufacturing,hse,1
+manufacturing,health and safety,1
+manufacturing,hazop,1
+manufacturing,fire alarm system,1
+manufacturing,equipment safety,1
+manufacturing,equipment design,1
+manufacturing,environmental and safety regulations,1
+manufacturing,environmental,1
+manufacturing,environment,1
+manufacturing,energy systems,1
+manufacturing,ehs,1
+manufacturing,commissioning,1
+manufacturing,comissioning,1
+manufacturing,change order,1
+manufacturing,capacity improvement,1
+manufacturing,alarp,1
+manufacturing,accident hazard,1
+manufacturing,production,1
+manufacturing,utilities,0
+manufacturing,suppliers,0
+manufacturing,supervise,0
+manufacturing,schedule,0
+manufacturing,quotation,0
+manufacturing,pmp,0
+manufacturing,piping,0
+manufacturing,physics,0
+manufacturing,machine,0
+manufacturing,fabrication,0
+manufacturing,end of life assessment,0
+manufacturing,drawings,0
+manufacturing,cleanroom,0
+manufacturing,building,0
+manufacturing,autocad,0
+manufacturing,sap,0
+manufacturing,wire bonding,-1
+manufacturing,wholesale distribution,-1
+manufacturing,wafer fabrication,-1
+manufacturing,wafer fab,-1
+manufacturing,transformer,-1
+manufacturing,switch gear,-1
+manufacturing,structural design,-1
+manufacturing,solidworks,-1
+manufacturing,solder wire,-1
+manufacturing,semiconductor,-1
+manufacturing,sap business one,-1
+manufacturing,robotics,-1
+manufacturing,robot,-1
+manufacturing,repair service,-1
+manufacturing,repair procedure,-1
+manufacturing,reactive maintenance,-1
+manufacturing,pvd,-1
+manufacturing,procurement,-1
+manufacturing,powder flux,-1
+manufacturing,plasma etching,-1
+manufacturing,pharmaceutical,-1
+manufacturing,packaging equipment,-1
+manufacturing,navtex,-1
+manufacturing,navision,-1
+manufacturing,metrology,-1
+manufacturing,material science,-1
+manufacturing,marine radar,-1
+manufacturing,inecom,-1
+manufacturing,gyro compass,-1
+manufacturing,gt. plains,-1
+manufacturing,fat/sat,-1
+manufacturing,factory acceptance,-1
+manufacturing,erp,-1
+manufacturing,construction,-1
+manufacturing,compounding,-1
+manufacturing,civil,-1
+manufacturing,cctv,-1
+manufacturing,autoclave,-1
+manufacturing,assembly,-1
+manufacturing,accpac,-1
+manufacturing,purchasing,-1
+marketing,customer segment,1
+marketing,user persona,1
+marketing,demographics,0
+marketing,life stage,0
+marketing,buying behavior,0
+marketing,promotion,0
+marketing,marketing optimization,-1
+operations,yield,1
+operations,troubleshooting,1
+operations,training,1
+operations,toolbox meeting,1
+operations,technical support,1
+operations,safety procedures,1
+operations,risk assessment,1
+operations,quality test,1
+operations,quality performance monitoring,1
+operations,quality matrix,1
+operations,quality controls,1
+operations,quality control,1
+operations,quality assurance,1
+operations,qms,1
+operations,project management,1
+operations,process controls,1
+operations,process audit,1
+operations,procedures,1
+operations,plan lesson,1
+operations,operation management,1
+operations,operating procedures,1
+operations,onboarding,1
+operations,non conformance,1
+operations,new product introduction,1
+operations,mentoring,1
+operations,iso9001,1
+operations,iso14001,1
+operations,iso,1
+operations,internal audit,1
+operations,external audit,1
+operations,employee engagement,1
+operations,corrective action,1
+operations,change management,1
+operations,cgmp,1
+operations,capex,1
+operations,capa,1
+operations,budget,1
+operations,backlog management,1
+operations,audit,1
+operations,performance monitoring,1
+operations,documentation,0
+operations,compliance,0
+operations,shift schedule,-1
+operations,capital portfolio management,-1
+others,podcast,0
+others,optics,0
+others,iatf16949,0
+others,external stakeholder,0
+others,edtech,0
+others,customer service,0
+others,agriculture,0
+others,campaign,0
+others,talent acquisition,0
+others,yield improvement,-1
+others,wire-bonding,-1
+others,warehouse management,-1
+others,transportation,-1
+others,transport,-1
+others,tpu,-1
+others,telecommunications,-1
+others,supply chain,-1
+others,structural materials,-1
+others,signal processing,-1
+others,selective laser melting,-1
+others,ride hailing,-1
+others,public affairs,-1
+others,printing,-1
+others,photronics,-1
+others,personalization,-1
+others,pcb,-1
+others,package design,-1
+others,optoelectronic,-1
+others,opto-electronics,-1
+others,mvno,-1
+others,medical device,-1
+others,mechanical design,-1
+others,marketing,-1
+others,machining,-1
+others,logistics,-1
+others,iso14971,-1
+others,iso13485,-1
+others,investor relations,-1
+others,insurance,-1
+others,injection moulding,-1
+others,ic design,-1
+others,hospital,-1
+others,high tech manufacturing,-1
+others,geometric dimensioning,-1
+others,fraud detection,-1
+others,food service,-1
+others,food and beverage,-1
+others,fmcg,-1
+others,fda,-1
+others,electronics,-1
+others,electron microscopy,-1
+others,ecn/etn,-1
+others,e-commerce,-1
+others,double moulding,-1
+others,daf/wb,-1
+software developer,containerization,0
+others,big 4,-1
+others,asmey145,-1
+others,aerospace,-1
+others,additive manufacturing,-1
+others,medical,-1
+others,underwriting,-1
+others,front office,-1
+others,channel optimization,-1
+others,user messaging,-1
+petrochemicals,water treatment,1
+petrochemicals,water system,1
+petrochemicals,steam engineer,1
+petrochemicals,separation,1
+petrochemicals,qra,1
+petrochemicals,process safety management,1
+petrochemicals,process optimization,1
+petrochemicals,process operations,1
+petrochemicals,process industries,1
+petrochemicals,process hazard analysis,1
+petrochemicals,process flow diagram,1
+petrochemicals,process equipment,1
+petrochemicals,process drawings,1
+petrochemicals,polymer science,1
+petrochemicals,piping sizing,1
+petrochemicals,piping and instrumentation diagram,1
+petrochemicals,petrochemical,1
+petrochemicals,oil and gas,1
+petrochemicals,loto,1
+petrochemicals,leak test,1
+petrochemicals,layer of protection analysis,1
+petrochemicals,industrial gasses,1
+petrochemicals,industrial automation,1
+petrochemicals,dcs system,1
+petrochemicals,cleaning,1
+petrochemicals,chemistry,1
+petrochemicals,chemicals,1
+petrochemicals,chemical processing plant,1
+petrochemicals,boiler,1
+petrochemicals,aspentech,1
+petrochemicals,api standards,1
+petrochemicals,alarm optimzation,1
+petrochemicals,polymer,0
+petrochemicals,pipe-flo,0
+petrochemicals,electricity market,0
+petrochemicals,aft fathom,0
+petrochemicals,thermoplastic elastomers,-1
+petrochemicals,saudi aramco,-1
+petrochemicals,offshore,-1
+petrochemicals,marine,-1
+petrochemicals,fpso,-1
+qualification,process engineer,1
+qualification,engineering,1
+qualification,chemical engineering,1
+qualification,mechanical engineering,-1
+qualification,information technology,-1
+qualification,finance,-1
+qualification,electronics engineering,-1
+qualification,electrical engineering,-1
+qualification,computer science,-1
+qualification,computer engineering,-1
+qualification,business administration,-1
+science,operations research,1
+science,operational research,0
+science,physiology,-1
+science,life science,-1
+science,healthcare,-1
+science,cardiology,-1
+science,biomedical,-1
+science,biomarkers,-1
+science,bioinformatics,-1
+science,neuroscience,-1
+science,publication,-1
+science,slam,-1
+science,multi-modal sensor calibration,-1
+science,motion forecasting,-1
+science,navigation,-1
+science,semantic segmentation,-1
+science,object detection,-1
+science,gis,-1
+science,higher education,-1
+science,weather,-1
+software developer,visual basic,1
+software developer,software development,1
+software developer,shell script,1
+software developer,scripting,1
+software developer,script,1
+software developer,r,1
+software developer,python,1
+software developer,programming,1
+software developer,powershell,1
+software developer,posgresql,1
+software developer,oop,1
+software developer,oo programming,1
+software developer,mvc,1
+software developer,microsoft windows,1
+software developer,json,1
+software developer,google sheet,1
+software developer,git,1
+software developer,excel vba,1
+software developer,excel macro,1
+software developer,debug,1
+software developer,csv,1
+software developer,command line,1
+software developer,coding errors,1
+software developer,bugs,1
+software developer,automation,1
+software developer,code,1
+software developer,object oriented programming,1
+software developer,confluence,1
+software developer,unit test,1
+software developer,wiki,1
+software developer,vba,1
+software developer,web scraping,1
+software developer,software application development,1
+software developer,code refactoring,1
+software developer,debugging,1
+software developer,notion,1
+software developer,xml,0
+software developer,web app,0
+software developer,virtual machine,0
+software developer,ux/ui,0
+software developer,ux,0
+software developer,user stories,0
+software developer,user interface,0
+software developer,uml,0
+software developer,uat,0
+software developer,svn,0
+software developer,sit,0
+software developer,centos,1
+software developer,linux,1
+software developer,javascript,0
+software developer,java,0
+software developer,gitlab,0
+software developer,flask,0
+software developer,exception processing,0
+software developer,devops,0
+software developer,cloud environment,1
+software developer,cloud,1
+software developer,c++,0
+software developer,application software,0
+software developer,app integration,0
+software developer,adobe xd,0
+software developer,test driven development,0
+software developer,devop,0
+software developer,code optimization,0
+software developer,visual studio,0
+software developer,open source,0
+software developer,shell scripting,0
+software developer,ms access,0
+software developer,windows kernel,-1
+software developer,user experience,-1
+software developer,unix,-1
+software developer,ssrs,0
+software developer,ssis,-1
+software developer,sprintboot,-1
+software developer,spring,-1
+software developer,solaris,-1
+software developer,soap,-1
+software developer,scss,-1
+software developer,sass,-1
+software developer,ruby,-1
+software developer,reactjs,-1
+software developer,php,-1
+software developer,perl,-1
+software developer,mobile app,-1
+software developer,full stack,-1
+software developer,frontend,-1
+software developer,control-m,-1
+software developer,cloud business,-1
+software developer,c#,-1
+software developer,c,-1
+software developer,backend,-1
+software developer,asp,-1
+software developer,.net,-1
+software developer,microservice,-1
+software developer,shell,-1
+software developer,os patch,-1
+software developer,application patch,-1
+software developer,gpu kernel programming,-1
+software developer,bitbucket,-1
+software developer,mavin,-1
+software developer,os patching,-1
+software developer,go,-1
+software developer,kotlin,-1
+sustainability,waste reduction,1
+sustainability,sustainable development goals,1
+sustainability,sustainability,1
+sustainability,hydrogen storage,1
+sustainability,greenhouse gas inventory,1
+sustainability,food waste,1
+sustainability,decarbonization,1
+sustainability,climate change,1
+sustainability,circular economy,1
+sustainability,ccus,1
+sustainability,hydrogen,1
+sustainability,renewable,1
+sustainability,energy efficiency,1
+sustainability,agritech,1
+sustainability,tcfd,0
+sustainability,sustainable finance,0
+sustainability,sustainability reporting,0
+sustainability,sasb,0
+sustainability,gri,0
+sustainability,green finance,0
+sustainability,ghg protocol,0
+sustainability,esg,0
+sustainability,cdp,0
+sustainability,product carbon footprint,0
+sustainability,regulation,0
+sustainability,SSAE 3000/3410,-1
+sustainability,iso14067,-1
+sustainability,iso14044,-1
+web developer,web application,1
+web developer,rest api,1
+web developer,django,1
+web developer,api,1
+web developer,cloud computing,0
+web developer,webpack,-1
+web developer,web assembly,-1
+web developer,swift,-1
+web developer,nodejs,-1
+web developer,html,-1
+web developer,css,-1
+web developer,android studio,-1
+web developer,android,-1
+web developer,severless deployment,-1
+data scientist,networkx,1
+data scientist,social network analysis,1
+data engineer,pdpa,0
+web developer,wix,1
+web developer,web publishing,0
+science,behavioral science,1
+data scientist,monte carlo,1
+science,political science,0
+sustainability,carbon capture,0
+sustainability,renewable energy,0
+sustainability,climate change policy,0
+sustainability,carbon tax,0
+sustainability,energy transition,1
+consultant,seo,0
+data engineer,snowflake,0
+data engineer,wherescape,0
+software developer,web development,0
+software developer,mobile development,-1
+software developer,terraform,-1
+software developer,helm,-1
+software developer,puppet,-1
+finance,blockchain,-1
+software developer,network load balancing,-1
+software developer,site reliability engineering,0
+data analyst,ibm cognos,0
+data analyst,sas visual analytics,0
+data analyst,sap business objects,0
+data analyst,oracle bi,0
+data analyst,sisense,0
+data engineer,kinesis,-1
+operations,qa/qc,1
+data scientist,crisp,-1
+data scientist,dataiku,-1
+data scientist,aiops,0
+data analyst,julia,-1
+data analyst,looker,-1
+web developer,streamlit,-1
+data analyst,plotly,0
+data scientist,statistical modeling,1
+data analyst,cognos,-1
+others,suppy chain,-1
+data scientist,bayesian inference,0
+data analyst,facebook,-1
+software developer,nexus,0
+software developer,spinnaker,-1
+manufacturing,operations,1
+consultant,interviewing,1
+consultant,focus group,0
+data scientist,chatbot,-1
+data scientist,virtual assistant,-1
+data scientist,character recognition,-1
+finance,forex,0
+data scientist,ann,0
+data scientist,cnn,0
+data scientist,rnn,0
+data scientist,k-means clustering,1
+data scientist,kernel svm,1
+data scientist,xgboost,0
+data scientist,anomaly detection,1
+data engineer,flint,-1
+data scientist,naive bayes,1
+data scientist,gradient boosting,1
+data scientist,geospatial analysis,0
+data engineer,networks,-1
+web developer,heroku,0
+web developer,celery,0
+software developer,selenium,1
+software developer,beautiful soup,1
+data engineer,postgres,0

@@ -1,0 +1,14 @@
+<h1 data-testid="signup-heading">Create account</h1>
+<form class="auth-form" ng-submit="vm.signup()" data-testid="signup-form">
+  <p class="auth-error" ng-if="vm.error" data-testid="signup-error">{{vm.error}}</p>
+  <label>Name <input ng-model="vm.form.name" autocomplete="name" required data-testid="signup-name"></label>
+  <label>Email <input type="email" ng-model="vm.form.email" autocomplete="username" required data-testid="signup-email"></label>
+  <span class="field-error" ng-if="vm.fieldError && vm.fieldError.field === 'email'" data-testid="signup-field-error">{{vm.fieldError.message}}</span>
+  <label>Password <input type="password" ng-model="vm.form.password" autocomplete="new-password" required data-testid="signup-password"></label>
+  <ul class="rule-list" data-testid="signup-rules">
+    <li ng-repeat="rule in vm.rules" data-testid="signup-rule-{{rule[0]}}" data-state="{{vm.state(rule[0])}}">{{rule[1]}}</li>
+  </ul>
+  <button type="submit" data-testid="signup-submit">Create account</button>
+  <a class="google-button" ng-if="vm.config.google_enabled" ng-href="{{vm.googleUrl}}" target="_self" data-testid="signup-google">Continue with Google</a>
+  <p>Already have an account? <a href="/signin" data-testid="signup-to-signin">Sign in</a></p>
+</form>

@@ -1,0 +1,54 @@
+<!--
+  ARCH-TEST-04 fixture corpus — hand-crafted synthetic markup matching the mycareerfutures
+  skill's documented card selectors (data-testid="job-card__job-title", data-testid=
+  "company-hire-info", data-cy="job-card-date-info", data-testid="salary-range", and a
+  card container id starting "job-card-"). Hand-crafted rather than a live capture so the
+  oracle tests in tests/backend/test_search_pipeline.py can hard-code exact expected post
+  ids and the "overlapping cards across keywords"/"two tracks share a card" scenarios the
+  010.10 tracker's Fixture corpus design note calls for — see this feature's Implement
+  section for the full rationale.
+
+  Card A: unique to "Data Analyst". Card B: also served by data_engineer_p0.html
+  (the design's "overlapping cards across keywords" case), and by the same keyword
+  searched under two different tracks/users (the "two tracks share a card" case).
+
+  Card R (10.IS.17): a synthetic "Recommended based on your skills & job applications" card,
+  interleaved between the hits the way real MCF markup places them, with both of MCF's
+  recommended markers (data-testid="green-job-card-N" and a render-more-jobs label). It is not
+  a hit for the keyword, so parse_cards must skip it and the sweep still counts 2 cards.
+-->
+<html>
+<body>
+  <div id="job-card-a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1">
+    <a href="/job/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1?source=search">
+      <span data-testid="job-card__job-title">Data Analyst I</span>
+    </a>
+    <p data-testid="company-hire-info">Acme Analytics</p>
+    <span data-cy="job-card-date-info">Posted today</span>
+    <div data-testid="salary-range">
+      <span>$4,500</span><span>to</span><span>$5,000</span>
+    </div>
+  </div>
+  <div id="job-card-r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9" data-testid="green-job-card-1">
+    <div data-testid="render-more-jobs">Recommended based on your skills &amp; job applications</div>
+    <a href="/job/r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9?source=search">
+      <span data-testid="job-card__job-title">Senior Accountant</span>
+    </a>
+    <p data-testid="company-hire-info">Unrelated Ledger Co</p>
+    <span data-cy="job-card-date-info">Posted 4 days ago</span>
+    <div data-testid="salary-range">
+      <span>$3,000</span><span>to</span><span>$4,000</span>
+    </div>
+  </div>
+  <div id="job-card-b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2">
+    <a href="/job/b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2?source=search">
+      <span data-testid="job-card__job-title">Senior Data Analyst</span>
+    </a>
+    <p data-testid="company-hire-info">Beta Corp</p>
+    <span data-cy="job-card-date-info">Posted 2 days ago</span>
+    <div data-testid="salary-range">
+      <span>$5,500</span><span>to</span><span>$6,000</span>
+    </div>
+  </div>
+</body>
+</html>

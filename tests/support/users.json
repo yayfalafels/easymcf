@@ -1,0 +1,4 @@
+{
+  "seed_a": {"email": "demo.user@example.test", "password": "Seed-Password-1!"},
+  "seed_b": {"email": "second.user@example.test", "password": "Seed-Password-2!"}
+}

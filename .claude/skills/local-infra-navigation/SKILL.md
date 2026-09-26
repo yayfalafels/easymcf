@@ -94,7 +94,7 @@ Both exit `0` only if every case passes, and write one JSON-lines record per cas
 
 ## Configuration
 
-No `.env` file is required — every setting has a default. `.env.example` (git-tracked, at the repo root) documents every override-able variable (`DB_PATH`, `PORT`, `SECRETS_DIR`, `MCF_MODE`, `HEADLESS`, `APPLY_POLL_RETRIES`, `APPLY_POLL_DELAY_S` — no project-specific prefix, an accepted tradeoff given only two venvs and no other project sharing this shell); copy it to `.env` and edit only what you want to change. `.env` itself stays gitignored and is loaded automatically (`python-dotenv`) by `python -m easymcf` and every `scripts/*.py` entry point — never by the test suite, which sets its own env vars explicitly per session so a personal `.env` can't leak into test behavior.
+No `.env` file is required — every setting has a default. `.env.example` (git-tracked, at the repo root) documents every override-able variable (`DB_PATH`, `PORT`, `SECRETS_DIR`, `MCF_MODE`, `HEADLESS`, `APPLY_POLL_RETRIES`, `APPLY_POLL_DELAY_S`, `APPLY_LIVE_SUBMIT` — no project-specific prefix, an accepted tradeoff given only two venvs and no other project sharing this shell); copy it to `.env` and edit only what you want to change. `.env` itself stays gitignored and is loaded automatically (`python-dotenv`) by `python -m easymcf` and every `scripts/*.py` entry point — never by the test suite, which sets its own env vars explicitly per session so a personal `.env` can't leak into test behavior.
 
 ## Repo layout today
 

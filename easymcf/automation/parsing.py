@@ -6,7 +6,11 @@ identically against a live-fetched page or the fixture corpus's captured HTML.
 
 Card selectors mirror the mycareerfutures skill's documented, prototype-validated markup:
 
-- card container: any element whose `id` starts with `job-card-`
+- card container: any element whose `id` starts with `job-card-`, except MCF's recommended
+  cards (10.IS.17). A real search hit carries `data-testid="white-job-card-N"`, while a
+  "Recommended based on your skills & job applications" card, interleaved among the hits in the
+  same card list, carries `data-testid="green-job-card-N"` and a `render-more-jobs` label child.
+  Confirmed against a live capture in `.dev/logs/010/10/20260926132423-10.IS.17-search-markup-probe/`.
 - title:   `span[data-testid="job-card__job-title"]`
 - company: `p[data-testid="company-hire-info"]`
 - posted:  `span[data-cy="job-card-date-info"]`, "today"/"yesterday"/"N days ago" text
@@ -97,10 +101,18 @@ def _parse_one_card(card, today: date) -> dict | None:
     }
 
 
+def _is_recommended(card) -> bool:
+    """Either marker is enough, so the filter survives MCF dropping one of them (10.IS.17)."""
+    return card.get("data-testid", "").startswith("green-job-card") or (
+        card.select_one('[data-testid="render-more-jobs"]') is not None
+    )
+
+
 def parse_cards(html: str, today: date) -> list[dict]:
-    """Each card -> {urlid, url_ref, position_title, company_name, salary_high, posted_date}, or []."""
+    """Each search-hit card -> {urlid, url_ref, position_title, company_name, salary_high,
+    posted_date}, or []. Recommended cards are skipped: they are not hits for the keyword."""
     soup = BeautifulSoup(html, "html5lib")
-    cards = soup.select("[id^='job-card-']")
+    cards = [card for card in soup.select("[id^='job-card-']") if not _is_recommended(card)]
     parsed = [_parse_one_card(card, today) for card in cards]
     return [card for card in parsed if card is not None]
 

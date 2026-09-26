@@ -6,7 +6,7 @@ angular.module('easymcfApp').controller('TracksCtrl', ['$location', 'ApiClient',
   function load() {
     ApiClient.list('track').then(function (rows) { vm.tracks = rows; });
     ApiClient.list('role').then(function (rows) { vm.roles = rows; });
-    ApiClient.list('cv').then(function (rows) { vm.cvs = rows; });
+    ApiClient.list('cv').then(function (rows) { vm.cvs = rows.filter(function (c) { return c.is_active; }); });  // 11.IS.19
     ApiClient.list('search_profile').then(function (rows) {
       vm.profiles = {};
       rows.forEach(function (p) { vm.profiles[p.track_id] = p; });

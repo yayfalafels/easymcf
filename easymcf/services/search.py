@@ -65,7 +65,7 @@ def start_run(db, uid: int, track_id: int, trigger_source: str) -> sqlite3.Row:
         running = db.execute(
             "SELECT id FROM run_log WHERE user_id = ? AND run_type = 'search' AND status = 'running'", (uid,)
         ).fetchone()
-        raise RunInFlight(running["id"]) from exc
+        raise RunInFlight("search", running["id"]) from exc
     threading.Thread(target=_run_search, args=(run_id, uid, track_id), daemon=True).start()
     return db.execute("SELECT * FROM run_log WHERE id = ?", (run_id,)).fetchone()
 
@@ -105,6 +105,7 @@ def run_sweep(db, uid: int, track_id: int, run_id: int, browser: "MCFBrowser") -
         counts["keywords"] += 1
         page = 0
         while True:
+            _set_progress(db, run_id, {**counts, "stage": "searching", "keywords_total": len(keywords)})
             try:
                 cards = _fetch_cards_with_retry(browser, keyword, profile["min_salary"], page, today)
             except Exception as exc:  # noqa: BLE001 — a third failure ends this keyword, the next still proceeds
@@ -112,6 +113,7 @@ def run_sweep(db, uid: int, track_id: int, run_id: int, browser: "MCFBrowser") -
                 break
             counts["pages"] += 1
             if not cards:
+                _set_progress(db, run_id, counts)
                 break
             counts["cards"] += len(cards)
             with db:
@@ -142,7 +144,7 @@ def run_sweep(db, uid: int, track_id: int, run_id: int, browser: "MCFBrowser") -
                             "VALUES (?, ?, 1.0, 'search_match_v1')",
                             (pid, track_id),
                         )
-                db.execute("UPDATE run_log SET outcome_counts = ? WHERE id = ?", (json.dumps(counts), run_id))
+                _merge_outcome_counts(db, run_id, counts)
             page += 1
     return counts
 
@@ -154,21 +156,38 @@ def _merge_outcome_counts(db, run_id: int, partial: dict) -> None:
     db.execute("UPDATE run_log SET outcome_counts = ? WHERE id = ?", (json.dumps(current), run_id))
 
 
-def run_detail_pass(db, run_id: int, browser: "MCFBrowser") -> dict:
+def _set_progress(db, run_id: int | None, partial: dict) -> None:
+    """Commits a progress snapshot on its own (10.IS.16): `stage` (searching, detailing,
+    done) plus the running totals the Posts page's stoplight display reads while a run is
+    in flight. Merged, never replaced, so each step's keys survive the next step's writes."""
+    if run_id is None:
+        return
+    with db:
+        _merge_outcome_counts(db, run_id, partial)
+
+
+def run_detail_pass(db, run_id: int, browser: "MCFBrowser", uid: int | None = None,
+                    track_id: int | None = None) -> dict:
     """Candidates: src_method='scraped', is_open=1, mcf_ref IS NULL. One commit per post
     (REQ-SRCH-04/06). The open/closed marker is read first; a closed posting's other
-    fields are never scraped (Detail pass Algorithms note)."""
+    fields are never scraped (Detail pass Algorithms note). Given a track, each open post
+    that qualifies is promoted as soon as its details land (10.IS.16), so the promoted count
+    rises alongside the loaded one; `promote_qualifying` still runs afterwards as catch-up."""
     candidates = db.execute(
         "SELECT id, url_ref FROM post WHERE src_method = 'scraped' AND is_open = 1 AND mcf_ref IS NULL "
         "ORDER BY posted_date DESC"
     ).fetchall()
     counts = {"detailed": 0, "closed": 0, "detail_errors": 0}
+    if track_id is not None:
+        counts.update(promoted=0, promote_errors=0)
+    _set_progress(db, run_id, {**counts, "stage": "detailing", "detail_total": len(candidates)})
     for row in candidates:
         try:
             html = browser.detail_page(row["url_ref"])
             detail = parsing.parse_detail(html)
         except Exception:  # noqa: BLE001 — the post stays a candidate for the next run's retry
             counts["detail_errors"] += 1
+            _set_progress(db, run_id, counts)
             continue
         with db:
             if not detail["is_open"]:
@@ -183,7 +202,35 @@ def run_detail_pass(db, run_id: int, browser: "MCFBrowser") -> dict:
                 )
                 counts["detailed"] += 1
             _merge_outcome_counts(db, run_id, counts)
+        if track_id is not None and detail["is_open"]:
+            _promote_one(db, uid, track_id, row["id"], counts)
+            _set_progress(db, run_id, counts)
     return counts
+
+
+def _qualifies(db, uid: int, track_id: int, pid: str) -> bool:
+    """Promotion Workflow 4's criteria for one post: search-matched to this track, open, detailed
+    (mcf_ref set), and no lead of this user's on it yet."""
+    return db.execute(
+        "SELECT 1 FROM post_track pt JOIN post p ON p.id = pt.post_id "
+        "WHERE pt.post_id = ? AND pt.track_id = ? AND pt.search_match = 1 AND p.is_open = 1 "
+        "AND p.mcf_ref IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM lead WHERE lead.user_id = ? AND lead.post_id = pt.post_id)",
+        (pid, track_id, uid),
+    ).fetchone() is not None
+
+
+def _promote_one(db, uid: int, track_id: int, pid: str, counts: dict) -> None:
+    """A promotion that raises is counted, not propagated — one bad post must not stop the rest."""
+    if not _qualifies(db, uid, track_id, pid):
+        return
+    try:
+        with db:
+            leads.promote(db, {"post_id": pid, "track_id": track_id})
+        counts["promoted"] += 1
+    except Exception:  # noqa: BLE001 — one promotion failing must not block the rest (Workflow 4)
+        logger.exception("MCF_DIAG promotion failed post_id=%s track_id=%s", pid, track_id)
+        counts["promote_errors"] += 1
 
 
 def promote_qualifying(db, uid: int, track_id: int) -> dict:
@@ -323,8 +370,11 @@ def _run_search(run_id: int, uid: int, track_id: int) -> None:
     crashed = False
     try:
         counts.update(run_sweep(db, uid, track_id, run_id, browser))
-        counts.update(run_detail_pass(db, run_id, browser))
-        counts.update(promote_qualifying(db, uid, track_id))
+        counts.update(run_detail_pass(db, run_id, browser, uid, track_id))
+        catch_up = promote_qualifying(db, uid, track_id)  # posts detailed by an earlier run, never promoted
+        counts["promoted"] += catch_up["promoted"]
+        counts["promote_errors"] += catch_up["promote_errors"]
+        counts["stage"] = "done"
     except Exception:  # noqa: BLE001 — every run ends with a terminal status, never a crashed thread
         logger.exception("MCF_DIAG search run %s failed", run_id)
         crashed = True
@@ -336,8 +386,7 @@ def _run_search(run_id: int, uid: int, track_id: int) -> None:
     counts["mcf_mode"] = config.mcf_mode
     status = _final_status(db, run_id, counts, crashed)
     with db:
-        db.execute(
-            "UPDATE run_log SET status = ?, ended_at = ?, outcome_counts = ? WHERE id = ?",
-            (status, clock.stamp(), json.dumps(counts), run_id),
-        )
+        # Merged so the progress totals survive; a crashed run keeps the counts and stage it stopped at.
+        _merge_outcome_counts(db, run_id, {"mcf_mode": config.mcf_mode} if crashed else counts)
+        db.execute("UPDATE run_log SET status = ?, ended_at = ? WHERE id = ?", (status, clock.stamp(), run_id))
     db.close()

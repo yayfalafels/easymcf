@@ -35,6 +35,7 @@ class Resource:
     before_read: Callable | None = None   # (db) -> None
     batch_schema: dict | None = None      # per-row schema for a hook-backed batch of updates
     batch_fn: Callable | None = None      # (db, rows, uid) -> list of row ids, applied in one transaction
+    delete_fn: Callable | None = None     # (db, row_id) -> dict | None; a returned row answers 200 instead of 204
     search_fn: Callable | None = None     # (db, uid, args) -> list[dict]; overrides the raw-column filter+select
                                            # below for a search that must join across tables rather than filter the
                                            # resource's own columns (a hook, same URL/verb, per the api design's
@@ -197,12 +198,39 @@ def update(table: str, row_id: str):
     return jsonify(row)
 
 
+def _referenced_by(db, table: str, row_id) -> dict[str, int]:
+    """Every `child_table.column` whose foreign key points at this row, with its row count. The FK-guard 409 names
+    them, so a user sees what still uses the row instead of SQLite's bare "FOREIGN KEY constraint failed"."""
+    found = {}
+    tables = [r["name"] for r in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")]
+    for child in tables:
+        for fk in db.execute(f"PRAGMA foreign_key_list({child})").fetchall():
+            if fk["table"] != table:
+                continue
+            count = db.execute(f"SELECT COUNT(*) FROM {child} WHERE {fk['from']} = ?", (row_id,)).fetchone()[0]
+            if count:
+                found[f"{child}.{fk['from']}"] = count
+    return found
+
+
 @bp.delete("/<table>/<row_id>")
 def delete(table: str, row_id: str):
     resource, db = _resource(table, "delete"), get_db()
     with db:
         _fetch(db, resource, row_id, _uid())
-        _guarded(db.execute, f"DELETE FROM {resource.table} WHERE {resource.pk} = ?", (row_id,))
+        if resource.delete_fn:
+            kept = resource.delete_fn(db, row_id)
+            if kept is not None:
+                return jsonify(_fetch(db, resource, row_id, _uid()))
+            return "", 204
+        try:
+            db.execute(f"DELETE FROM {resource.table} WHERE {resource.pk} = ?", (row_id,))
+        except sqlite3.IntegrityError as exc:
+            refs = _referenced_by(db, resource.table, row_id)
+            if not refs:
+                raise Conflict(str(exc)) from exc
+            names = ", ".join(f"{name} ({count})" for name, count in refs.items())
+            raise Conflict(f"{resource.table} {row_id} is still referenced by {names}", referenced_by=refs) from exc
     return "", 204
 
 

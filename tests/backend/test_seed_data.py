@@ -42,7 +42,7 @@ def test_two_users_with_distinct_data(conn):
     assert conn.execute("SELECT COUNT(*) FROM lead WHERE user_id = 2").fetchone()[0] == 4
     assert conn.execute("SELECT COUNT(*) FROM cv WHERE user_id = 2").fetchone()[0] == 1
     assert conn.execute("SELECT COUNT(*) FROM lead_note WHERE lead_id IN (SELECT id FROM lead WHERE user_id = 2)").fetchone()[0] == 2
-    assert conn.execute("SELECT COUNT(*) FROM run_log WHERE user_id = 2").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM run_log WHERE user_id = 2").fetchone()[0] == 2  # search 6, apply 8
     assert conn.execute("SELECT COUNT(*) FROM mcf_session").fetchone()[0] == 2
     assert conn.execute("SELECT COUNT(*) FROM mcf_attempt").fetchone()[0] == 2
 
@@ -222,10 +222,13 @@ def test_open_stages_expire_and_closed_leads_keep_state(isolated_client, isolate
     conn.execute("UPDATE lead SET deadline = '2026-01-01'")
     conn.commit()
     closed_before = conn.execute("SELECT * FROM lead WHERE user_id = 1 AND status = 'CLOSED' ORDER BY id").fetchall()
+    open_ids = [row[0] for row in conn.execute("SELECT id FROM lead WHERE user_id = 1 AND status = 'OPEN'")]
     fixed_clock("2026-09-15T07:00:00")
     leads = isolated_client.get("/api/v1/lead/search").get_json()
-    assert all(l["close_reason"] == "expired" for l in leads if l["id"] <= 5)
-    assert conn.execute("SELECT * FROM lead WHERE user_id = 1 AND status = 'CLOSED' AND id >= 6 ORDER BY id").fetchall() == closed_before
+    assert all(l["close_reason"] == "expired" for l in leads if l["id"] in open_ids)
+    # the leads closed before the sweep, tracked by id: lead 20 (11.10) is an open lead above id 6 (11.IS.05)
+    closed_ids = ", ".join(str(row[0]) for row in closed_before)
+    assert conn.execute(f"SELECT * FROM lead WHERE id IN ({closed_ids}) ORDER BY id").fetchall() == closed_before
 
 
 def _pin_after_anchor(isolated_db, fixed_clock, days: int) -> date:
@@ -317,3 +320,106 @@ def test_offer_history_and_the_one_open_offer_invariant(conn):
     assert conn.execute("SELECT lead_id, status FROM offer ORDER BY id").fetchall() == [(5, "rejected"), (5, "open"), (6, "accepted")]
     assert conn.execute("SELECT COUNT(*) FROM lead l WHERE l.stage = 'OFFER' AND "
                         "(SELECT COUNT(*) FROM offer o WHERE o.lead_id = l.id AND o.status = 'open') != 1").fetchone()[0] == 0
+
+
+# 11.10 — apply data model and seed coherence (11.IS.02, 11.IS.03). Workflow 7, transcribed: the lead state an
+# attempt's outcome leaves behind. A retryable outcome leaves the lead open at TOAPPLY for repair, after which the
+# user may still advance it by hand (11.CK.08) or close it for a reason of their own, never `apply_failed`.
+CLOSING_OUTCOMES = {"post_closed", "post_unavailable"}
+RETRYABLE_OUTCOMES = {"questionnaire_required", "cv_selector_error", "unable_to_apply", "cv_not_found", "invalid_input"}
+EFFECTIVE_CV = "COALESCE(l.cv_id, (SELECT default_cv_id FROM track t WHERE t.id = l.track_id))"
+
+
+def test_schema_version_11_adds_the_lead_cv_override_and_cv_retirement(conn):
+    assert conn.execute("SELECT schema_version FROM meta").fetchone()[0] == 11
+    assert conn.execute("SELECT id, is_active FROM cv ORDER BY id").fetchall() == [(1, 1), (2, 1), (3, 1)]  # 11.IS.19
+    assert "cv_id" in {row[1] for row in conn.execute("PRAGMA table_info(lead)")}
+    assert conn.execute("SELECT id, cv_id FROM lead WHERE cv_id IS NOT NULL").fetchall() == [(1, 2)]
+    assert conn.execute("SELECT COUNT(*) FROM lead l JOIN cv ON cv.id = l.cv_id WHERE cv.user_id != l.user_id").fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT event_type, detail FROM lead_event WHERE lead_id = 1 AND detail LIKE 'cv_id:%'").fetchall() == [
+        ("field_edited", "cv_id: None -> 2")]
+
+
+def test_every_attempt_runs_inside_an_apply_run_of_its_lead_owner(conn):
+    bad = conn.execute(
+        "SELECT a.id FROM application a JOIN lead l ON l.id = a.lead_id JOIN run_log r ON r.id = a.run_id "
+        "WHERE r.run_type != 'apply' OR r.user_id != l.user_id OR a.attempted_at < r.started_at "
+        "OR a.attempted_at > r.ended_at").fetchall()
+    assert bad == []
+    assert conn.execute("SELECT COUNT(*) FROM application a JOIN lead l ON l.id = a.lead_id JOIN cv ON cv.id = a.cv_id "
+                        "WHERE cv.user_id != l.user_id").fetchone()[0] == 0
+
+
+def test_a_run_attempts_each_lead_at_most_once(conn):
+    assert conn.execute("SELECT COUNT(*) FROM (SELECT 1 FROM application GROUP BY run_id, lead_id HAVING COUNT(*) > 1)").fetchone()[0] == 0
+
+
+def test_apply_run_rows_follow_the_apply_contract(conn):
+    import json
+
+    rows = conn.execute("SELECT id, track_id, trigger_source, outcome_counts FROM run_log WHERE run_type = 'apply' ORDER BY id").fetchall()
+    assert [row[0] for row in rows] == [3, 4, 7, 8]
+    for run_id, track_id, trigger_source, outcome_counts in rows:
+        assert track_id is None and trigger_source == "manual", run_id
+        actual = dict(conn.execute("SELECT status, COUNT(*) FROM application WHERE run_id = ? GROUP BY status", (run_id,)).fetchall())
+        assert json.loads(outcome_counts) == actual, run_id
+        assert set(actual) <= APPLICATION_STATUSES, run_id
+
+
+def test_latest_attempt_leaves_its_lead_in_the_workflow_7_state(conn):
+    rows = conn.execute(
+        "SELECT a.lead_id, a.status, l.stage, l.close_reason FROM application a JOIN lead l ON l.id = a.lead_id "
+        "WHERE a.id = (SELECT MAX(id) FROM application WHERE lead_id = a.lead_id)").fetchall()
+    assert {row[1] for row in rows} >= {"applied"} | CLOSING_OUTCOMES
+    for lead_id, status, stage, close_reason in rows:
+        if status == "applied":
+            assert stage not in ("TOAPPLY",) and close_reason != "apply_failed", lead_id
+        elif status in CLOSING_OUTCOMES:
+            assert (stage, close_reason) == ("CLOSED", "apply_failed"), lead_id
+        else:
+            assert status in RETRYABLE_OUTCOMES and close_reason != "apply_failed", lead_id
+    # every apply_failed close is explained by a closing outcome
+    assert conn.execute(
+        "SELECT COUNT(*) FROM lead l WHERE l.close_reason = 'apply_failed' AND NOT EXISTS "
+        "(SELECT 1 FROM application a WHERE a.lead_id = l.id AND a.status IN ('post_closed', 'post_unavailable'))").fetchone()[0] == 0
+
+
+def test_first_attempt_date_marks_exactly_the_attempted_leads(conn):
+    assert conn.execute(
+        "SELECT COUNT(*) FROM lead l WHERE (l.first_attempt_date IS NOT NULL) != "
+        "EXISTS (SELECT 1 FROM application a WHERE a.lead_id = l.id)").fetchone()[0] == 0
+    assert conn.execute(
+        "SELECT COUNT(*) FROM lead l WHERE l.first_attempt_date != (SELECT substr(MIN(attempted_at), 1, 10) "
+        "FROM application a WHERE a.lead_id = l.id)").fetchone()[0] == 0
+
+
+def test_invalid_input_names_a_field_the_lead_is_missing(conn):
+    rows = conn.execute("SELECT a.error_detail, l.url_ref FROM application a JOIN lead l ON l.id = a.lead_id "
+                        "WHERE a.status = 'invalid_input'").fetchall()
+    assert rows == [("missing field: url_ref", None)]
+
+
+def test_apply_queue_covers_fresh_repaired_and_blocked_leads(conn):
+    """The open TOAPPLY leads are the queue (11.CK.02). A lead whose latest attempt is `cv_not_found` stays blocked
+    until its effective CV differs from the CV that failed (user interface page 7)."""
+    queue = conn.execute(
+        f"SELECT l.id, l.user_id, {EFFECTIVE_CV}, "
+        "(SELECT status FROM application a WHERE a.lead_id = l.id ORDER BY a.id DESC LIMIT 1), "
+        "(SELECT cv_id FROM application a WHERE a.lead_id = l.id ORDER BY a.id DESC LIMIT 1) "
+        "FROM lead l WHERE l.status = 'OPEN' AND l.stage = 'TOAPPLY' ORDER BY l.id").fetchall()
+    assert queue == [
+        (1, 1, 2, "cv_selector_error", 2),   # repaired cv (override 2 after cv_not_found on 1), retryable
+        (15, 2, 3, "cv_not_found", 3),       # blocked: effective cv is the one that failed
+        (20, 1, 1, None, None),              # fresh: never attempted, track default cv
+    ]
+    tracks = {row[0] for row in conn.execute("SELECT track_id FROM lead WHERE id IN (1, 20)")}
+    assert len(tracks) == 2  # an apply run spans tracks, so run_log.track_id is null
+
+
+def test_every_seeded_cv_has_a_delete_guard_reference(conn):
+    """11.TC.01's two FK-guard 409 cases: cv 1 is a track default, cv 2 only an override and an attempt's CV."""
+    assert conn.execute("SELECT COUNT(*) FROM track WHERE default_cv_id = 1").fetchone()[0] >= 1
+    assert conn.execute("SELECT COUNT(*) FROM track WHERE default_cv_id = 2").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM application WHERE cv_id = 2").fetchone()[0] >= 1
+    assert conn.execute("SELECT COUNT(*) FROM lead WHERE cv_id = 2").fetchone()[0] == 1

@@ -1,5 +1,5 @@
 <section class="config-page" data-testid="cvs-page">
-  <button type="button" class="secondary" ng-click="vm.back()">Back to tracks</button>
+  <button type="button" class="secondary" ng-click="vm.back()" data-testid="cvs-back">{{vm.fromApplications ? 'Back to applications' : 'Back to tracks'}}</button>
   <h1>CV labels</h1>
   <p>Labels are matched against resumes already stored in your MCF profile.</p>
   <form class="inline-form" ng-submit="vm.save()" data-testid="cv-form">

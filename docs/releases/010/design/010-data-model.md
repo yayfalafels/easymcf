@@ -52,7 +52,8 @@ erDiagram
     TRACK ||--o{ POST_TRACK : "matched by"
     TRACK ||--o{ LEAD : "owns"
     TRACK }o--|| CV : "default cv"
-    CV ||--o{ APPLICATION : "override cv"
+    CV ||--o{ LEAD : "override cv"
+    CV ||--o{ APPLICATION : "cv used"
     POST ||--o{ POST_TRACK : "matched against"
     POST ||--o{ LEAD : "promoted into, once per user"
     POST }o--|| RUN_LOG : "discovered by"
@@ -153,13 +154,14 @@ These three fields are the complete definition of a schedule. `schedule_enabled 
 
 ### `cv`
 
-A named CV/resume version, unique by label within its owner, that the user can assign as a track default or an application override (REQ-APPLY-02). The actual file lives on MCF's own profile. 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring, per the **prototype extraction**'s `cv_select()`. This table is a small label catalog.
+A named CV/resume version, unique by label within its owner, that the user can assign as a track default or a per-lead override (REQ-APPLY-02). The actual file lives on MCF's own profile. 010 only needs to remember the label the apply run matches against MCF's resume-selector options by substring, per the **prototype extraction**'s `cv_select()`. This table is a small label catalog.
 
 | field     | notes                                                               |
 | --------- | ------------------------------------------------------------------- |
 | `id`      | PK                                                                  |
 | `user_id` | FK → `user`                                                        |
 | `label`   | unique per user, matched by substring against MCF's resume card titles at apply time |
+| `is_active` | 1, or 0 once retired: removed while only attempt history or an archived track uses it  |
 
 ### `post`
 
@@ -220,6 +222,7 @@ One user's personal, trackable instance of a post for one track (glossary, REQ-C
 | `user_id`             | FK → `user`, the owner, always equal to the owner of `track_id`                      |
 | `post_id`             | FK → `post`, the promoted post                                                       |
 | `track_id`            | FK → `track`, the promoting run's track, editable (REQ-CRM-12)                       |
+| `cv_id`               | FK → `cv`, nullable per-lead override of `track.default_cv_id`, REQ-APPLY-02         |
 | `status`              | `OPEN` \| `CLOSED`, REQ-CRM-02                                                       |
 | `stage`               | enum, see Workflow 5 stage diagram                                                   |
 | `close_reason`        | enum, set when `status = CLOSED` — see Workflow 5                                    |
@@ -228,13 +231,13 @@ One user's personal, trackable instance of a post for one track (glossary, REQ-C
 | `url_ref`             | nullable, copied from the post at creation, user-editable, `http` or `https`         |
 | `deadline`            | REQ-CRM-03, system-maintained (REQ-CRM-05), see `lead_event`                         |
 | `applied_date`        | REQ-CRM-03                                                                           |
-| `first_attempt_date`  | REQ-CRM-03                                                                           |
+| `first_attempt_date`  | REQ-CRM-03, the date of the lead's first `application` attempt                       |
 | `last_contact_date`   | REQ-CRM-03                                                                           |
 | `expected_salary_sgd` | nullable integer `>= 0`, REQ-CRM-09, copied from profile `min_salary` at creation    |
 | `created_at`          | creation timestamp (promotion or manual add)                                         |
 | `updated_at`          | refreshed by each `lead_event` written for the lead, drives auto-expiry (REQ-CRM-05) |
 
-Uniqueness: `(user_id, post_id)`. A post can be promoted into at most one lead per user, and two users can each hold a lead on the same post. Once a user has promoted a post, it is excluded from that user's further promotion under any track (Workflow 4). A trigger rejects a lead whose `user_id` differs from the owner of its `track_id`, so the ownership shortcut on the lead cannot drift from the track. The four display fields `position_title`, `company_name`, `url_ref`, and `deadline` are the only values the Leads screens show, and the post row is never read for display after promotion. A later change to the post, such as a detail pass filling its `closing_date`, never rewrites a lead. Free-text notes are not a field on this row. They live in `lead_note` below, so a lead can carry a history of multiple notes rather than one that overwrites the last.
+Uniqueness: `(user_id, post_id)`. A post can be promoted into at most one lead per user, and two users can each hold a lead on the same post. Once a user has promoted a post, it is excluded from that user's further promotion under any track (Workflow 4). A trigger rejects a lead whose `user_id` differs from the owner of its `track_id`, so the ownership shortcut on the lead cannot drift from the track. The four display fields `position_title`, `company_name`, `url_ref`, and `deadline` are the only values the Leads screens show, and the post row is never read for display after promotion. A later change to the post, such as a detail pass filling its `closing_date`, never rewrites a lead. The CV an apply run uses for a lead is its effective CV, `COALESCE(lead.cv_id, track.default_cv_id)`. The override lives on the lead because the user sets it before an attempt exists, and `application` rows are append-only attempt records the apply service writes. Free-text notes are not a field on this row. They live in `lead_note` below, so a lead can carry a history of multiple notes rather than one that overwrites the last.
 
 ### `lead_note`
 
@@ -301,7 +304,7 @@ An automated apply attempt against a lead (glossary, REQ-APPLY-01..09). One-to-m
 | -------------- | -------------------------------------------------------- |
 | `id`           | PK                                                       |
 | `lead_id`      | FK → `lead`                                              |
-| `cv_id`        | FK → `cv`, nullable override of `track.default_cv_id`    |
+| `cv_id`        | FK → `cv`, nullable, the effective CV this attempt used  |
 | `status`       | enum, see REQ-APPLY-04 / Workflow 6 for full vocabulary  |
 | `error_detail` | nullable free text, REQ-PLAT-03                          |
 | `attempted_at` | timestamp of this attempt                                |
@@ -321,10 +324,12 @@ Every automated run: search or apply (REQ-PLAT-03). Scoring is not a separate ru
 | `started_at`     | REQ-PLAT-03                                                    |
 | `ended_at`       | nullable while running                                         |
 | `status`         | `running` \| `success` \| `partial` \| `failed`                |
-| `outcome_counts` | e.g. `{new_posts: 12, updated: 3}` — REQ-PLAT-03               |
+| `outcome_counts` | JSON text, search-run keys below — REQ-PLAT-03                 |
 | `error_detail`   | nullable, REQ-PLAT-03                                          |
 
 Each run belongs to one user, and at most one run of each type per user is `running` at a time (`ARCH-RUN-03`). A search run is always track-scoped. An apply run can span leads queued across multiple tracks, so `track_id` may be null there. `trigger_source` distinguishes a run the user started (REQ-SRCH-02) from one the scheduler fired (REQ-SRCH-11); apply runs are always `manual` in `010`, since nothing schedules them. `status` gains no `skipped` value: a scheduled trigger that collided with an in-flight run never started a run, so it writes no row here at all (`ARCH-SCHED-05`).
+
+A search run's `outcome_counts` holds the pipeline counters `keywords`, `pages`, `cards`, `new_posts`, `existing_posts`, `detailed`, `closed`, `detail_errors`, `promoted`, `promote_errors`, and `mcf_mode`. It also holds the progress keys the Posts page's progress display reads while the run is `running` (feature 10, `10.IS.16`): `stage` (`searching`, `detailing`, `done`), `keywords_total`, and `detail_total`. The run commits these as it goes, so a poll mid-run sees live progress. A run that crashes keeps the counts and `stage` it had reached.
 
 ### `mcf_session`
 
@@ -368,5 +373,7 @@ One row per user tracking browser state established through Workflow 8 and consu
 | 07 | 7       | 13        | accounts, `auth_session`, `mcf_session`, `lead.user_id`, `run_log.user_id`    |
 | 08 | 8       | 17        | adds `mcf_attempt`, `mcf_session.confirmed_account_email`/`confirmed_at`      |
 | 09 | 9       | 10        | adds `run_log.trigger_source`, `lead.close_reason` `track_not_matched`        |
+| 10 | 10      | 11        | adds `lead.cv_id`, the per-lead CV override                                   |
+| 11 | 11      | 11        | adds `cv.is_active`, retiring a label history still uses (11.IS.19)           |
 
-Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, version 8 is specified for feature 17, and version 9 is specified for milestone 10 to implement. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. Version 8 adds the Google connect-attempt table and the two account-confirmation columns `mcf_session` gained for that flow. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).
+Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, version 8 is specified for feature 17, version 9 is specified for milestone 10 to implement, and version 10 is specified and implemented by task 11.10 of feature 11. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. Version 8 adds the Google connect-attempt table and the two account-confirmation columns `mcf_session` gained for that flow. Version 10 moves the CV override from `application` to `lead`, since an override must exist before the lead's first attempt. Version 11 lets a CV label leave every picker while `application.cv_id` keeps naming the CV each attempt used. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).

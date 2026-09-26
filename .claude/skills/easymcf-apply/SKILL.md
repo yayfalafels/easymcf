@@ -9,7 +9,7 @@ Implements [010-01-requirements.md](../../../docs/releases/010/010-01-requiremen
 
 ## Hard constraint
 
-Any test or dev run of apply automation must run against local/seed data (REQ-DEV-03), never the live MCF site or a real session cookie, unless the user explicitly runs it interactively themselves. This is the highest-blast-radius skill in the project — a bug here submits real job applications.
+Any test or dev run of apply automation must run against local/seed data (REQ-DEV-03), never the live MCF site or a real session cookie, unless the user explicitly runs it interactively themselves. This is the highest-blast-radius skill in the project — a bug here submits real job applications. Live mode alone never runs apply: `MCF_MODE=live` also needs `APPLY_LIVE_SUBMIT=1`, checked in `apply.start_run()`'s preflight and again in `apply_browser.get_browser()`, so a script that inherits `.env`'s `MCF_MODE=live` through `load_dotenv()` is refused before any browser starts (11.IS.14). Any diagnostic script or dev server for apply work exports `MCF_MODE=fixture` itself, which `load_dotenv()` never overrides.
 
 ## Session handling (REQ-APPLY-06)
 

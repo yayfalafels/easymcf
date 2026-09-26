@@ -1,0 +1,22 @@
+[
+  {
+    "name": "11.TC.09 a CV created from the Applications link appears in the override list",
+    "route": "/applications",
+    "actions": [
+      {"op": "wait_for", "selector": "[data-testid=\"apply-manage-cvs\"]"},
+      {"op": "click", "selector": "[data-testid=\"apply-manage-cvs\"]"},
+      {"op": "wait_for", "selector": "[data-testid=\"cv-label\"]"},
+      {"op": "fill", "selector": "[data-testid=\"cv-label\"]", "value": "Fixture CV 99"},
+      {"op": "click", "selector": "[data-testid=\"cv-save\"]"},
+      {"op": "wait_for", "selector": "[data-testid=\"cv-row-4\"]"},
+      {"op": "click", "selector": "[data-testid=\"cvs-back\"]"},
+      {"op": "wait_for", "selector": "[data-testid=\"apply-cv-1\"]"}
+    ],
+    "expect": [
+      {"op": "url_path_equals", "value": "/applications"},
+      {"op": "count_equals", "selector": "[data-testid=\"apply-cv-1\"] option", "value": 4},
+      {"op": "count_equals", "selector": "[data-testid=\"apply-cv-1\"] option:has-text(\"Fixture CV 99\")", "value": 1}
+    ],
+    "as_user": "seed_a"
+  }
+]

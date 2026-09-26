@@ -99,7 +99,8 @@ def test_tracks_form_shows_track_fields_only(page, ui_app):
 
 
 # Seeded user 1 only. The second user's leads (feature 13 seed) are not visible to user 1.
-TAB_COUNTS = {"toapply": 1, "applied": 1, "callbacks": 1, "interviews": 1, "offers": 1, "closed": 9}
+# 11.10 seed: lead 20 joins the TOAPPLY queue and lead 19 closes as apply_failed (11.IS.08)
+TAB_COUNTS = {"toapply": 2, "applied": 1, "callbacks": 1, "interviews": 1, "offers": 1, "closed": 10}
 
 
 def test_leads_tabs_follow_the_seeded_stages(page, ui_app):

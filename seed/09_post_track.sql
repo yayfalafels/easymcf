@@ -25,3 +25,7 @@ INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-1
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-2', 8, 0);
 -- second user shared or private match
 INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-u2-3', 8, 0);
+-- apply-queue fixture match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-apply-closed', 1, 0);
+-- apply-queue fixture match
+INSERT INTO post_track (post_id, track_id, search_match) VALUES ('synthetic-apply-queued', 3, 0);

@@ -149,3 +149,23 @@ def test_manual_post_promotes_unconditionally_under_the_named_track(db):
         "SELECT search_match FROM post_track WHERE post_id = ? AND track_id = 1", (pid,)
     ).fetchone()
     assert post_track["search_match"] == 0
+
+
+_HIT = ('<div id="job-card-h1h1" data-testid="white-job-card-0"><a href="/job/h1h1?source=search">'
+        '<span data-testid="job-card__job-title">Gen AI Engineer</span></a>'
+        '<p data-testid="company-hire-info">Hit Co</p><span data-cy="job-card-date-info">Posted today</span></div>')
+
+
+@pytest.mark.parametrize("recommended", [
+    '<div id="job-card-r1r1" data-testid="green-job-card-1"><a href="/job/r1r1?source=search">'
+    '<span data-testid="job-card__job-title">Senior Accountant</span></a>'
+    '<p data-testid="company-hire-info">Other Co</p></div>',
+    '<div id="job-card-r1r1"><div data-testid="render-more-jobs">Recommended based on your skills</div>'
+    '<a href="/job/r1r1?source=search"><span data-testid="job-card__job-title">Senior Accountant</span></a>'
+    '<p data-testid="company-hire-info">Other Co</p></div>',
+], ids=["green-testid-only", "render-more-jobs-only"])
+def test_recommended_cards_are_not_search_hits(recommended):
+    """10.IS.17 — MCF interleaves "Recommended based on your skills" cards among the real hits;
+    either of its two markers alone is enough to skip the card."""
+    cards = search.parsing.parse_cards(f"<html><body>{_HIT}{recommended}</body></html>", clock.today())
+    assert [card["urlid"] for card in cards] == ["h1h1"]

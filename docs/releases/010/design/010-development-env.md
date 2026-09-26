@@ -191,6 +191,7 @@ MCF_MODE=fixture          # fixture | live — never set live except on explicit
 HEADLESS=1                # 0 only for a human visually debugging a selector
 APPLY_POLL_RETRIES=5      # apply-button poll attempts before unable_to_apply 
 APPLY_POLL_DELAY_S=5      # seconds between apply-button poll attempts 
+APPLY_LIVE_SUBMIT=0       # 1 lets MCF_MODE=live submit real applications; a deliberate human choice (11.IS.14)
 
 GOOGLE_REDIRECT_URI=http://127.0.0.1:5000/api/v1/auth/google/callback   # must equal the OAuth client's registered URI
 GCP_OAUTH_CLIENT_ID=%%GCP_OAUTH_CLIENT_ID%%       # Google OAuth client id, not secret

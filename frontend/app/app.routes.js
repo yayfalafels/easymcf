@@ -18,6 +18,8 @@ angular.module('easymcfApp').config(['$routeProvider', '$locationProvider', '$ht
       .when('/cvs', { templateUrl: 'app/cvs/cvs.html', controller: 'CvsCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/leads', { templateUrl: 'app/leads/leads.html', controller: 'LeadsCtrl', controllerAs: 'vm', resolve: guarded })
       .when('/offers', { templateUrl: 'app/offers/offers.html', controller: 'OffersCtrl', controllerAs: 'vm', resolve: guarded })
+      .when('/applications', { templateUrl: 'app/applications/applications.html', controller: 'ApplicationsCtrl', controllerAs: 'vm', resolve: guarded })
+      .when('/automation', { templateUrl: 'app/automation/automation.html', controller: 'AutomationCtrl', controllerAs: 'vm', resolve: guarded })
       .otherwise({ redirectTo: '/leads' });
   }
 ]).run(['$rootScope', '$location', function ($rootScope, $location) {

@@ -35,9 +35,51 @@ angular.module('easymcfApp').controller('PostsCtrl', ['ApiClient', 'RunPoller', 
       }).then(vm.load);
     };
 
-    vm.statusText = function () {
+    // Search progress display (10.IS.16): four lights in two pairs, driven by the `stage`
+    // key search.py merges into run_log.outcome_counts. Each running stage lights a pair,
+    // since pages are fetched and their posts saved in the same step, and each post is
+    // promoted as soon as its details load. Earlier pairs are green, the current pair
+    // yellow (red if the run failed there), later ones grey.
+    var STAGES = [
+      { key: 'searching', text: 'searching for posts' },
+      { key: 'detailing', text: 'reading post details' }
+    ];
+    var PAIR_OF_STEP = [0, 0, 1, 1];
+
+    function stageIndex() {
       var counts = vm.runner.outcomeCounts || {};
-      return (counts.cards || 0) + ' postings found, page ' + (counts.pages || 0);
+      if (counts.stage === 'done') { return STAGES.length; }
+      for (var i = 0; i < STAGES.length; i++) { if (STAGES[i].key === counts.stage) { return i; } }
+      return vm.runner.active ? 0 : -1;  // no progress written yet: running → first stage, idle → none
+    }
+
+    vm.statusText = function () {
+      var index = stageIndex();
+      return vm.runner.active && index >= 0 && index < STAGES.length ? STAGES[index].text + '...' : '';
+    };
+
+    vm.lightClass = function (step) {
+      var index = stageIndex(), pair = PAIR_OF_STEP[step];
+      if (index < 0 || pair > index) { return 'light-grey'; }
+      if (pair < index) { return 'light-green'; }
+      return vm.runner.status === 'failed' ? 'light-red' : 'light-yellow';
+    };
+
+    // Fixed step list, with primitive-returning getters: an ng-repeat over a function that
+    // builds fresh objects each digest never stabilises (infdig).
+    vm.steps = ['pages', 'posts found', 'loaded', 'promoted'];
+
+    vm.stepValue = function (step) {
+      var c = vm.runner.outcomeCounts || {};
+      return [c.pages || 0, c.cards || 0, (c.detailed || 0) + (c.closed || 0), c.promoted || 0][step];
+    };
+
+    vm.stepDetail = function (step) {
+      var c = vm.runner.outcomeCounts || {};
+      if (step === 0) { return c.keywords_total ? 'keyword ' + (c.keywords || 0) + ' of ' + c.keywords_total : ''; }
+      if (step === 1) { return c.cards ? (c.new_posts || 0) + ' new' : ''; }
+      if (step === 2) { return c.detail_total !== undefined ? 'of ' + c.detail_total : ''; }
+      return vm.runner.active && c.stage === 'detailing' ? 'so far' : '';
     };
 
     vm.addManual = function () {

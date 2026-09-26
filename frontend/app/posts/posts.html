@@ -12,7 +12,16 @@
   <button type="button" ng-click="vm.addManual()" data-testid="posts-add-manual-btn">Add posting manually</button>
 </div>
 
-<p ng-if="vm.runner.active" data-testid="posts-run-status">{{vm.statusText()}}</p>
+<div class="run-progress" data-testid="posts-run-progress">
+  <p class="run-progress-status"><span ng-if="vm.runner.active" data-testid="posts-run-status">{{vm.statusText()}}</span></p>
+  <ol class="run-progress-steps">
+    <li ng-repeat="label in vm.steps" data-testid="posts-run-step-{{$index}}">
+      <span class="light {{vm.lightClass($index)}}" data-testid="posts-run-light-{{$index}}"></span>
+      <span><span class="step-label">{{label}}</span> <span class="step-value" data-testid="posts-run-value-{{$index}}">{{vm.stepValue($index)}}</span></span>
+      <span class="step-detail">{{vm.stepDetail($index)}}</span>
+    </li>
+  </ol>
+</div>
 <p class="field-error" ng-if="!vm.runner.active && (vm.runner.status === 'failed' || vm.runner.status === 'partial')" data-testid="posts-run-error">
   {{vm.runner.errorDetail || ('Run ended: ' + vm.runner.status)}}
 </p>

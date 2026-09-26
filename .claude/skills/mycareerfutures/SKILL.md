@@ -19,7 +19,7 @@ URL scheme (`JobSearchWebsite.jobsearch_URLquery()`):
 search?search={keyword}&salary={level}&employmentType=Full%20Time&sort=new_posting_date&page={n}
 ```
 
-Paginate `page=0,1,2,...` until a page returns zero matching cards — there is no total-count field to read instead.
+Paginate `page=0,1,2,...` until a page returns zero search-hit cards. The results header, `[data-testid="search-results-page-label"]`, reads "N of M jobs found based on your filters" (N matches the filters, M is the keyword's total), which is useful for checking a scrape's hit count.
 
 Per-card fields and selectors (`get_jobRecord_fromcard`):
 
@@ -30,7 +30,9 @@ Per-card fields and selectors (`get_jobRecord_fromcard`):
 | `posted_date` | `span[data-cy="job-card-date-info"]` — text like "Posted today/yesterday/N days ago"; parse to an actual date, don't store the raw string |
 | `salaryHigh` | top figure from a `$`-containing span under `[data-testid="salary-range"]` |
 | `urlid` | slug from the card's `<a href>`, with the `/job/` prefix and any query string stripped |
-| card container | elements whose `id` starts with `job-card-` |
+| card container | elements whose `id` starts with `job-card-`, except recommended cards (below) |
+
+**Recommended cards are not search hits.** When a search has few hits, MCF fills the list with "Recommended based on your skills & job applications" cards, interleaved with the hits in the same `div[data-testid="card-list"]`. So neither the container nor the position in the list separates them. The card element's own `data-testid` does: `white-job-card-N` is a hit, and `green-job-card-N` is a recommendation, which also contains a `div[data-testid="render-more-jobs"]` label. Skip a card when either marker is present (`easymcf/automation/parsing.py`, `_is_recommended`). A second, independent signal sits on the card's own link: a hit's `href` carries `event=Search` and a recommendation's carries `event=SuggestedJob` — useful as a corroborating check when the `data-testid` prefix convention itself is what has drifted. Confirmed against a live capture in 10.IS.17 and reconfirmed live for keyword "gen ai" on 2026-09-26 (8 hits, 20 recommendations, an exact match against the `render-more-jobs` label count).
 
 Cards render client-side — a plain HTTP GET without JS execution will not see them; a real (or headless) browser render is required, which is why this project uses Playwright (see [playwright](../playwright/SKILL.md)) rather than `requests` alone for this page.
 

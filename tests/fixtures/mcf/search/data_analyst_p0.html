@@ -11,6 +11,11 @@
   Card A: unique to "Data Analyst". Card B: also served by data_engineer_p0.html
   (the design's "overlapping cards across keywords" case), and by the same keyword
   searched under two different tracks/users (the "two tracks share a card" case).
+
+  Card R (10.IS.17): a synthetic "Recommended based on your skills & job applications" card,
+  interleaved between the hits the way real MCF markup places them, with both of MCF's
+  recommended markers (data-testid="green-job-card-N" and a render-more-jobs label). It is not
+  a hit for the keyword, so parse_cards must skip it and the sweep still counts 2 cards.
 -->
 <html>
 <body>
@@ -22,6 +27,17 @@
     <span data-cy="job-card-date-info">Posted today</span>
     <div data-testid="salary-range">
       <span>$4,500</span><span>to</span><span>$5,000</span>
+    </div>
+  </div>
+  <div id="job-card-r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9" data-testid="green-job-card-1">
+    <div data-testid="render-more-jobs">Recommended based on your skills &amp; job applications</div>
+    <a href="/job/r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9r9?source=search">
+      <span data-testid="job-card__job-title">Senior Accountant</span>
+    </a>
+    <p data-testid="company-hire-info">Unrelated Ledger Co</p>
+    <span data-cy="job-card-date-info">Posted 4 days ago</span>
+    <div data-testid="salary-range">
+      <span>$3,000</span><span>to</span><span>$4,000</span>
     </div>
   </div>
   <div id="job-card-b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2">

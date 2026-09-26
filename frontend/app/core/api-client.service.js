@@ -14,6 +14,7 @@ angular.module('easymcfApp').factory('ApiClient', ['$http', '$q', 'ErrorService'
     create: function (table, body) { return call({ method: 'POST', url: base + table, data: body }); },
     createManualLead: function (body) { return call({ method: 'POST', url: base + 'lead/manual', data: body }); },
     triggerSearchRun: function (trackId) { return call({ method: 'POST', url: base + 'runs/search', data: { track_id: trackId } }); },
+    triggerApplyRun: function () { return call({ method: 'POST', url: base + 'runs/apply' }); },
     promoteManualPost: function (body) { return call({ method: 'POST', url: base + 'posts/manual', data: body }); },
     batch: function (table, rows, describe) { return call({ method: 'POST', url: base + table + '/batch', data: { rows: rows } }, describe); },
     update: function (table, id, body) { return call({ method: 'PUT', url: base + table + '/' + id, data: body }); },

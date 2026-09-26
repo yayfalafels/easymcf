@@ -1,0 +1,13 @@
+[
+  {"name": "11.TC.06 a trigger with a missing session aborts with the session error", "method": "POST",
+   "path": "/api/v1/runs/apply", "expected_status": 409, "as_user": "seed_b",
+   "expected_body": {"error": "conflict",
+                     "message": "mcf_session is not valid: sign in through the MCF nav page before running apply"}},
+  {"name": "11.TC.04 trigger an apply run for a session-valid user", "method": "POST", "path": "/api/v1/runs/apply",
+   "expected_status": 201, "as_user": "seed_a"},
+  {"name": "11.TC.05 a second trigger while in flight answers 409, then that run polls to success", "method": "POST",
+   "path": "/api/v1/runs/apply", "expected_status": 409, "as_user": "seed_a",
+   "poll": {"path": "/api/v1/run_log/{run_id}", "until": {"status": ["success", "partial", "failed"]}, "timeout_s": 60},
+   "expected_final": {"status": "success", "run_type": "apply", "track_id": null, "trigger_source": "manual",
+                      "outcome_counts": "{\"applied\": 1}", "error_detail": null}}
+]

@@ -37,6 +37,8 @@ class Config:
     apply_poll_delay_s: float = field(
         default_factory=lambda: float(os.environ.get("APPLY_POLL_DELAY_S", "5"))
     )
+    # 11.IS.14 — the explicit apply-submission flag: live mode alone never drives the real apply flow.
+    apply_live_submit: bool = field(default_factory=lambda: os.environ.get("APPLY_LIVE_SUBMIT", "0") == "1")
     session_lifetime_h: int = field(default_factory=lambda: int(os.environ.get("SESSION_LIFETIME_H", "336")))
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("COOKIE_SECURE", "0") == "1")
     signin_max_failures: int = field(default_factory=lambda: int(os.environ.get("SIGNIN_MAX_FAILURES", "5")))

@@ -9,7 +9,7 @@ from flask import current_app, g, jsonify, request
 from .. import clock
 from .. import tenancy
 from ..errors import ValidationFailed
-from ..services import leads, mcf_connection, offers, search
+from ..services import apply, cvs, leads, mcf_connection, offers, search
 from .db import get_db
 from .generic import GENERIC, REGISTRY, Resource, _fetch, _guarded, _insert, _scope_sql, _select, _serialize, _validate, bp, register
 
@@ -71,7 +71,8 @@ register(Resource(
     "cv",
     create_schema={"type": "object", "properties": _CV_PROPS, "required": ["label"], "additionalProperties": False},
     update_schema={"type": "object", "properties": _CV_PROPS, "required": ["label"], "additionalProperties": False},
-    verbs=frozenset({"get", "search", "create", "update", "delete"}), owned=_owner,
+    verbs=frozenset({"get", "search", "create", "update", "delete"}), owned=_owner, bool_columns=("is_active",),
+    create_fn=cvs.create, delete_fn=cvs.remove,
 ))
 _PROFILE_PROPS = {
     "keywords": {"type": "string", "minLength": 1}, "min_salary": {"type": ["integer", "null"]},
@@ -146,6 +147,14 @@ def trigger_search_run():
     return jsonify(dict(run)), 201
 
 
+@bp.post("/runs/apply")
+def trigger_apply_run():
+    """API-EP-05: an empty body; attempts every open TOAPPLY lead of the signed-in user (REQ-APPLY-03)."""
+    db, uid = get_db(), g.user_id
+    run = apply.start_run(db, current_app.config["EASYMCF_CONFIG"], uid)
+    return jsonify(dict(run)), 201
+
+
 @bp.post("/posts/manual")
 def create_manual_post():
     body = request.get_json(silent=True)
@@ -175,9 +184,15 @@ _LEAD_SELECT = (
     "offer.id AS offer_id, offer.amount_sgd AS offer_amount_sgd, offer.offer_date AS offer_date, "
     "offer.deadline AS offer_deadline, offer.status AS offer_status, "
     "(SELECT stage_from FROM lead_event WHERE lead_event.lead_id = lead.id AND lead_event.stage_to = 'CLOSED' "
-    "ORDER BY lead_event.id DESC LIMIT 1) AS closed_from "
+    "ORDER BY lead_event.id DESC LIMIT 1) AS closed_from, "
+    # 11.05: the apply queue's effective CV and latest attempt, resolved by the same rule apply.py's run uses
+    f"{apply.EFFECTIVE_CV_SQL} AS effective_cv_id, "
+    "last_app.status AS last_apply_status, last_app.error_detail AS last_apply_error, "
+    "last_app.cv_id AS last_apply_cv_id, last_app.attempted_at AS last_apply_at, "
+    f"{apply.BLOCKED_SQL} AS apply_blocked "
     "FROM lead "
-    "LEFT JOIN offer ON offer.lead_id = lead.id AND offer.status = 'open'"
+    "LEFT JOIN offer ON offer.lead_id = lead.id AND offer.status = 'open' "
+    f"LEFT JOIN application last_app ON last_app.id = ({apply.LATEST_APPLICATION_SQL})"
 )
 _SALARY = {"type": ["integer", "null"], "minimum": 0}
 register(Resource(
@@ -193,7 +208,8 @@ register(Resource(
         "url_ref": {"type": ["string", "null"], "pattern": r"^https?://\S+$"},
         "deadline": _DATE, "applied_date": _DATE,
         "first_attempt_date": _DATE, "last_contact_date": _DATE,
-        "expected_salary_sgd": _SALARY, "track_id": {"type": "integer"}}},
+        "expected_salary_sgd": _SALARY, "track_id": {"type": "integer"},
+        "cv_id": {"type": ["integer", "null"]}}},
     verbs=frozenset({"get", "search", "create", "update", "batch"}),
     select_sql=_LEAD_SELECT,
     create_fn=leads.promote, update_fn=leads.update_lead, before_read=leads.expire_due,
@@ -201,7 +217,8 @@ register(Resource(
         "id": {"type": "integer"}, "stage": {"enum": list(leads.STAGES)},
         "close_reason": {"enum": [*leads.CLOSE_REASONS, None]}}},
     batch_fn=leads.batch_update,
-    parents=(("track_id", "track"), ("post_id", "post")),
+    parents=(("track_id", "track"), ("post_id", "post"), ("cv_id", "cv")),
+    bool_columns=("apply_blocked",),
 ))
 
 _MANUAL_LEAD_SCHEMA = {

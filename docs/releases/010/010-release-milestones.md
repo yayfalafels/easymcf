@@ -18,11 +18,11 @@ The `seq` column determines the implementation order
 | 09 | 010     | 10  | closed   | job leads tracking                       |
 | 13 | 010     | 11  | closed   | oauth login                              |
 | 17 | 010     | 12  | closed   | MCF website session                      |
-| 10 | 010     | 13  | open     | search by keywords                       |
-| 11 | 010     | 14  | pending  | apply automation                         |
-| 14 | 010     | 15  | pending  | performance dashboard reports            |
-| 15 | 010     | 16  | pending  | scraper drift repair                     |
-| 16 | 010     | 17  | pending  | position title score model develop       |
+| 10 | 010     | 13  | closed   | search by keywords                       |
+| 11 | 010     | 14  | open     | apply automation                         |
+| 15 | 010     | 15  | pending  | scraper drift repair                     |
+| 14 | 010     | 16  | pending  | performance dashboard reports            |
+| 16 | 010     | 17  | drop     | position title score model develop       |
 
 Architecture (05), data model (04), and test strategy (02) are each independently sequenced and consumed by later milestones (test strategy builds on `ARCH-TEST-01..08`; architecture's storage section is concrete about data model's tables), so each gets its own top-level row. Test cases (03) is [010-test-cases.md](010-test-cases.md) — the concrete case set milestone 02 (test strategy) scopes, organized by the same silo breakdown, with `STRAT-CASE-01` traceability back to every functional `REQ-*`.
 

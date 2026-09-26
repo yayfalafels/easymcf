@@ -27,10 +27,11 @@ class Conflict(ApiError):
 
 
 class RunInFlight(Conflict):
-    """A second search-run trigger for a user with one already running (ARCH-RUN-03)."""
+    """A second trigger for a user with a run of the same run_type already running (ARCH-RUN-03)."""
 
-    def __init__(self, run_id: int):
-        super().__init__("a search run is already in progress", run_id=run_id)
+    def __init__(self, run_type: str, run_id: int):
+        super().__init__(f"an {run_type} run is already in progress" if run_type[0] in "aeiou"
+                         else f"a {run_type} run is already in progress", run_id=run_id)
 
 
 class Unauthenticated(ApiError):

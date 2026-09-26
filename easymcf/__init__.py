@@ -20,7 +20,7 @@ from .auth import google as auth_google, routes as auth_routes, sessions
 from .db.connection import get_connection, schema_version
 from .services import mcf_connection, search
 
-SCHEMA_VERSION = 9  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
+SCHEMA_VERSION = 11  # bump alongside easymcf/db/schema.sql (ARCH-STO-03)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRONTEND_DIR = os.path.join(_REPO_ROOT, "frontend")

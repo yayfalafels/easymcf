@@ -21,3 +21,5 @@ INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-1', 7, 0.7, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-2', 8, 0.7, 'title_keyword_v1');
 INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-u2-3', 8, 0.7, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-apply-closed', 1, 0.8, 'title_keyword_v1');
+INSERT INTO match_score (post_id, track_id, match_score, score_method) VALUES ('synthetic-apply-queued', 3, 0.8, 'title_keyword_v1');

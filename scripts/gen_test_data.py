@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import json
 import os
 import sqlite3
 import sys
@@ -166,6 +167,7 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
         sql["role"] += insert("role", row)
     for row in users:
         sql["user"] += insert("user", row)
+    cv_label = {row["id"]: row["label"] for row in cvs}
     for row in cvs:
         sql["cv"] += insert("cv", row)
     for row in tracks:
@@ -178,12 +180,44 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     run_rows = [
         {"id": 1, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 08:00:00", "ended_at": f"{anchor} 08:02:00", "status": "success", "outcome_counts": '{"new_posts": 3}', "error_detail": None, "trigger_source": "manual"},
         {"id": 2, "run_type": "search", "user_id": 1, "track_id": 2, "started_at": f"{anchor} 08:03:00", "ended_at": f"{anchor} 08:05:00", "status": "partial", "outcome_counts": '{"new_posts": 1}', "error_detail": "one fixture detail page was unavailable", "trigger_source": "manual"},
-        {"id": 3, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:00:00", "ended_at": f"{anchor} 09:03:00", "status": "success", "outcome_counts": '{"applied": 1}', "error_detail": None, "trigger_source": "manual"},
-        {"id": 4, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:04:00", "ended_at": f"{anchor} 09:05:00", "status": "failed", "outcome_counts": '{"failed": 1}', "error_detail": "synthetic failure fixture", "trigger_source": "manual"},
+        {"id": 3, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:00:00", "ended_at": f"{anchor} 09:03:00", "status": "success", "outcome_counts": None, "error_detail": None, "trigger_source": "manual"},
+        {"id": 4, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:04:00", "ended_at": f"{anchor} 09:05:00", "status": "failed", "outcome_counts": None, "error_detail": "RuntimeError: synthetic worker failure after 1 of 1 queued leads", "trigger_source": "manual"},
         {"id": 5, "run_type": "search", "user_id": 1, "track_id": 1, "started_at": f"{anchor} 10:00:00", "ended_at": None, "status": "running", "outcome_counts": '{"new_posts": 0}', "error_detail": None, "trigger_source": "manual"},
         {"id": 6, "run_type": "search", "user_id": 2, "track_id": 7, "started_at": f"{anchor} 11:00:00", "ended_at": f"{anchor} 11:02:00", "status": "success", "outcome_counts": '{"new_posts": 1}', "error_detail": None, "trigger_source": "scheduled"},
+        {"id": 7, "run_type": "apply", "user_id": 1, "track_id": None, "started_at": f"{anchor} 09:10:00", "ended_at": f"{anchor} 09:12:00", "status": "success", "outcome_counts": None, "error_detail": None, "trigger_source": "manual"},
+        {"id": 8, "run_type": "apply", "user_id": 2, "track_id": None, "started_at": f"{anchor} 11:10:00", "ended_at": f"{anchor} 11:12:00", "status": "success", "outcome_counts": None, "error_detail": None, "trigger_source": "manual"},
     ]
+    # Apply attempts, one per (run, lead), each landing its lead in the Workflow 7 state the lead is seeded at
+    # (11.IS.03). Leads 19/20 are appended after user 2's so no pre-existing lead id moves. An apply run's
+    # outcome_counts is derived from its own attempts below, never hand-typed.
+    apply_attempts = [
+        (3, 3, 1, "questionnaire_required", "09:00:30"),  # then advanced by hand to APPLIED (11.CK.08)
+        (3, 4, 1, "applied", "09:01:00"),
+        (3, 5, 1, "unable_to_apply", "09:01:30"),
+        (3, 12, 1, "post_unavailable", "09:02:00"),
+        (3, 1, 1, "cv_not_found", "09:02:30"),           # repaired by lead 1's cv_id override to cv 2
+        (4, 1, 2, "cv_selector_error", "09:04:30"),      # the run then fails at run level
+        (7, 5, 1, "applied", "09:10:30"),                # retry history: unable_to_apply, then applied
+        (7, 10, 1, "invalid_input", "09:11:00"),         # then cancelled by the user
+        (7, 19, 1, "post_closed", "09:11:30"),
+        (8, 15, 3, "cv_not_found", "11:10:30"),          # unrepaired: effective cv is still the one that failed
+        (8, 16, 3, "applied", "11:11:00"),
+    ]
+    error_details = {
+        "questionnaire_required": "final submit failed: review page reported required questions",
+        "cv_selector_error": "TimeoutError: resume-card lookup timed out",
+        "unable_to_apply": "apply button unresolved after 5 attempts",
+        "post_unavailable": "Error: posting navigation failed with HTTP 404",
+        "post_closed": "This job is no longer available",
+        "invalid_input": "missing field: url_ref",
+    }
     for row in run_rows:
+        if row["run_type"] == "apply":
+            counts: dict[str, int] = {}
+            for run_id, _lead, _cv, status, _at in apply_attempts:
+                if run_id == row["id"]:
+                    counts[status] = counts.get(status, 0) + 1
+            row["outcome_counts"] = json.dumps(counts, sort_keys=True)
         sql["run_log"] += insert("run_log", row, "synthetic run-log coverage")
 
     posts = list(source)
@@ -202,6 +236,10 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     base_posts = list(posts)
     for number in (1, 2, 3):
         posts.append({"id": f"synthetic-u2-{number}", "source": "Synthetic", "position_title": f"Second user role {number}", "company_name": "Second Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/synthetic-u2-{number}", "posted_date": (anchor - timedelta(days=number)).isoformat(), "salary_high": 9000, "is_open": 1, "closing_date": None, "applicants": 0, "description": None, "score": 0.7})
+    # apply-queue fixtures (11.IS.03): a post MCF reported closed at apply time, and a fresh queued post
+    apply_posts = (("synthetic-apply-closed", "Seed apply closed role", 1, 0), ("synthetic-apply-queued", "Seed apply queued role", 3, 1))
+    for post_id, title, _track, is_open in apply_posts:
+        posts.append({"id": post_id, "source": "Synthetic", "position_title": title, "company_name": "Synthetic Company", "url_ref": f"https://www.mycareersfuture.gov.sg/job/{post_id}", "posted_date": (anchor - timedelta(days=4)).isoformat(), "salary_high": 10000, "is_open": is_open, "closing_date": None if is_open else anchor.isoformat(), "applicants": 0, "description": None, "score": 0.8})
     for post in posts:
         fields = {key: post[key] for key in ("id", "source", "position_title", "company_name", "url_ref", "posted_date", "salary_high", "is_open", "closing_date", "applicants", "description")}
         fields.update({"industry_classification": None, "mcf_ref": None, "src_method": "manual" if post["source"] in ("Synthetic", "Manual") else "scraped", "run_id": None if post["source"] in ("Synthetic", "Manual") else 1})
@@ -222,33 +260,46 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
         post = post_by_id[post_id]
         return {"position_title": post["position_title"], "company_name": post["company_name"], "url_ref": post["url_ref"]}
 
-    for post_id, track_id, match in ((posts[0]["id"], 7, 1), ("synthetic-u2-1", 7, 0), ("synthetic-u2-2", 8, 0), ("synthetic-u2-3", 8, 0)):
+    for post_id, track_id, match in ((posts[0]["id"], 7, 1), ("synthetic-u2-1", 7, 0), ("synthetic-u2-2", 8, 0), ("synthetic-u2-3", 8, 0),
+                                     *((post_id, track, 0) for post_id, _title, track, _open in apply_posts)):
         score = post_by_id[post_id]["score"]
-        sql["post_track"] += insert("post_track", {"post_id": post_id, "track_id": track_id, "search_match": match}, "second user shared or private match")
+        comment = "apply-queue fixture match" if post_id.startswith("synthetic-apply-") else "second user shared or private match"
+        sql["post_track"] += insert("post_track", {"post_id": post_id, "track_id": track_id, "search_match": match}, comment)
         sql["match_score"] += insert("match_score", {"post_id": post_id, "track_id": track_id, "match_score": score, "score_method": "title_keyword_v1"})
 
     leads = []
     for index, stage in enumerate(STAGES, start=1):
         post_id = MANUAL_POST_ID if stage == "APPLIED" else posts[index - 1]["id"]
         close_reason = None if stage != "CLOSED" else CLOSE_REASONS[0]
-        leads.append({"id": index, "user_id": 1, "post_id": post_id, "track_id": 1, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, **copies(post_id), "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(), "applied_date": anchor.isoformat() if stage != "TOAPPLY" else None, "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "user_id": 1, "post_id": post_id, "track_id": 1, "cv_id": None, "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": close_reason, **copies(post_id), "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(), "applied_date": anchor.isoformat() if stage != "TOAPPLY" else None, "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
     for index, reason in enumerate(CLOSE_REASONS[1:], start=len(STAGES) + 1):
         post = posts[index - 1]
-        leads.append({"id": index, "user_id": 1, "post_id": post["id"], "track_id": 1, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, **copies(post["id"]), "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+        leads.append({"id": index, "user_id": 1, "post_id": post["id"], "track_id": 1, "cv_id": None, "status": "CLOSED", "stage": "CLOSED", "close_reason": reason, **copies(post["id"]), "deadline": anchor.isoformat(), "applied_date": anchor.isoformat(), "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000, "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
     leads[0]["company_name"] = "Seed Co"
     user1_lead_count = len(leads)
     u2_stages = (("TOAPPLY", None, 7, posts[0]["id"]), ("APPLIED", None, 7, "synthetic-u2-1"),
                  ("CALLBACK", None, 8, "synthetic-u2-2"), ("CLOSED", "rejected", 8, "synthetic-u2-3"))
     for offset, (stage, reason, track_id, post_id) in enumerate(u2_stages, start=1):
-        leads.append({"id": user1_lead_count + offset, "user_id": 2, "post_id": post_id, "track_id": track_id,
+        leads.append({"id": user1_lead_count + offset, "user_id": 2, "post_id": post_id, "track_id": track_id, "cv_id": None,
                       "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": reason,
                       **copies(post_id), "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(),
                       "applied_date": anchor.isoformat() if stage != "TOAPPLY" else None, "first_attempt_date": None,
                       "last_contact_date": None, "expected_salary_sgd": 9000,
                       "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+    for (post_id, _title, track_id, _open), (stage, reason) in zip(apply_posts, (("CLOSED", "apply_failed"), ("TOAPPLY", None))):
+        leads.append({"id": len(leads) + 1, "user_id": 1, "post_id": post_id, "track_id": track_id, "cv_id": None,
+                      "status": "CLOSED" if stage == "CLOSED" else "OPEN", "stage": stage, "close_reason": reason,
+                      **copies(post_id), "deadline": anchor.isoformat() if stage == "CLOSED" else (anchor + timedelta(days=28)).isoformat(),
+                      "applied_date": None, "first_attempt_date": None, "last_contact_date": None, "expected_salary_sgd": 10000,
+                      "created_at": f"{anchor} 07:00:00", "updated_at": f"{anchor} 07:00:00"})
+    leads[0]["cv_id"] = 2  # lead 1's CV override, set after its cv_not_found attempt (REQ-APPLY-02)
+    next(row for row in leads if row["close_reason"] == "cancelled")["url_ref"] = None  # its invalid_input cause
+    attempted = {lead_id for _run, lead_id, _cv, _status, _at in apply_attempts}
     for row in leads:
         if row["stage"] == "CALLBACK":
             row["last_contact_date"] = anchor.isoformat()
+        if row["id"] in attempted:
+            row["first_attempt_date"] = anchor.isoformat()
     note_id = 1
     event_id = 1
     for row in leads:
@@ -283,11 +334,13 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     callback_id = next(row["id"] for row in leads if row["stage"] == "CALLBACK")
     for lead_id, event_type, detail, stage, minute in (
         (1, "field_edited", f"company_name: {posts[0]['company_name']} -> Seed Co", "TOAPPLY", 31),
+        (1, "field_edited", "cv_id: None -> 2", "TOAPPLY", None),
         (callback_id, "contact_logged", f"last_contact_date: None -> {anchor}", "CALLBACK", 40),
         (callback_id, "deadline_changed", f"deadline: {anchor} -> {anchor + timedelta(days=28)}", "CALLBACK", 41),
     ):
         sql["lead_event"] += insert("lead_event", {"id": event_id, "lead_id": lead_id, "event_type": event_type, "detail": detail,
-                                                   "stage_from": stage, "stage_to": stage, "occurred_at": f"{anchor} 07:{minute}:00"},
+                                                   "stage_from": stage, "stage_to": stage,
+                                                   "occurred_at": f"{anchor} 07:{minute}:00" if minute else f"{anchor} 09:03:30"},
                                     "synthetic event coverage")
         event_id += 1
 
@@ -303,19 +356,11 @@ def build_sql(anchor: date, mode: str) -> dict[str, str]:
     for row in offer_rows:
         sql["offer"] += insert("offer", row, "synthetic offer history coverage")
 
-    apply_failed_lead = next(row["id"] for row in leads if row["close_reason"] == "apply_failed")
-    app_id = 1
-    for status in APPLICATION_STATUSES:
-        lead_id = 3 if status == "applied" else 1
-        if status in ("post_closed", "post_unavailable"):
-            lead_id = apply_failed_lead
-        sql["application"] += insert("application", {"id": app_id, "lead_id": lead_id, "cv_id": 1, "status": status, "error_detail": None if status == "applied" else f"synthetic {status} fixture", "attempted_at": f"{anchor} 09:00:00", "run_id": 3 if status == "applied" else 4}, "synthetic apply outcome coverage")
-        app_id += 1
-    for attempt in range(2):
-        sql["application"] += insert("application", {"id": app_id, "lead_id": 3, "cv_id": 1, "status": "applied", "error_detail": None, "attempted_at": f"{anchor} 09:0{attempt + 1}:00", "run_id": 3}, "synthetic retry pair")
-        app_id += 1
-    u2_applied = next(row["id"] for row in leads if row["user_id"] == 2 and row["stage"] == "APPLIED")
-    sql["application"] += insert("application", {"id": app_id, "lead_id": u2_applied, "cv_id": 3, "status": "applied", "error_detail": None, "attempted_at": f"{anchor} 11:01:00", "run_id": 6}, "second user apply attempt")
+    for app_id, (run_id, lead_id, cv_id, status, at) in enumerate(apply_attempts, start=1):
+        sql["application"] += insert("application", {"id": app_id, "lead_id": lead_id, "cv_id": cv_id, "status": status,
+                                                     "error_detail": error_details.get(status, f"no resume option matched CV label '{cv_label[cv_id]}'" if status == "cv_not_found" else None),
+                                                     "attempted_at": f"{anchor} {at}", "run_id": run_id},
+                                     "synthetic apply attempt, Workflow 7 coherent")
     for account in ACCOUNTS:
         previously_confirmed = account["id"] == 1
         sql["mcf_session"] += insert("mcf_session", {

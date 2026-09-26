@@ -128,10 +128,10 @@ Every list-bearing page, meaning Posts, Leads, Offers, Applications, and Automat
 
 ### 2. CVs
 
-**Purpose:** maintain the CV/resume label catalog that Tracks draws from as a default and Applications draws from as an override, per REQ-APPLY-02.
+**Purpose:** maintain the CV/resume label catalog that Tracks draws from as a default and Applications draws from as a per-lead override, per REQ-APPLY-02.
 
 - A simple list of `cv` rows, just a label each. Per the **data model**, the actual file lives on the user's MCF profile. This table only stores the substring the apply run matches against MCF's resume-selector options.
-- Add, rename, or remove a CV label. Removing a label that's in use, as a track default or an application override, is blocked with an inline explanation and a list of what references it, rather than silently orphaning those references.
+- Add, rename, or remove a CV label. Removing a label that's in use, as a track default, a lead override, or a past attempt's CV, is blocked with an inline explanation and a list of what references it, rather than silently orphaning those references.
 - Reached from the "Manage CVs" link on Tracks, and from the CV override control on Applications. There is no standalone nav entry, since it's a small supporting catalog rather than an entity with its own workflow or lifecycle, per Information architecture above.
 - No delete/archive ambiguity here the way there is for tracks: an unused CV label can simply be removed.
 

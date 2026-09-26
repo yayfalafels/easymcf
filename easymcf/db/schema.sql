@@ -13,12 +13,16 @@
 -- schema_version 8 (feature 17) adds `mcf_attempt` and `mcf_session.confirmed_account_email`/`confirmed_at`.
 -- schema_version 9 (milestone 10) adds `run_log.trigger_source` and `lead.close_reason`
 -- `track_not_matched` (see docs/releases/010/design/010-data-model.md, Schema versions).
+-- schema_version 10 (feature 11) adds `lead.cv_id`, the per-lead CV override of `track.default_cv_id`
+-- (REQ-APPLY-02); the effective CV of a queued lead is COALESCE(lead.cv_id, track.default_cv_id).
+-- schema_version 11 (feature 11, 11.IS.19) adds `cv.is_active`: removing a label only attempt history or an archived
+-- track still uses retires it, so every `application.cv_id` keeps its meaning.
 
 CREATE TABLE meta (
     schema_version INTEGER NOT NULL
 );
 
-INSERT INTO meta (schema_version) VALUES (9);
+INSERT INTO meta (schema_version) VALUES (11);
 
 CREATE TABLE role (
     id INTEGER PRIMARY KEY,
@@ -51,6 +55,7 @@ CREATE TABLE cv (
     id INTEGER PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES user(id),
     label TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
     UNIQUE (user_id, label)
 );
 
@@ -137,6 +142,7 @@ CREATE TABLE lead (
     user_id INTEGER NOT NULL REFERENCES user(id),
     post_id TEXT NOT NULL REFERENCES post(id),
     track_id INTEGER NOT NULL REFERENCES track(id),
+    cv_id INTEGER REFERENCES cv(id),
     status TEXT NOT NULL CHECK (status IN ('OPEN', 'CLOSED')),
     stage TEXT NOT NULL CHECK (stage IN ('TOAPPLY', 'APPLIED', 'CALLBACK', 'INTERVIEW', 'OFFER', 'CLOSED')),
     close_reason TEXT CHECK (close_reason IN ('offer_accepted', 'rejected', 'withdrawn', 'expired', 'cancelled', 'duplicate', 'apply_failed', 'dropped', 'track_not_matched')),

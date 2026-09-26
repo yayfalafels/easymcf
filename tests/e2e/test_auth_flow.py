@@ -100,6 +100,8 @@ def test_a_new_google_identity_lands_on_the_requested_page_with_its_name_and_pic
     assert fresh.locator('[data-testid="user-name"]').inner_text() == "First Google"
     row = _rows(db_path, "SELECT name, email, password_hash, google_sub, photo_ref FROM user WHERE email = 'first.google@example.test'")
     assert len(row) == 1 and row[0][0] == "First Google" and row[0][2] is None and row[0][3].startswith("stub-sub-") and row[0][4]
+    # A visible <img> can still be downloading; naturalWidth reads 0 until it finishes (13.IS.25).
+    fresh.wait_for_function("document.querySelector('[data-testid=\"user-photo\"]').complete", timeout=10_000)
     assert fresh.evaluate("document.querySelector('[data-testid=\"user-photo\"]').naturalWidth") == 256
 
 

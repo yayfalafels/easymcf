@@ -21,9 +21,15 @@ The `seq` column determines the implementation order
 | 10 | 010     | 13  | closed   | search by keywords                       |
 | 11 | 010     | 14  | closed   | apply automation                         |
 | 18 | 010     | 15  | open     | release documentation                    |
-| 15 | 010     | 16  | pending  | scraper drift repair                     |
-| 14 | 010     | 17  | pending  | performance dashboard reports            |
+| 15 | 010     | 16  | drop     | scraper drift repair                     |
+| 14 | 010     | 17  | drop     | performance dashboard reports            |
 | 16 | 010     | 18  | drop     | position title score model develop       |
+
+Milestones 14, 15, and 16 move to release `020`:
+
+01. 14 moved to [020.08 performance dashboard reports](../020/features/020.08-performance-dashboard-reports.md).
+02. 15 moved to [020.07 scraper drift repair](../020/features/020.07-scraper-drift-repair.md).
+03. 16 moved to [020.09 position title score model](../020/features/020.09-position-title-score-model.md).
 
 Architecture (05), data model (04), and test strategy (02) are each independently sequenced and consumed by later milestones (test strategy builds on `ARCH-TEST-01..08`; architecture's storage section is concrete about data model's tables), so each gets its own top-level row. Test cases (03) is [010-test-cases.md](010-test-cases.md) — the concrete case set milestone 02 (test strategy) scopes, organized by the same silo breakdown, with `STRAT-CASE-01` traceability back to every functional `REQ-*`.
 

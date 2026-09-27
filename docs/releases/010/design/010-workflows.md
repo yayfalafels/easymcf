@@ -187,11 +187,13 @@ flowchart TD
 
 ## 8. MCF session establishment
 
-1. User clicks "Log in to MCF" in-app.
+1. User clicks the MCF nav icon, then **Connect MCF** in the connection pop-up. A user has at most one active attempt, and a second click reuses it.
 2. EasyMCF opens MCF's Singpass login in an isolated Playwright context and displays the current QR and decoded app link in the connection pop-up.
 3. User scans or opens the reference and completes Singpass approval manually. EasyMCF does not automate MFA, CAPTCHA, or biometric approval.
 4. The same browser context receives MCF's callback. EasyMCF verifies an authenticated MCF page, reads the account email, and requires confirmation for a first account. A previously confirmed matching account reconnects directly. A mismatch is blocked.
 5. EasyMCF exports cookies, local storage, IndexedDB, and a protected sessionStorage sidecar into the user's own files, then marks `mcf_session` valid. Session status is shown in the nav pop-up. Missing local state is downgraded to missing, and a remote rejection is marked expired. An apply run aborts up front if the session is not valid, per Workflow 6 and REQ-APPLY-06.
+
+The attempt moves through `starting`, `awaiting_approval` while the QR shows, `verifying` after the callback, and `account_confirmation_required` for a first account, then ends `connected`. It can also end `expired` when the QR times out, `cancelled` when the user cancels, `failed` on a runner error, or `interaction_required` when the account does not match the confirmed one. An apply run that finds MCF's login page instead of a signed-in page marks the session expired and the attempt `reauthentication_required`, and the pop-up offers **Connect MCF** again.
 
 ## 9. Run logging & status
 

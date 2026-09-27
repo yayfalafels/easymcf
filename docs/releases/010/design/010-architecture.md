@@ -21,7 +21,7 @@
   - [Tier 1 — backend only (REQ-DEV-03)](#tier-1--backend-only-req-dev-03)
   - [Tier 1b — frontend silo (STRAT-SILO-07)](#tier-1b--frontend-silo-strat-silo-07)
   - [Tier 3 — live MCF and Google sign-in (REQ-DEV-05, REQ-DEV-06)](#tier-3--live-mcf-and-google-sign-in-req-dev-05-req-dev-06)
-  - [The agent's build → test → debug loop](#the-agents-build--test--debug-loop)
+  - [The build → test → debug loop](#the-build--test--debug-loop)
 
 ## Purpose
 
@@ -39,11 +39,8 @@ Decisions carry an `ARCH-*` id (grouped `RUN`/`SCHED`/`STO`/`NET`/`BOT`/`TEST`, 
 - **API reference**: [010-api.md](010-api.md) — elaborates `ARCH-RUN-10`'s endpoint surface into the full generic/hook/named classification and named-endpoint catalog, so that detail lives there instead of bloating this document.
 - **frontend app design**: [010-frontend-app.md](010-frontend-app.md) — elaborates `ARCH-RUN-06/09`'s frontend decisions and `ARCH-TEST-05/09`'s Playwright tiers into the AngularJS module/routing/API-client structure and the `data-testid` convention those tiers assert against.
 - **development env runbook**: [010-development-env.md](010-development-env.md) — the concrete install/config/script/agent-loop runbook that implements this document and the **test strategy** as an actual, executable environment. It is the direct input to milestone 07.
-- **local-infra skills**: `.claude/skills/local-infra-navigation/SKILL.md`, `.claude/skills/deploy-and-validation-cycle/SKILL.md` — both are scaffolds explicitly waiting on this document plus milestone 07/08. They are the intended destination for the run/reset/test commands defined here.
 - **workflows**: [010-workflows.md](010-workflows.md) — the process logic behind every `ARCH-*` decision that touches a run or a state transition.
 - **user interface design**: [010-user-interface.md](010-user-interface.md) — what the user sees, referenced wherever an `ARCH-*` decision has a visible UI effect.
-- **backend-api skill**: [.claude/skills/easymcf-backend-api/SKILL.md](../../../../.claude/skills/easymcf-backend-api/SKILL.md) — the agent-facing skill covering the generic CRUD endpoint shapes.
-- **playwright skill**: [.claude/skills/playwright/SKILL.md](../../../../.claude/skills/playwright/SKILL.md) — explicit-wait and locator patterns that carry over from the prototype's Selenium usage.
 - **project instructions**: `CLAUDE.md` (repo root) — the project's own boundaries on live-site access, secrets, and the two-venv rule.
 
 ## Guiding constraint
@@ -125,7 +122,7 @@ Note the emergent consequence, which is intended rather than incidental: the ind
 
 **implementation decision** — **a skipped tick writes no `run_log` row, and no `skipped` value is added to `run_log.status`.** `run_log` is the record of runs that happened; a trigger that never started a run is not one. Widening that closed vocabulary would ripple into milestone 08's `CHECK` constraint, its seed enumeration oracle, and the UI's status badge, to represent a non-event whose only reader is a developer reading the log. The skip is an application-log line (ARCH-SCHED-04) and nothing more.
 
-**ARCH-SCHED-06** **The tick thread is started by `__main__.py`, never by `create_app()`**, and is governed by two entries in ARCH-RUN-07's config table: `SCHEDULER_ENABLED` (default `1`) and `SCHEDULER_TICK_S` (default `60`). The split matters for the test tiers. Tier 1 uses `app.test_client()` against `create_app()` (ARCH-TEST-03), which must not acquire a background thread that fires runs at wall-clock intervals underneath an assertion; a scheduler test instead constructs the tick function and calls it directly against a controlled clock. Tier 1b/2 spawn `python -m easymcf` (ARCH-TEST-04/09) and set `SCHEDULER_ENABLED=0` unless the test is about scheduling, in which case it sets a sub-second `SCHEDULER_TICK_S` so the full loop still runs rather than being stubbed out — the same env-var-indirection pattern, and the same "shrink the wait, don't skip the code path" rule, as ARCH-BOT-05's apply-poll timings. The default local run sets neither, so a user who starts the app gets the scheduler.
+**ARCH-SCHED-06** **The tick thread is started by `__main__.py`, never by `create_app()`**, and is governed by two entries in ARCH-RUN-07's config table: `SCHEDULER_ENABLED` (default `1`) and `SCHEDULER_TICK_S` (default `30`). The split matters for the test tiers. Tier 1 uses `app.test_client()` against `create_app()` (ARCH-TEST-03), which must not acquire a background thread that fires runs at wall-clock intervals underneath an assertion; a scheduler test instead constructs the tick function and calls it directly against a controlled clock. Tier 1b/2 spawn `python -m easymcf` (ARCH-TEST-04/09) and set `SCHEDULER_ENABLED=0` unless the test is about scheduling, in which case it sets a sub-second `SCHEDULER_TICK_S` so the full loop still runs rather than being stubbed out — the same env-var-indirection pattern, and the same "shrink the wait, don't skip the code path" rule, as ARCH-BOT-05's apply-poll timings. The default local run sets neither, so a user who starts the app gets the scheduler.
 
 ### Language, dependencies, entry points
 
@@ -146,7 +143,9 @@ Note the emergent consequence, which is intended rather than incidental: the ind
 | `APPLY_POLL_DELAY_S`    | `5`                   | seconds between poll attempts, REQ-APPLY-07           |
 | `APPLY_LIVE_SUBMIT`     | `0`                   | `1` lets live mode run apply, ARCH-BOT-02             |
 | `SCHEDULER_ENABLED`     | `1`                   | run ARCH-SCHED-01's tick thread, `0` disables it      |
-| `SCHEDULER_TICK_S`      | `60`                  | seconds between scheduler ticks, ARCH-SCHED-06        |
+| `SCHEDULER_TICK_S`      | `30`                  | seconds between scheduler ticks, ARCH-SCHED-06        |
+| `SEARCH_PAGE_DELAY_S`   | `1`                   | pause between MCF page loads in a search run          |
+| `MCF_FIXTURE_SCENARIO`  | `default`             | canned fixture scenario for tests, fixture mode only  |
 | `SECRET_KEY`            | file in `SECRETS_DIR` | signs cookies, generated on first start, ARCH-AUTH-02 |
 | `SESSION_LIFETIME_H`    | `336`                 | absolute sign-in session lifetime in hours            |
 | `COOKIE_SECURE`         | `0`                   | set `1` only when served over https                   |
@@ -161,7 +160,7 @@ Note the emergent consequence, which is intended rather than incidental: the ind
 | `GOOGLE_REDIRECT_URI`   | derived from `PORT`   | must equal the console registration                   |
 | `GCP_OAUTH_TEST_EMAIL`  | empty                 | test account address, read only by the live tier      |
 
-**implementation decision** — no project-specific prefix, previously \`\`, on these names. With only two venvs and no other project sharing this shell, per the **project instructions**' two-venv rule, the collision risk a prefix would guard against, another tool on the same machine also reading `PORT`/`DB_PATH`/`HEADLESS`, is accepted as a known and deliberate tradeoff. If it bites in practice, reintroducing a prefix is a contained rename rather than a re-architecture.
+**implementation decision** — no project-specific prefix on these names. With only two venvs and no other project sharing this shell, per the **project instructions**' two-venv rule, the collision risk a prefix would guard against, another tool on the same machine also reading `PORT`/`DB_PATH`/`HEADLESS`, is accepted as a known and deliberate tradeoff. If it bites in practice, reintroducing a prefix is a contained rename rather than a re-architecture.
 
 **ARCH-RUN-08** `MCF_MODE` accepts only `fixture` or `live` and defaults to `fixture` in code. Automated tests set `fixture` explicitly. A human may set `MCF_MODE=live` in the gitignored `.env`; `scripts/restart.sh` reads and exports that exact value before startup and reports it in the startup line. Invalid values fail during configuration instead of silently selecting fixture behavior. Live-site access remains human-gated by the **project instructions**.
 
@@ -193,35 +192,43 @@ easymcf/
   easymcf/                  # backend package
     __main__.py             # entry point (ARCH-RUN-07)
     config.py               # env-var config (ARCH-RUN-07)
-    api/                    # generic CRUD blueprint + schema validation + named endpoints (010-api.md)
-    auth/                   # accounts, sessions, Google flow, photo pipeline (ARCH-AUTH-01..10)
+    clock.py                # the one clock.now() indirection tests pin
     tenancy.py              # per-table ownership predicates (ARCH-AUTH-04)
+    api/                    # generic CRUD blueprint, resource registry, named endpoints (010-api.md)
+    auth/                   # accounts, sessions, Google flow, photo pipeline, rate limit (ARCH-AUTH-01..10)
     db/
       schema.sql            # full DDL, single file (ARCH-STO-02)
       connection.py         # WAL/pragma setup, per-thread connections
-    services/               # search, scoring, apply orchestration; lead/application write hooks (010-api.md)
-      scheduler.py          # due-schedule tick thread (ARCH-SCHED-01)
+    services/               # search, apply, leads, offers, cvs, MCF connection, scheduler (010-api.md)
     automation/
-      browser.py            # MCFBrowser interface (ARCH-BOT-02)
-      live.py               # Playwright -> real MCF
-      fixture.py            # Playwright -> route-intercepted fixture corpus
+      browser.py            # MCFBrowser search interface (ARCH-BOT-02), live.py and fixture.py behind it
+      apply_browser.py      # apply interface, apply_live.py and apply_fixture.py behind it
+      singpass_browser.py   # MCF login and Singpass QR, singpass_live.py and singpass_fixture.py behind it
+      parsing.py            # MCF card and detail page parsing
   frontend/                 # AngularJS SPA, no build step (ARCH-RUN-06)
     index.html
-    app/                    # modules, controllers, services, templates
+    app/                    # one folder per page, plus core/ services and shared/ directives
     vendor/                 # angular.min.js et al, vendored
+  assets/                   # the MCF icon the frontend serves from /assets/
+  docs/                     # MkDocs site source: index.md, user-guide/, developer-guide/, design/, releases/
+  mkdocs.yml                # docs site config
+  .github/workflows/        # docs.yml, builds and publishes the docs site
+  python-envs/              # dev-env and ops-env dependency manifests
   data/                     # gitignored; dev scratch database and profile photos live here
-  seed/                     # seed dataset as SQL text (ARCH-STO-04)
-  scripts/
-    initdb.py               # create schema
-    resetdb.py              # drop + recreate + optionally seed (ARCH-STO-06)
+  seed/                     # seed dataset as SQL text, identity tokens rendered at load (ARCH-STO-04)
+  scripts/                  # operational toolkit: initdb, resetdb, render_seed, gen_test_data, db_util,
+                            # api_tester, ui_tester, envcheck, check_no_secrets, restart.sh,
+                            # build_docs.sh, sync_design_docs
   tests/
     backend/                # tier 1 (ARCH-TEST-02)
     frontend/               # tier 1b, frontend silo against mocked /api (ARCH-TEST-09)
     e2e/                    # tier 2 (ARCH-TEST-03)
     live/                   # tier 3, deselected by default (ARCH-TEST-06)
     support/                # stub identity provider, seeded account list, photo fixtures (ARCH-AUTH-10)
+    docs/                   # the docs site's published page list
     fixtures/
       mcf/                  # canned MCF HTML + routes manifest (ARCH-TEST-04)
+      singpass/             # canned MCF login, Singpass QR, and account pages
       api/                  # canned /api/** JSON responses (ARCH-TEST-09)
     conftest.py
   .secrets/                 # gitignored; MCF session files, Google client secret, cookie key (ARCH-AUTH-06)
@@ -324,17 +331,17 @@ Rejected alternatives:
 
 Test tiers never read this file: the fixture-mode browser uses a synthetic cookie fixture, so a missing or expired real session cannot break the autonomous loop.
 
-**ARCH-BOT-04** Backend startup logs the active `MCF_MODE`, and any run triggered in `live` mode records it in `run_log` (as part of `outcome_counts`/error detail), so it is always answerable after the fact whether a given run touched the real site.
+**ARCH-BOT-04** `scripts/restart.sh` prints the active `MCF_MODE` in its startup line. A search run records the mode in `run_log.outcome_counts` as `mcf_mode`, and an apply run writes it to the app log line for each attempt, so it is answerable after the fact whether a run touched the real site.
 
 **ARCH-BOT-05** REQ-APPLY-07's apply-button poll (production default: 5 retries, 5s apart, up to 25s to reach `unable_to_apply`) reads its retry count and delay through `APPLY_POLL_RETRIES`/`APPLY_POLL_DELAY_S` (ARCH-RUN-07's config table) rather than hardcoded constants — the same env-var-indirection pattern `ARCH-STO-05` uses for `clock.py::now()`. Production and the default local run never set these, so the real 25-second wait is what a human sees. Fixture-mode tests exercising the `unable_to_apply` scenario (ARCH-TEST-04's `apply/{scenario}/` corpus) set both to a small value (e.g. 2 retries, 0.01s) so the full retry loop still runs — proving the retry logic and its terminal state, not skipping it — without spending real wall-clock seconds against `pytest-timeout`'s 60s per-test budget (ARCH-TEST-02).
 
 ## 5. Testing infrastructure
 
-The design goal is stronger than "tests exist": **an AI agent must be able to run a build → test → debug loop end to end with no human in the loop.** That imposes four properties on every tier below the live one — single-command invocation, exit-code pass/fail, disposable isolated state, and a hard timeout — and it is why the live tier is deliberately excluded from the loop rather than merely discouraged.
+The design goal is stronger than "tests exist": **a developer or an automated loop must be able to run a build → test → debug loop end to end with no human in the loop.** That imposes four properties on every tier below the live one — single-command invocation, exit-code pass/fail, disposable isolated state, and a hard timeout — and it is why the live tier is deliberately excluded from the loop rather than merely discouraged.
 
 ### Common mechanics
 
-**ARCH-TEST-01** **State isolation: a fresh temp-file SQLite database per test session, seeded from `seed/*.sql`, deleted on teardown.** A `conftest.py` session fixture creates the file under pytest's `tmp_path_factory`, applies `schema.sql` + seed, and exports `DB_PATH` to it. Function-scoped tests that mutate data wrap in a transaction rolled back at teardown, or request a function-scoped fresh copy where a rollback is impractical. Temp *file*, rather than `:memory:`. An in-memory database is per-connection, which breaks the moment the app opens a second connection, and it does: a background run thread (ARCH-RUN-02/STO-07). It also diverges from the WAL/file semantics being tested. At `010`'s data volumes the file costs milliseconds. The consequence that matters for the agent loop: **no test run ever touches `data/easymcf.db`, and no iteration inherits state from the previous one** — an agent can run the loop fifty times without a human resetting anything.
+**ARCH-TEST-01** **State isolation: a fresh temp-file SQLite database per test session, seeded from `seed/*.sql`, deleted on teardown.** A `conftest.py` session fixture creates the file under pytest's `tmp_path_factory`, applies `schema.sql` + seed, and exports `DB_PATH` to it. Function-scoped tests that mutate data wrap in a transaction rolled back at teardown, or request a function-scoped fresh copy where a rollback is impractical. Temp *file*, rather than `:memory:`. An in-memory database is per-connection, which breaks the moment the app opens a second connection, and it does: a background run thread (ARCH-RUN-02/STO-07). It also diverges from the WAL/file semantics being tested. At `010`'s data volumes the file costs milliseconds. The consequence that matters for the loop: **no test run ever touches `data/easymcf.db`, and no iteration inherits state from the previous one** — the loop can run fifty times without a human resetting anything.
 
 **ARCH-TEST-02** **Tooling: pytest for all four tiers**, with markers `backend`, `frontend`, `e2e`, `live` and `pytest.ini` carrying `addopts = -m "not live" --timeout=60 -q`.
 
@@ -397,11 +404,11 @@ The tradeoff is stated plainly: a JS unit tier would give faster isolated feedba
 
 ### Tier 3 — live MCF and Google sign-in (REQ-DEV-05, REQ-DEV-06)
 
-**ARCH-TEST-06** Explicitly **outside the autonomous loop, by design.** Running it requires three independent conditions, none of which occurs by default: the `live` marker is deselected by `pytest.ini` and must be re-selected (`pytest -m live --run-live`), `MCF_MODE=live` must be set (ARCH-RUN-08 defaults it to `fixture`), and a valid `.secrets/mcf_session.json` must exist (ARCH-BOT-03) — which only a human can produce, since login/MFA is manual and out of scope. An agent cannot satisfy the third condition at all, which is the point: this is the **project instructions**' boundary against unattended live-site access made structural rather than advisory. **No agent may run this tier on its own initiative, and no automated loop invokes it.** The Google sign-in live case (REQ-DEV-06) belongs to the same tier under the same rule. It needs `GCP_OAUTH_CLIENT_ID`, the client secret file, and `GCP_OAUTH_TEST_EMAIL`, plus a Google consent that only the account's owner can give, so an agent cannot satisfy it either.
+**ARCH-TEST-06** Explicitly **outside the autonomous loop, by design.** Running it requires conditions that do not occur by default. The `live` marker is deselected by `pytest.ini` and must be re-selected with `pytest -m live --run-live`, and the tests set `MCF_MODE=live` for themselves. The apply tests also need a valid per-user session file, `.secrets/mcf_session_<user_id>.json` (ARCH-BOT-03), which only a human can produce through Workflow 8's Singpass approval. **No agent may run this tier on its own initiative, and no automated loop invokes it.** Google sign-in has no test in this tier. A person confirms it by signing in with Google against the real provider, which needs `GCP_OAUTH_CLIENT_ID`, the client secret file, and a consent that only the account's owner can give.
 
-Content is the local successor to `jobsearch`'s `recommission.py`: a short sequential smoke protocol (browser loads → search page loads → cards found and parsed → detail page parsed → apply page selectors resolve) whose purpose is detecting MCF markup drift and refreshing the tier-2 fixture corpus when it is found. Apply-submission steps are excluded by default — they mutate real MCF-side application state — and gated behind a further explicit flag when genuinely needed.
+The tier holds `tests/live/test_search_live.py`, one page-1 search for a seeded track that must find and promote a lead, and `tests/live/test_apply_live.py`, three steps against one posting the person names in `APPLY_LIVE_URL`: a probe that reads the banner and the Apply button, a deeper probe that reads the resume cards and stops before Next, and a submit step that needs `APPLY_LIVE_SUBMIT=1` and `APPLY_LIVE_CV`, submits one real application, and records its outcome code.
 
-### The agent's build → test → debug loop
+### The build → test → debug loop
 
 **ARCH-TEST-07** What to run after each kind of change, and where the signal comes from:
 

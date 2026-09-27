@@ -23,6 +23,8 @@
   - [`application`](#application)
   - [`run_log`](#run_log)
   - [`mcf_session`](#mcf_session)
+  - [`mcf_attempt`](#mcf_attempt)
+  - [`meta`](#meta)
 - [Design notes](#design-notes)
   - [Schema versions](#schema-versions)
 
@@ -46,6 +48,7 @@ erDiagram
     USER ||--o{ LEAD : "owns"
     USER ||--o{ RUN_LOG : "runs for"
     USER ||--|| MCF_SESSION : "owns"
+    USER ||--o{ MCF_ATTEMPT : "connects through"
     ROLE ||--o{ TRACK : "generic role"
     TRACK ||--|| SEARCH_PROFILE : "one profile"
     TRACK ||--|| SEARCH_SCHEDULE : "one schedule"
@@ -66,7 +69,7 @@ erDiagram
     RUN_LOG ||--o{ RUN_LOG : "search / apply"
 ```
 
-`MCF_SESSION`, the MCF credential store, has no FK relationship to domain data beyond its owner. It is one row per user that the apply run checks (Workflow 8). `AUTH_SESSION` is the sign-in session store and is unrelated to `MCF_SESSION`.
+`MCF_SESSION`, the MCF credential store, has no FK relationship to domain data beyond its owner. It is one row per user that the apply run checks (Workflow 8). `MCF_ATTEMPT` records each MCF connection attempt that establishes it. `AUTH_SESSION` is the sign-in session store and is unrelated to `MCF_SESSION`.
 
 ## Entities
 
@@ -208,7 +211,7 @@ Exactly one row per `post_track` pairing, each scored independently (REQ-SRCH-09
 | `post_id`      | PK part, FK → `post_track.post_id`     |
 | `track_id`     | PK part, FK → `post_track.track_id`    |
 | `match_score`  | 0–1, REQ-SRCH-09                       |
-| `score_method` | e.g. `title_keyword_v1` — REQ-SRCH-09  |
+| `score_method` | `search_match_v1` \| `manual_v1` — REQ-SRCH-09  |
 
 `score_method` is recorded alongside the score so a future NLP-based method can be added later without a schema change (REQ-SRCH-09).
 
@@ -225,7 +228,7 @@ One user's personal, trackable instance of a post for one track (glossary, REQ-C
 | `cv_id`               | FK → `cv`, nullable per-lead override of `track.default_cv_id`, REQ-APPLY-02         |
 | `status`              | `OPEN` \| `CLOSED`, REQ-CRM-02                                                       |
 | `stage`               | enum, see Workflow 5 stage diagram                                                   |
-| `close_reason`        | enum, set when `status = CLOSED` — see Workflow 5                                    |
+| `close_reason`        | set when `status = CLOSED`, Workflow 5, one of the values below                      |
 | `position_title`      | copied from the post at creation, user-editable, REQ-CRM-03/04                       |
 | `company_name`        | copied from the post at creation, user-editable, REQ-CRM-03/04                       |
 | `url_ref`             | nullable, copied from the post at creation, user-editable, `http` or `https`         |
@@ -238,6 +241,8 @@ One user's personal, trackable instance of a post for one track (glossary, REQ-C
 | `updated_at`          | refreshed by each `lead_event` written for the lead, drives auto-expiry (REQ-CRM-05) |
 
 Uniqueness: `(user_id, post_id)`. A post can be promoted into at most one lead per user, and two users can each hold a lead on the same post. Once a user has promoted a post, it is excluded from that user's further promotion under any track (Workflow 4). A trigger rejects a lead whose `user_id` differs from the owner of its `track_id`, so the ownership shortcut on the lead cannot drift from the track. The four display fields `position_title`, `company_name`, `url_ref`, and `deadline` are the only values the Leads screens show, and the post row is never read for display after promotion. A later change to the post, such as a detail pass filling its `closing_date`, never rewrites a lead. The CV an apply run uses for a lead is its effective CV, `COALESCE(lead.cv_id, track.default_cv_id)`. The override lives on the lead because the user sets it before an attempt exists, and `application` rows are append-only attempt records the apply service writes. Free-text notes are not a field on this row. They live in `lead_note` below, so a lead can carry a history of multiple notes rather than one that overwrites the last.
+
+`close_reason` is one of `offer_accepted`, `rejected`, `withdrawn`, `expired`, `cancelled`, `duplicate`, `apply_failed`, `dropped`, or `track_not_matched`.
 
 ### `lead_note`
 
@@ -305,10 +310,12 @@ An automated apply attempt against a lead (glossary, REQ-APPLY-01..09). One-to-m
 | `id`           | PK                                                       |
 | `lead_id`      | FK → `lead`                                              |
 | `cv_id`        | FK → `cv`, nullable, the effective CV this attempt used  |
-| `status`       | enum, see REQ-APPLY-04 / Workflow 6 for full vocabulary  |
+| `status`       | apply outcome, REQ-APPLY-04, one of the values below     |
 | `error_detail` | nullable free text, REQ-PLAT-03                          |
 | `attempted_at` | timestamp of this attempt                                |
 | `run_id`       | FK → `run_log` — which apply run this attempt belongs to |
+
+`status` is one of `applied`, `questionnaire_required`, `cv_selector_error`, `unable_to_apply`, `post_unavailable`, `cv_not_found`, `post_closed`, or `invalid_input`. Workflow 7 maps each outcome to its effect on the lead.
 
 ### `run_log`
 
@@ -345,13 +352,37 @@ One row per user tracking browser state established through Workflow 8 and consu
 | `confirmed_account_email` | nullable MCF account identity confirmed by the user      |
 | `confirmed_at`            | nullable ISO-8601 timestamp of identity confirmation     |
 
+### `mcf_attempt`
+
+One row per MCF connection attempt, Workflow 8. An attempt runs MCF's Singpass login in an EasyMCF-owned browser, shows the user the QR, reads the MCF account's email after approval, and asks the user to confirm it. The confirmed outcome is written to `mcf_session`. The QR value and an unconfirmed email live in memory only.
+
+| field           | notes                                                          |
+| --------------- | -------------------------------------------------------------- |
+| `id`            | PK                                                             |
+| `user_id`       | FK → `user`, the owner                                         |
+| `status`        | attempt state, one of the values below                         |
+| `account_email` | nullable MCF account email read after approval                 |
+| `error_code`    | nullable failure code, such as `account_mismatch`              |
+| `created_at`    | ISO-8601 timestamp the attempt started                         |
+| `updated_at`    | ISO-8601 timestamp of the last state change                    |
+
+`status` is one of `starting`, `awaiting_approval`, `verifying`, `account_confirmation_required`, `connected`, `expired`, `cancelled`, `failed`, `interaction_required`, or `reauthentication_required`. The first four are active states, and a user has at most one active attempt.
+
+### `meta`
+
+One row holding the schema version the database was created with, compared with `SCHEMA_VERSION` in `easymcf/__init__.py` at startup.
+
+| field            | notes                                              |
+| ---------------- | -------------------------------------------------- |
+| `schema_version` | integer, currently `11`, see Schema versions below |
+
 ## Design notes
 
 - `cv` is its own small catalog table rather than a free-text field on `track`/`application`, so the UI can offer a dropdown of known CVs rather than free text.
 - `run_log` unifies search and apply run logging into one table (`run_type` discriminator) rather than two, since both need the same start/end/outcome/error shape (REQ-PLAT-03).
 - `track.is_active` follows the same soft-delete shape as `post.is_open` — a bool flip rather than a row deletion, so archived tracks keep every dependent row (`post_track`, `lead`, `application`) intact.
 - `lead_event` makes lead activity an append-only log rather than a single mutable `updated_at` column, mirroring why `application` is one-to-many from `lead` rather than a single overwritten row (REQ-APPLY-08). Both exist so retry/activity history survives rather than being clobbered by the next update.
-- ownership is a `user_id` column on `track`, `cv`, `lead`, `run_log`, and `mcf_session`. Every other table reaches its owner through one of those, `search_profile`, `search_schedule`, `post_track`, and `match_score` through the track, and `lead_note`, `lead_event`, `offer`, and `application` through the lead. `lead` carries its own `user_id` so the one-lead-per-user-per-post rule is a plain unique constraint. The `post` table has no owner, and `role` is a shared catalog.
+- ownership is a `user_id` column on `track`, `cv`, `lead`, `run_log`, `mcf_session`, and `mcf_attempt`. Every other table reaches its owner through one of those, `search_profile`, `search_schedule`, `post_track`, and `match_score` through the track, and `lead_note`, `lead_event`, `offer`, and `application` through the lead. `lead` carries its own `user_id` so the one-lead-per-user-per-post rule is a plain unique constraint. The `post` table has no owner, and `role` is a shared catalog.
 - `lead` holds copies of the post's display fields rather than reading them through a join, so a user edits the lead and the shared post stays read-only. The copy happens once at creation.
 - `auth_session` stores a token digest rather than the token, and `mcf_session` is a separate table because the two sessions serve unrelated purposes.
 - `match_score` is split out of `post_track` as its own 1:1 extension, the same shape `search_profile` already uses against `track`. This keeps the association and the scoring result independently replaceable, so a rescoring pass can update `match_score`/`score_method` without touching `post_track`'s `search_match` provenance flag.
@@ -376,4 +407,4 @@ One row per user tracking browser state established through Workflow 8 and consu
 | 10 | 10      | 11        | adds `lead.cv_id`, the per-lead CV override                                   |
 | 11 | 11      | 11        | adds `cv.is_active`, retiring a label history still uses (11.IS.19)           |
 
-Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, version 8 is specified for feature 17, version 9 is specified for milestone 10 to implement, and version 10 is specified and implemented by task 11.10 of feature 11. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. Version 8 adds the Google connect-attempt table and the two account-confirmation columns `mcf_session` gained for that flow. Version 10 moves the CV override from `application` to `lead`, since an override must exist before the lead's first attempt. Version 11 lets a CV label leave every picker while `application.cv_id` keeps naming the CV each attempt used. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).
+Versions 4 and 5 are implemented by milestone 09, version 6 is specified by task 09.13 of milestone 09, version 7 is specified for feature 13, version 8 is specified for feature 17, version 9 is specified for milestone 10 to implement, and version 10 is specified and implemented by task 11.10 of feature 11. Version 7 renames `session` to `mcf_session`, replaces `lead.title_override` and `lead.company_override` with `lead.position_title`, `lead.company_name`, and `lead.url_ref`, changes the `lead` uniqueness to `(user_id, post_id)`, replaces `cv.label`'s global uniqueness with uniqueness per user, and adds `run_log.user_id`. Version 8 adds the MCF connection-attempt table, `mcf_attempt`, and the two account-confirmation columns `mcf_session` gained for that flow. Version 10 moves the CV override from `application` to `lead`, since an override must exist before the lead's first attempt. Version 11 lets a CV label leave every picker while `application.cv_id` keeps naming the CV each attempt used. The remedy for a version mismatch is always `scripts/resetdb.py --seed` (`ARCH-STO-03`).

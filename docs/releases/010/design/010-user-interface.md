@@ -53,7 +53,7 @@ This makes the page count line up with the nav count. Every nav destination is e
 
 ## Navigation structure
 
-A persistent left sidebar, or a top nav as an implementation detail, with six destinations, plus an always-visible session-status indicator and the signed-in user section. A signed-out visitor sees neither the destinations nor the user section, only the Sign in or Sign up page:
+A persistent left sidebar, or a top nav as an implementation detail, with six destinations, plus the MCF nav icon and the signed-in user section. A signed-out visitor sees neither the destinations nor the user section, only the Sign in or Sign up page:
 
 1. **Tracks**: Workflow 1
 2. **Posts**: Workflows 2, 3, 4
@@ -64,7 +64,7 @@ A persistent left sidebar, or a top nav as an implementation detail, with six de
 
 **User section**, top-right on every signed-in page, REQ-AUTH-08: a circle icon showing the user's photo, or their initials when no photo exists, that opens a small menu with the user's name and email, `Upload photo`, `Remove photo` when a photo exists, and `Log out`. Uploading opens the file picker for a JPEG, PNG, or WebP image and refuses a file over 2 MB before sending it. `Log out` returns the user to Sign in.
 
-**Session status badge**, top-right, always visible, and not a nav destination: shows `valid`, `expired`, or `missing` for the MCF session, Workflow 8, and is clickable to open the session panel from anywhere. This is deliberately not buried behind the Automation nav item. An expired session is the single most common reason an apply run will abort, REQ-APPLY-06, so REQ-FE-02's principle of surfacing failures rather than burying them argues for it being always on screen regardless of where the user is. Clicking it opens the same session panel described under Automation below. That section explains why it's one component reached two ways rather than two separate implementations.
+**MCF nav icon**, beside the user section on every signed-in page, and not a nav destination: the MCF magnifying-glass mark with a red, amber, or green status dot for the MCF session, Workflow 8. Clicking it opens the MCF connection pop-up from any page, described below. It stays on screen because an expired session is the most common reason an apply run aborts, REQ-APPLY-06, and REQ-FE-02 surfaces failures where the user is.
 
 ## Cross-cutting UX patterns
 

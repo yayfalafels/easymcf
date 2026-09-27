@@ -43,7 +43,6 @@ Decisions carry an `FE-*` id grouped `APP`/`RTE`/`SVC`/`RUN`/`ERR`/`SCR`/`TEST`,
 - **architecture doc**: [architecture.md](architecture.md) — `ARCH-RUN-06` fixes no node/npm, vendored `angular.min.js`, no build step. `ARCH-RUN-09` fixes that Flask serves `frontend/` at `/`, with `index.html` returned for unmatched non-`/api` paths. This is what makes HTML5-mode routing possible without a rewrite proxy. `ARCH-RUN-10` fixes the `/api/v1` prefix. `ARCH-TEST-05`/`ARCH-TEST-09` fix the two Playwright tiers this document's `data-testid` convention exists to support.
 - **workflows doc**: [workflows.md](workflows.md) — workflow numbers cited per screen below, for the process logic each controller drives.
 - **data model**: [data-model.md](data-model.md) — the entity/field definitions, `lead_event` included, that the API-client service and per-screen data reads are checked against.
-- **frontend skill**: `.claude/skills/easymcf-frontend/SKILL.md` — the AngularJS framework commitment, which is not a migration target for `010`, and the screen list this elaborates.
 - **AngularJS style guide**: [github.com/mgechev/angularjs-style-guide](https://github.com/mgechev/angularjs-style-guide) — the one-component-per-file convention `FE-APP-03` commits to, per the **frontend skill**'s framework reference.
 
 ## 1. App structure and module layout
@@ -59,7 +58,7 @@ frontend/
   app/
     app.module.js          # angular.module('easymcfApp', ['ngRoute']) — the one module (FE-APP-02)
     app.routes.js           # $routeProvider table (FE-RTE-01)
-    app.config.js            # constants: API base path, poll interval, poll timeout
+    app.css                  # the app's one stylesheet
     core/
       api-client.service.js  # FE-SVC-01/02/03
       run-poller.service.js   # FE-RUN-01/02/03
@@ -69,6 +68,7 @@ frontend/
       error.service.js         # FE-ERR-01
       confirm-dialog.service.js # FE-ERR-03
       offer-dialog.service.js   # OfferDialog, the offer form modal (page 9, Lead Detail)
+      manual-post-dialog.service.js # ManualPostDialog, the manual post and lead form (page 4)
     shared/
       nav-bar/                # sidebar + MCF icon + user section, FE-SCR row "shell"
       mcf-nav-icon/           # status indicator and connection pop-up toggle
@@ -77,7 +77,7 @@ frontend/
       user-menu/               # <user-menu> photo circle, upload, remove, log out (FE-AUTH-04)
       confirm-modal/           # <confirm-modal> directive backing confirm-dialog.service.js
       offer-modal/             # <offer-modal> directive backing offer-dialog.service.js
-      empty-state/              # <empty-state> directive (010-user-interface's empty-state pattern)
+      manual-post-modal/       # <manual-post-modal> directive backing manual-post-dialog.service.js
     auth/                # screens 10–11 — auth.controller.js, signin.html, signup.html (FE-AUTH-05)
     tracks/           # screen 1 — tracks.controller.js, tracks.html, and screen 1b's search-profile.controller.js,
                        # search-profile.html, its own route reached from Tracks (FE-RTE-02), colocated here rather
@@ -89,6 +89,7 @@ frontend/
     leads/                # screens 5–6 — leads.controller.js, leads.html, lead-detail.controller.js, lead-detail.html
     offers/                # screen 9 — offers.controller.js, offers.html
     applications/          # screen 7 — applications.controller.js, applications.html
+    automation/            # screen 8 — automation.controller.js, automation.html
 ```
 
 **FE-APP-02** **One Angular module, `easymcfApp`, no per-feature submodules.** AngularJS submodules exist to let independent teams or independently-loaded bundles compose. `010` has one developer, one `<script>` load order, and no lazy loading, since there is no build step to split on, per `ARCH-RUN-06`. Splitting into eight feature modules would add eight registration points and eight places to get DI wiring wrong for zero runtime benefit at this scale. Folder-per-screen (above) gets the organizational benefit without the module-boundary ceremony.
@@ -112,7 +113,7 @@ frontend/
 | `/signup`                 | `AuthCtrl`           | `auth/signup.html`               | — (public)      |
 | (unmatched)               | redirect to `/leads` | —                                | —               |
 
-**FE-RTE-02** **Manual Post Entry, Lead Detail, and the offer dialog are not routes; Search Profiles and CVs are.** The **user-interface doc** calls Search Profiles and CVs "reached from a page" rather than standalone nav destinations, but each turned out to need its own bookmarkable URL and its own full-page form once built, so each is a real route above (`/tracks/:trackId/search`, `/cvs`), reached by `$location.path()` from its parent row action rather than an `ng-if`-gated overlay, and dismissed by navigating back. Manual Post Entry, Lead Detail, and the offer dialog have no parent list of their own underneath them, so each stays a dialog: `PostsCtrl` opens `ManualPostEntryCtrl` in an `ng-if`-gated modal, and `LeadsCtrl` opens `LeadDetailCtrl` the same way, per `FE-RTE-04`'s dialog-service pattern. `CvsCtrl` has two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
+**FE-RTE-02** **Manual Post Entry, Lead Detail, and the offer dialog are not routes; Search Profiles and CVs are.** The **user-interface doc** calls Search Profiles and CVs "reached from a page" rather than standalone nav destinations, but each turned out to need its own bookmarkable URL and its own full-page form once built, so each is a real route above (`/tracks/:trackId/search`, `/cvs`), reached by `$location.path()` from its parent row action rather than an `ng-if`-gated overlay, and dismissed by navigating back. Manual Post Entry, Lead Detail, and the offer dialog have no parent list of their own underneath them, so each stays a dialog: `PostsCtrl` opens the `<manual-post-modal>` directive through `ManualPostDialog`, and `LeadsCtrl` opens `LeadDetailCtrl` the same way, per `FE-RTE-04`'s dialog-service pattern. `CvsCtrl` has two call sites, opened from two different parents, Tracks and Applications, per the **user-interface doc**'s page 2 description. It is one controller/template pair, instantiated by whichever parent's "Manage CVs" control was clicked, per `FE-APP-03`'s one-component-per-file rule, still one file, two call sites.
 
 **FE-RTE-04** **A dialog that isn't a route is a shared state service plus a directive, not a controller.** `ManualPostDialog`/`OfferDialog`-shaped: a factory holds an `open()`/`save()`/`cancel()` API and a `state` object a directive's `link` function reads (`manual-post-modal`/`offer-modal`), rendered with `ng-if="dialog.open"`. The opening controller calls `open()` and gets a promise back, exactly the shape `ConfirmDialog` and `OfferDialog` already established. There is no separate `*Ctrl` for a dialog — the directive's own scope and the shared service are enough, and a second call site never needs a second instantiation path.
 

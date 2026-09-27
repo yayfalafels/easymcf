@@ -10,7 +10,7 @@
 - [2. Configuration surface](#2-configuration-surface) 
 - [3. Reusable, re-runnable scripts](#3-reusable-re-runnable-scripts) 
 - [4. Running the app interactively](#4-running-the-app-interactively)
-- [5. The agent's closed install → build → run → test → debug loop, per component](#5-the-agents-closed-install--build--run--test--debug-loop-per-component) 
+- [5. The closed install → build → run → test → debug loop, per component](#5-the-closed-install--build--run--test--debug-loop-per-component) 
 - [6. Troubleshooting signatures](#6-troubleshooting-signatures) 
 
 
@@ -23,7 +23,7 @@ This document is the concrete runbook that implements the **architecture doc** a
 03. the CLI contract of every reusable helper script.
 04. the closed install → build → run → test → debug sequence for each project component: data model, backend API, automation, and frontend.
 
-It is written so a Claude Code agent can execute it unattended, read the failure signal, fix the code, and re-run without a human in the loop.
+It is written so every step can run unattended, read the failure signal, fix the code, and re-run without a human in the loop.
 
 It elaborates architecture and test-strategy the same way the **api doc** elaborates `ARCH-RUN-10` and the **frontend-app doc** elaborates `ARCH-TEST-05/09`. It does not re-decide anything either document already fixed. It only makes those decisions operable.
 
@@ -46,14 +46,12 @@ Every alias below is used bolded, unlinked, throughout the rest of this document
 - **api doc** — [api.md](api.md) — `API-EP-07 GET /api/v1/health`, the readiness probe section 4 polls.
 - **frontend-app doc** — [frontend-app.md](frontend-app.md) — the sibling design doc, elaborated under the same milestone-06 grouping this document belongs to.
 - `CLAUDE.md` — the two-venv hard rule, `.dev/dev-env` and `env`, both nested inside the repo at the repo root, that this document's install section maps onto `ARCH-RUN-05`. Kept unaliased below since it is already short and never linked, being a root-level file with no relative path to carry.
-- **infra-navigation skill** — local-infra-navigation — scaffold skill this document is written to fill in. Once milestone 07 is implemented, its content should be copied forward from here rather than re-derived.
-- **deploy-cycle skill** — deploy-and-validation-cycle — same scaffold status as the infra-navigation skill. It is the golden-path checklist this document's automated loop, section 5, is meant to make redundant, tier by tier.
 - `python-envs/dev-env/pyproject.toml`, `python-envs/ops-env/pyproject.toml` — the manifests section 1 fixes the target dependency contents of. Kept unaliased since these are plain file paths, not linked docs.
 - **local-dev-env tracker** — 010.07-local-dev-env.md — the feature tracker whose `07.05` task breakdown produces the artifacts this document's bootstrap sequence assumes already exist.
 
 ## Guiding constraint
 
-This document follows the lowest-ceremony principle `ARCH-RUN`'s preamble states, with one addition specific to this document. Every step below must be expressible as a single non-interactive shell command with an exit code. This document exists so an agent runs it unattended. No step may require watching a terminal, clicking through a wizard, or interpreting colored output. Where a step is inherently human-gated, tier 3 live testing, `.secrets/mcf_session.json` upload, that gate is stated explicitly, not left implicit.
+This document follows the lowest-ceremony principle `ARCH-RUN`'s preamble states, with one addition specific to this document. Every step below must be expressible as a single non-interactive shell command with an exit code. This document exists so it runs unattended. No step may require watching a terminal, clicking through a wizard, or interpreting colored output. Where a step is inherently human-gated, tier 3 live testing, `.secrets/mcf_session.json` upload, that gate is stated explicitly, not left implicit.
 
 ## 1. Runtimes, SDKs, and the two-venv model
 
@@ -77,7 +75,7 @@ This document follows the lowest-ceremony principle `ARCH-RUN`'s preamble states
 | 12 | authlib         | add    | `ARCH-AUTH-01` — Google OpenID Connect authorization code flow      |
 | 13 | pillow          | add    | `ARCH-AUTH-07` — profile photo validation and re-encoding           |
 
-Applying this table is a `python-envs/ops-env/pyproject.toml` edit plus the sync command below. It is implementation work for milestone 07. `python-envs/dev-env/pyproject.toml` needs no change: `pytest`, `ipython`, `faker`, and `requests` already match what throwaway diagnostic/mock-data work needs.
+The table is `python-envs/ops-env/pyproject.toml`, applied with the sync command below. `python-envs/dev-env/pyproject.toml` holds `pytest`, `ipython`, `faker`, `requests`, and `pyflakes` for throwaway diagnostic and mock-data work, and `mkdocs==1.6.*`, `mkdocs-material==9.7.*`, and `pymdown-extensions==10.*` for the documentation site, per `ENV-SCRIPT-10`.
 
 **ENV-SETUP-03 Sync command.** After editing either manifest, re-sync the corresponding venv, per the **infra-navigation skill**'s pattern. Never `pip install` a package without recording it in the manifest first:
 
@@ -174,10 +172,10 @@ The env variables toggled routinely during development:
 
 The human-operated restart helper is the one exception to ordinary dotenv precedence: `scripts/restart.sh` parses `MCF_MODE` directly from `.env`, validates that it is `fixture` or `live`, exports that exact value, and reports it before startup. This prevents an inherited shell value from silently selecting a different browser implementation. Automated tests continue to set `MCF_MODE=fixture` inline and do not use the restart helper.
 
-**ENV-CFG-03 Making `.env` actually do something, and what's tracked about it.** `ENV-CFG-02` says a personal `.env` *may* hold overrides. That's necessary but not sufficient. `python-dotenv` being an installed dependency (`ENV-SETUP-02` row 10) does not by itself make anything read `.env`, and nothing in this codebase calls it yet. Two things fix that.
+**ENV-CFG-03 Making `.env` actually do something, and what's tracked about it.** `ENV-CFG-02` says a personal `.env` *may* hold overrides. Two things make it take effect.
 
-01. **Loading.** `easymcf/__main__.py` calls `dotenv.load_dotenv()` as its first statement, before `Config()` is instantiated. `load_dotenv()` populates `os.environ`, and `Config`'s `default_factory` fields (`ARCH-RUN-07`) already re-read `os.environ` on every call, so no change to `config.py` itself is needed, only the one call before the app starts. Every `scripts/*.py` CLI entry point (`ENV-SCRIPT-01..05`) that reads a config-relevant env var does the same at its own top. A script run directly never goes through `__main__.py`'s load, so it needs its own. Test entry points (`tests/conftest.py`, `pytest` itself) deliberately do **not** call `load_dotenv()`. `ARCH-TEST-01`'s state isolation already sets `DB_PATH`, and any other test-relevant var, explicitly per session. Loading a developer's personal `.env` into a test run would let a machine-local override silently change test behavior, exactly what that isolation exists to prevent.
-02. **The template.** A git-tracked `.env.example` at the repo root, `.env` itself stays gitignored per `ENV-CFG-02`, is the only reviewable record of what's actually available to override, since nobody can `git show` another developer's `.env`. One line per `ARCH-RUN-07` variable, set to its own default and annotated with its purpose. Copying the file verbatim to `.env` is a no-op for every default line, so a developer edits only the lines whose value they actually want to change, and can delete the rest. The Google lines hold placeholders that the developer replaces to enable Google sign-in:
+01. **Loading.** `easymcf/__main__.py` calls `dotenv.load_dotenv()` before any other import of the app, before `Config()` is instantiated. `load_dotenv()` populates `os.environ`, and `Config`'s `default_factory` fields (`ARCH-RUN-07`) already re-read `os.environ` on every call, so no change to `config.py` itself is needed, only the one call before the app starts. Every `scripts/*.py` CLI entry point (`ENV-SCRIPT-01..05`) that reads a config-relevant env var does the same at its own top. A script run directly never goes through `__main__.py`'s load, so it needs its own. Test entry points (`tests/conftest.py`, `pytest` itself) deliberately do **not** call `load_dotenv()`. `ARCH-TEST-01`'s state isolation already sets `DB_PATH`, and any other test-relevant var, explicitly per session. Loading a developer's personal `.env` into a test run would let a machine-local override silently change test behavior, exactly what that isolation exists to prevent.
+02. **The template.** A git-tracked `.env.example` at the repo root, `.env` itself stays gitignored per `ENV-CFG-02`, is the only reviewable record of what's actually available to override, since nobody can `git show` another developer's `.env`. One line per `ARCH-RUN-07` variable, set to its own default and annotated with its purpose. Copying the file verbatim to `.env` is a no-op for every default line, so a developer edits only the lines whose value they actually want to change, and can delete the rest. The Google lines and the seeded identity lines hold `%%` placeholders. A developer replaces the Google ones to enable Google sign-in, and the identity ones to seed their own name and email, per `ENV-SCRIPT-06`:
 
 ```bash
 # .env.example — copy to .env, then edit only the values you want to override.
@@ -185,18 +183,24 @@ The human-operated restart helper is the one exception to ordinary dotenv preced
 # Nothing here is required — every line already matches the default ARCH-RUN-07 fixes.
 
 DB_PATH=data/easymcf.db   # SQLite file; point at a scratch path for a one-off run, never prod
-PORT=5000                 # HTTP port; change only if 5000 is already bound 
-SECRETS_DIR=.secrets      # where the MCF session file lives 
+PORT=5000                 # HTTP port; change only if 5000 is already bound
+SECRETS_DIR=.secrets      # where the MCF session file lives
 MCF_MODE=fixture          # fixture | live — never set live except on explicit, human-confirmed ask
 HEADLESS=1                # 0 only for a human visually debugging a selector
-APPLY_POLL_RETRIES=5      # apply-button poll attempts before unable_to_apply 
-APPLY_POLL_DELAY_S=5      # seconds between apply-button poll attempts 
-APPLY_LIVE_SUBMIT=0       # 1 lets MCF_MODE=live submit real applications; a deliberate human choice (11.IS.14)
+APPLY_POLL_RETRIES=5      # apply-button poll attempts before unable_to_apply
+APPLY_POLL_DELAY_S=5      # seconds between apply-button poll attempts
+APPLY_LIVE_SUBMIT=1       # 1 lets MCF_MODE=live submit real applications; a deliberate human choice (11.IS.14)
 
-GOOGLE_REDIRECT_URI=http://127.0.0.1:5000/api/v1/auth/google/callback   # must equal the OAuth client's registered URI
-GCP_OAUTH_CLIENT_ID=%%GCP_OAUTH_CLIENT_ID%%       # Google OAuth client id, not secret
-GCP_OAUTH_TEST_EMAIL=%%test_user%%@gmail.com      # test account for the live sign-in tier only
-# The client secret is never an environment variable. It lives in .secrets/gcp_oauth_client_secret (ARCH-AUTH-06).
+GOOGLE_REDIRECT_URI=http://127.0.0.1:5000/api/v1/auth/google/callback
+GCP_OAUTH_CLIENT_ID=%%GCP_OAUTH_CLIENT_ID%%
+# The Google client secret is never an environment variable. It lives in .secrets/gcp_oauth_client_secret (mode 0600).
+GCP_OAUTH_TEST_EMAIL=%%test_user%%@gmail.com
+
+# Initial user seeded by scripts/resetdb.py --seed. Unset or %% values seed the public demo identity.
+INITIAL_USER_NAME=%%INITIAL_USER_NAME%%
+INITIAL_USER_EMAIL=%%INITIAL_USER_EMAIL%%
+
+# FIXED_NOW=2026-09-15T07:00:00   # pins clock.now() for a spawned process; tests use clock.set_fixed()
 ```
 
 ## 3. Reusable, re-runnable scripts
@@ -205,7 +209,7 @@ These are the "helpers" the **test-strategy doc** names but doesn't fully specif
 
 **ENV-SCRIPT-01 `scripts/initdb.py`** — idempotent schema application. `python scripts/initdb.py [--db-path PATH]` applies `easymcf/db/schema.sql` to `DB_PATH`, or `--db-path`, creating the file if absent. This is the primitive `conftest.py`'s per-session fixture (`ARCH-TEST-01`) and `resetdb.py` both call. It never deletes an existing file itself.
 
-**ENV-SCRIPT-02 `scripts/resetdb.py`** — the destructive human/agent-facing reset (`ARCH-STO-06`). `python scripts/resetdb.py [--seed]` deletes the file at `DB_PATH` if present, calls `initdb.py`'s apply-schema routine, then applies `seed/*.sql` if `--seed` is passed. This is the single command that recovers from a `schema_version` mismatch (`ARCH-STO-03`) or a corrupted dev scratch db. Never hand-edit `data/easymcf.db`.
+**ENV-SCRIPT-02 `scripts/resetdb.py`** — the destructive human/agent-facing reset (`ARCH-STO-06`). `python scripts/resetdb.py [--seed]` deletes the file at `DB_PATH` if present, calls `initdb.py`'s apply-schema routine, then applies `seed/*.sql` if `--seed` is passed, with user 1's identity rendered from `.env` by `ENV-SCRIPT-06`. This is the single command that recovers from a `schema_version` mismatch (`ARCH-STO-03`) or a corrupted dev scratch db. Never hand-edit `data/easymcf.db`.
 
 **ENV-SCRIPT-02a `scripts/restart.sh`** — the human-operated kill and restart helper. It reads `MCF_MODE` from `.env`, resolves the configured port, and refuses to kill a listener unless `/proc` identifies this repo's `python -m easymcf` process. `scripts/restart.sh` preserves the database. `scripts/restart.sh --reset-seed` runs ENV-SCRIPT-02 before starting. Both launch through `env/bin/python` and remain attached to the terminal.
 
@@ -218,7 +222,19 @@ These are the "helpers" the **test-strategy doc** names but doesn't fully specif
 
 Mode 02 is a diagnostic convenience, never part of the automated tier-1 loop. `pytest -m backend` against the test client is.
 
-**ENV-SCRIPT-05 `scripts/envcheck.py`** — this is a proposed new helper, flagged for `testing-validation`/architect confirmation the same way `STRAT-SILO-07` was, not yet in `ARCH-TEST` or the **test-strategy doc**. It is a single preflight command an agent runs **before** any loop iteration in section 5, so an environment defect, wrong venv active, browser binary missing, stale schema, port already bound, is never misdiagnosed as a code bug three layers up. `python scripts/envcheck.py` checks, in order: Python version is at least 3.11 and `sys.prefix` resolves to `env`, catching a stray system-Python invocation; `~/.cache/ms-playwright` contains a Chromium build; `frontend/vendor/angular.min.js` and `angular-route.min.js` both exist per `ENV-SETUP-05`, catching a fresh clone with the vendor commit missing before it surfaces three layers up as a blank-page Playwright failure; `DB_PATH`, or the default, is either absent or has a `meta.schema_version` matching `schema.sql`'s current value; `PORT` (default `5000`) is free; `MCF_MODE` is unset or `fixture`, never silently `live`. It exits `0` with `all checks passed` on success. On failure, it prints one line per failed check naming the check and the fix, for example `[FAIL] playwright chromium missing — run: python -m playwright install chromium`, and exits `1`. This turns the "installation, sdks, runtime, helpers" concern into one runnable diagnostic instead of a document a human re-reads.
+**ENV-SCRIPT-05 `scripts/envcheck.py`** — a single preflight command an agent runs **before** any loop iteration in section 5, so an environment defect, wrong venv active, browser binary missing, stale schema, port already bound, is never misdiagnosed as a code bug three layers up. `python scripts/envcheck.py` checks, in order: Python version is at least 3.11 and `sys.prefix` resolves to `env`, catching a stray system-Python invocation; `~/.cache/ms-playwright` contains a Chromium build; `frontend/vendor/angular.min.js` and `angular-route.min.js` both exist per `ENV-SETUP-05`, catching a fresh clone with the vendor commit missing before it surfaces three layers up as a blank-page Playwright failure; `DB_PATH`, or the default, is either absent or has a `meta.schema_version` matching `schema.sql`'s current value; `PORT` (default `5000`) is free; `MCF_MODE` is unset or `fixture`, never silently `live`. It exits `0` with `all checks passed` on success. On failure, it prints one line per failed check naming the check and the fix, for example `[FAIL] playwright chromium missing — run: python -m playwright install chromium`, and exits `1`. This turns the "installation, sdks, runtime, helpers" concern into one runnable diagnostic instead of a document a human re-reads.
+
+**ENV-SCRIPT-06 `scripts/render_seed.py`** — fills user 1's name and email into the seed. The tracked `seed/*.sql` holds them as `{{INITIAL_USER_NAME}}` and `{{INITIAL_USER_EMAIL}}`, so no real identity is committed. `resetdb.py --seed` renders them from `INITIAL_USER_NAME` and `INITIAL_USER_EMAIL` in `.env`, and falls back to `Demo User` and `demo.user@example.test` when they are unset. The test suite always seeds the public defaults. `python scripts/render_seed.py --out <dir>` writes the rendered files for inspection and prints the identity source, never the values.
+
+**ENV-SCRIPT-07 `scripts/gen_test_data.py`** — regenerates `seed/*.sql` from its rules, with a thin wrapper `scripts/gen_test_data.sh`. `python scripts/gen_test_data.py --mode seed --out seed/ --rand-seed 42 --anchor 2026-09-21` reproduces the committed seed byte for byte. Edit the generator, never the generated files.
+
+**ENV-SCRIPT-08 `scripts/ui_tester.py`** (`STRAT-SILO-07`) — replays `tests/frontend/checks/*.json` browser checks against a spawned app, the frontend counterpart of `ENV-SCRIPT-04`. Both testers log one JSON line per case to `.dev/logs/`.
+
+**ENV-SCRIPT-09 `scripts/check_no_secrets.py`** — fails when a secret, a seed password in the database, or the `.env` identity values appear where they must not. It prints the file name of each hit and never the value. Run it before every push.
+
+**ENV-SCRIPT-10 `scripts/build_docs.sh`** — builds the documentation site. It checks `docs/design/` is in sync with the release design docs, runs `mkdocs build --strict` through `.dev/dev-env`, and fails on any warning or link to an unpublished page. The Pages workflow runs the same script.
+
+**ENV-SCRIPT-11 `scripts/sync_design_docs.py`** — regenerates `docs/design/` from the current release's design docs, named in `extra.design_release` in `mkdocs.yml`. `--check` compares instead of writing. A design change is made in the release doc under `docs/releases/<release>/design/`, then synced.
 
 ## 4. Running the app interactively
 
@@ -234,7 +250,7 @@ kill %1                                               # stop it when done
 
 The two checks on the first two lines are deliberately independent, `ENV-SETUP-06`'s implementation decision. The `curl` proves the backend is alive. The browser page proves the frontend stack is alive. Neither one's result depends on the other's code path. Never run this against `MCF_MODE=live` unless the user has explicitly asked for a live check in that turn, per `ARCH-RUN-08`, `ARCH-TEST-06`, and `CLAUDE.md`'s boundary. The default `fixture` mode is always what an agent's own interactive check uses.
 
-## 5. The agent's closed install → build → run → test → debug loop, per component
+## 5. The closed install → build → run → test → debug loop, per component
 
 **ENV-LOOP-01 "Build" and "compile" in this stack.** Neither Python nor build-free AngularJS (`ARCH-RUN-05/06`) has a compile step. That is a deliberate design decision. This document does not need to fill a gap here. The nearest equivalent signal is a Python `ImportError`/`SyntaxError` surfacing at pytest **collection time**, before any test body runs. That failure is this stack's "compile error," and it is already what `pytest -m backend` reports first if it occurs. The loop below is therefore install → run → test → debug, with `scripts/envcheck.py` (`ENV-SCRIPT-05`) standing in for the "is the toolchain even installed correctly" check a compiled-language project would need separately.
 
